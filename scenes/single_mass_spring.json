@@ -4,7 +4,7 @@
   "description": "Block hanging from a ceiling spring. Pure vertical oscillation, omega0 = sqrt(k/m) = 10 rad/s.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },
-  "view": { "center": [0, 0.3], "width": 2.0 },
+  "view": { "center": [0, 0.35], "width": 2.4 },
   "bodies": [
     {
       "id": "m1",

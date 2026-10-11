@@ -4,7 +4,7 @@
   "description": "Two blocks connected in series by springs, hanging from the ceiling. Body-to-body spring test.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },
-  "view": { "center": [0, 0.2], "width": 2.5 },
+  "view": { "center": [0, 0.5], "width": 2.5 },
   "bodies": [
     {
       "id": "m1",

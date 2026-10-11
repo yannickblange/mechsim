@@ -4,7 +4,7 @@
   "description": "Slender block pinned at its top end (Festlager), released at 0.1 rad.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },
-  "view": { "center": [0, 0], "width": 2.0 },
+  "view": { "center": [0, -0.45], "width": 2.6 },
   "bodies": [
     {
       "id": "bar",
