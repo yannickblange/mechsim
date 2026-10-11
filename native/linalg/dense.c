@@ -1,25 +1,29 @@
-/* dense.c - matrix/vector helpers. TICKET A1 implements this file. */
+/*
+ * dense.c - dense matrix-vector products (row-major).
+ * Element (r, c) of a rows x cols matrix A is A[r * cols + c].
+ */
 #include "linalg.h"
 
 void la_matvec(const double* A, int rows, int cols, const double* x, double* y) {
-    /* y = A x: y[r] = sum_c A[r*cols + c] * x[c] */
-    for (int r = 0; r < rows; r++) {
-        double sum = 0.0;
-        const double* Ar = A + r * cols;
-        for (int c = 0; c < cols; c++) {
-            sum += Ar[c] * x[c];
+    for (int r = 0; r < rows; ++r) {
+        const double* row = A + (long)r * cols;
+        double acc = 0.0;
+        for (int c = 0; c < cols; ++c) {
+            acc += row[c] * x[c];
         }
-        y[r] = sum;
+        y[r] = acc;
     }
 }
 
 void la_matvec_t(const double* A, int rows, int cols, const double* x, double* y) {
-    /* y = A^T x: y[c] = sum_r A[r*cols + c] * x[r] */
-    for (int c = 0; c < cols; c++) {
-        double sum = 0.0;
-        for (int r = 0; r < rows; r++) {
-            sum += A[r * cols + c] * x[r];
+    for (int c = 0; c < cols; ++c) {
+        y[c] = 0.0;
+    }
+    for (int r = 0; r < rows; ++r) {
+        const double* row = A + (long)r * cols;
+        const double xr = x[r];
+        for (int c = 0; c < cols; ++c) {
+            y[c] += row[c] * xr;
         }
-        y[c] = sum;
     }
 }
