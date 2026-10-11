@@ -1,1 +1,129 @@
-/* main.css - TICKET B3 implements this file. */
+/* main.css - blackboard look (lecture-hall board with chalk colours). */
+:root {
+  --c-bg: #22332b;
+  --c-panel: #1a2620;
+  --c-grid: rgba(233, 238, 228, 0.07);
+  --c-ink: #e9eee4;
+  --c-muted: #9fb0a4;
+  --c-spring: #f0c96a;
+  --c-support: #9cc3e6;
+  --c-force: #e8868a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100vh;
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+}
+
+.toolbar,
+.statusbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--c-panel);
+}
+
+.app-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-muted);
+}
+
+.transport {
+  display: flex;
+  gap: 6px;
+}
+
+button,
+select {
+  background: var(--c-panel);
+  color: var(--c-ink);
+  border: 1px solid var(--c-muted);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--c-ink);
+  cursor: pointer;
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--c-support);
+  outline-offset: 1px;
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.4;
+}
+
+.stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.statusbar {
+  font-variant-numeric: tabular-nums;
+  color: var(--c-muted);
+}
+
+.statusbar output {
+  color: var(--c-ink);
+}
+
+.spacer {
+  flex: 1;
+}
+
+#conn[data-connected="true"] {
+  color: var(--c-support);
+}
+
+#conn[data-connected="false"] {
+  color: var(--c-muted);
+}
+
+#error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 8px;
+  background: var(--c-panel);
+  color: var(--c-force);
+}
+
+#error[hidden] {
+  display: none;
+}
