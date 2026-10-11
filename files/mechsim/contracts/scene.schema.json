@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mechsim/scene.schema.json",
+  "title": "MechSim scene v0.1",
+  "type": "object",
+  "required": ["version", "bodies"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "0.1" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "gravity": { "$ref": "#/$defs/vec2", "default": [0, -9.81] },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dt": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1, "default": 0.001 },
+        "integrator": { "enum": ["semi_implicit_euler"], "default": "semi_implicit_euler" },
+        "baumgarte_alpha": { "type": "number", "minimum": 0, "default": 5.0 },
+        "baumgarte_beta": { "type": "number", "minimum": 0, "default": 5.0 }
+      }
+    },
+    "view": {
+      "type": "object",
+      "description": "Optional hint for the frontend camera. Ignored by the engine.",
+      "additionalProperties": false,
+      "properties": {
+        "center": { "$ref": "#/$defs/vec2" },
+        "width": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "bodies": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/body" }
+    },
+    "elements": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/element" }
+    },
+    "constraints": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/constraint" }
+    }
+  },
+  "$defs": {
+    "vec2": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_\\-]+$" },
+    "anchor": {
+      "type": "object",
+      "required": ["body", "point"],
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "description": "Body id, or null for ground.",
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "point": {
+          "$ref": "#/$defs/vec2",
+          "description": "Body-local point if body is set, world point if body is null."
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "required": ["id", "type", "position", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["block"] },
+        "position": { "$ref": "#/$defs/vec2" },
+        "angle": { "type": "number", "default": 0 },
+        "velocity": { "$ref": "#/$defs/vec2", "default": [0, 0] },
+        "omega": { "type": "number", "default": 0 },
+        "params": { "$ref": "#/$defs/blockParams" }
+      }
+    },
+    "blockParams": {
+      "type": "object",
+      "required": ["mass", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "mass": { "type": "number", "exclusiveMinimum": 0 },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "element": {
+      "type": "object",
+      "required": ["id", "type", "a", "b", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["spring"] },
+        "a": { "$ref": "#/$defs/anchor" },
+        "b": { "$ref": "#/$defs/anchor" },
+        "params": { "$ref": "#/$defs/springParams" }
+      }
+    },
+    "springParams": {
+      "type": "object",
+      "required": ["k"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "type": "number", "minimum": 0 },
+        "rest_length": {
+          "type": "number",
+          "minimum": 0,
+          "description": "If omitted, the initial distance between a and b is used."
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["id", "type", "body", "point"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["pin_support"] },
+        "body": { "$ref": "#/$defs/id" },
+        "point": {
+          "$ref": "#/$defs/vec2",
+          "description": "Body-local point. The support is fixed at its initial world position."
+        },
+        "params": { "type": "object", "additionalProperties": false, "default": {} }
+      }
+    }
+  }
+}

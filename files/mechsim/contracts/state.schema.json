@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mechsim/state.schema.json",
+  "title": "MechSim frame v0.1",
+  "description": "One simulation frame, produced by ms_world_frame_json() and sent to the browser.",
+  "type": "object",
+  "required": ["t", "bodies", "elements", "constraints", "energy"],
+  "additionalProperties": false,
+  "properties": {
+    "t": { "type": "number" },
+    "bodies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "x", "y", "phi", "vx", "vy", "omega"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "phi": { "type": "number" },
+          "vx": { "type": "number" },
+          "vy": { "type": "number" },
+          "omega": { "type": "number" }
+        }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "p1", "p2", "force"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "p1": { "$ref": "#/$defs/vec2", "description": "World position of anchor a." },
+          "p2": { "$ref": "#/$defs/vec2", "description": "World position of anchor b." },
+          "force": { "type": "number", "description": "Axial force, positive = tension." }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "position", "reaction"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "position": { "$ref": "#/$defs/vec2", "description": "World position of the support." },
+          "reaction": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 3,
+            "description": "[Fx, Fy] or [Fx, Fy, M] exerted by the support on the body."
+          }
+        }
+      }
+    },
+    "energy": {
+      "type": "object",
+      "required": ["kinetic", "potential"],
+      "additionalProperties": false,
+      "properties": {
+        "kinetic": { "type": "number" },
+        "potential": { "type": "number" }
+      }
+    }
+  },
+  "$defs": {
+    "vec2": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+  }
+}

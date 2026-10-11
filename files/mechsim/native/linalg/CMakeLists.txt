@@ -1,0 +1,7 @@
+file(GLOB MS_LINALG_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/*.c)
+add_library(ms_linalg STATIC ${MS_LINALG_SOURCES})
+target_include_directories(ms_linalg PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT MSVC)
+  target_compile_options(ms_linalg PRIVATE -Wall -Wextra)
+  target_link_libraries(ms_linalg PUBLIC m)
+endif()

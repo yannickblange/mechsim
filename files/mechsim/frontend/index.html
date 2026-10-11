@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MechSim</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <!-- Element ids are part of the frontend contract: main.js depends on them. Do not rename. -->
+  <header class="toolbar">
+    <h1 class="app-name">MechSim</h1>
+
+    <label class="field">
+      <span>Scene</span>
+      <select id="scene-select" aria-label="Scene"></select>
+    </label>
+
+    <div class="transport" role="group" aria-label="Simulation controls">
+      <button id="btn-play" type="button">Play</button>
+      <button id="btn-step" type="button">Step</button>
+      <button id="btn-reset" type="button">Reset</button>
+    </div>
+
+    <label class="field">
+      <span>Speed</span>
+      <select id="speed" aria-label="Simulation speed">
+        <option value="0.1">0.1×</option>
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+      </select>
+    </label>
+  </header>
+
+  <main class="stage">
+    <canvas id="view" aria-label="Simulation view"></canvas>
+    <div id="error" class="error" role="alert" hidden></div>
+  </main>
+
+  <footer class="statusbar">
+    <span>t = <output id="time">0.000</output> s</span>
+    <span>E<sub>kin</sub> = <output id="e-kin">–</output> J</span>
+    <span>E<sub>pot</sub> = <output id="e-pot">–</output> J</span>
+    <span>E<sub>total</sub> = <output id="e-total">–</output> J</span>
+    <span class="spacer"></span>
+    <span id="mode">–</span>
+    <span id="conn" data-connected="false">Disconnected</span>
+  </footer>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

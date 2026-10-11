@@ -1,0 +1,21 @@
+{
+  "version": "0.1",
+  "name": "Physical pendulum",
+  "description": "Slender block pinned at its top end (Festlager), released at 0.1 rad.",
+  "gravity": [0, -9.81],
+  "solver": { "dt": 0.001 },
+  "view": { "center": [0, 0], "width": 2.0 },
+  "bodies": [
+    {
+      "id": "bar",
+      "type": "block",
+      "position": [0.049916708, -0.497502083],
+      "angle": 0.1,
+      "params": { "mass": 2.0, "width": 0.05, "height": 1.0 }
+    }
+  ],
+  "elements": [],
+  "constraints": [
+    { "id": "A", "type": "pin_support", "body": "bar", "point": [0, 0.5] }
+  ]
+}

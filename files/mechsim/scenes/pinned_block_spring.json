@@ -1,0 +1,28 @@
+{
+  "version": "0.1",
+  "name": "Pinned block with spring",
+  "description": "Block on a Festlager at its lower left corner, held up by a spring at its upper right corner.",
+  "gravity": [0, -9.81],
+  "solver": { "dt": 0.001 },
+  "view": { "center": [0.3, 0.4], "width": 2.0 },
+  "bodies": [
+    {
+      "id": "plate",
+      "type": "block",
+      "position": [0.2, 0.15],
+      "params": { "mass": 3.0, "width": 0.4, "height": 0.3 }
+    }
+  ],
+  "elements": [
+    {
+      "id": "k1",
+      "type": "spring",
+      "a": { "body": "plate", "point": [0.2, 0.15] },
+      "b": { "body": null, "point": [0.4, 0.9] },
+      "params": { "k": 400.0, "rest_length": 0.45 }
+    }
+  ],
+  "constraints": [
+    { "id": "A", "type": "pin_support", "body": "plate", "point": [-0.2, -0.15] }
+  ]
+}

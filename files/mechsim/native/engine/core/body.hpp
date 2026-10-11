@@ -1,0 +1,56 @@
+// body.hpp - planar rigid body with 3 DOF (x, y, phi). Interface frozen for v0.1.
+#pragma once
+
+#include <string>
+
+#include "types.hpp"
+
+namespace ms {
+
+class Body {
+public:
+    std::string id;
+    std::string type;  // "block" in v0.1
+
+    double mass = 1.0;     // kg
+    double inertia = 1.0;  // kg m^2 about the centre of mass
+
+    // State
+    Vec2 pos;            // centre of mass, world
+    double phi = 0.0;    // rad, CCW positive
+    Vec2 vel;            // m/s
+    double omega = 0.0;  // rad/s
+
+    // Force accumulators (world frame, about the centre of mass)
+    Vec2 force;
+    double torque = 0.0;
+
+    // R(phi) * local
+    Vec2 rotated(Vec2 local) const;
+    // pos + R(phi) * local
+    Vec2 toWorld(Vec2 local) const;
+    // vel + omega x (R(phi) * local)
+    Vec2 velocityAt(Vec2 local) const;
+
+    // Add force f (world frame) acting at body-local point `local`:
+    // force += f; torque += cross(R(phi) * local, f).
+    void applyForceAt(Vec2 f, Vec2 local);
+    // Add force f at the centre of mass (no torque).
+    void applyForce(Vec2 f);
+    void clearForces();
+
+    // 0.5 m |v|^2 + 0.5 J omega^2
+    double kineticEnergy() const;
+
+    // Store / restore pos, phi, vel, omega for World::reset().
+    void saveInitialState();
+    void restoreInitialState();
+
+private:
+    Vec2 pos0_;
+    double phi0_ = 0.0;
+    Vec2 vel0_;
+    double omega0_ = 0.0;
+};
+
+}  // namespace ms

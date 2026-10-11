@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mechsim"
+version = "0.1.0"
+description = "Planar (x, y, phi) multibody mechanics simulator"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jsonschema>=4.20",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+mechsim-server = "mechsim.server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+mechsim = ["lib/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python", "tests/validation"]
+pythonpath = ["python"]
+markers = [
+    "native: needs the compiled libmechsim (run tools/build.sh first)",
+]

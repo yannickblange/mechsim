@@ -1,0 +1,11 @@
+build/
+python/mechsim/lib/*
+!python/mechsim/lib/.gitkeep
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+.DS_Store
+.vscode/
+.idea/

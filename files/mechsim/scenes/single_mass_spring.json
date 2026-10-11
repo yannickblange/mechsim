@@ -1,0 +1,26 @@
+{
+  "version": "0.1",
+  "name": "Single mass on a spring",
+  "description": "Block hanging from a ceiling spring. Pure vertical oscillation, omega0 = sqrt(k/m) = 10 rad/s.",
+  "gravity": [0, -9.81],
+  "solver": { "dt": 0.001 },
+  "view": { "center": [0, 0.3], "width": 2.0 },
+  "bodies": [
+    {
+      "id": "m1",
+      "type": "block",
+      "position": [0, 0],
+      "params": { "mass": 1.0, "width": 0.2, "height": 0.2 }
+    }
+  ],
+  "elements": [
+    {
+      "id": "k1",
+      "type": "spring",
+      "a": { "body": null, "point": [0, 1.0] },
+      "b": { "body": "m1", "point": [0, 0.1] },
+      "params": { "k": 100.0, "rest_length": 0.5 }
+    }
+  ],
+  "constraints": []
+}
