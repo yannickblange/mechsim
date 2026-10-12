@@ -128,26 +128,52 @@ function linkForm(model, link, draft) {
   };
 }
 
-// A Stab: rigid (a constraint) or, with a cross section, an elastic bar of axial stiffness E A / L.
+const DEFAULT_SEGMENTS = 4; // of an elastic Stab
+const DEFAULT_BOW = 0.00001; // initial bow of an elastic Stab, as a fraction of its length (a seed for buckling)
+
+// A Stab: rigid (a constraint) or, with a cross section, an elastic bar: steel, axial stiffness E A / L, and a
+// beam-column that bends under its own weight and buckles at the Euler load.
 function stabForm(model, stab, draft) {
   const d = installedLength(model, stab);
   const rigid = stab.type === 'rod' ? !draft.sectionType || draft.sectionType === 'rigid' : draft.sectionType === 'rigid';
   const section = rigid ? null : formSection(stab.type === 'bar' ? stab.params.section : null, draft);
   const info = [`Length ${fixed(d)} m (the distance between its ends). A massless two-force member that takes push and pull.`];
+  const fields = sectionFields(section || defaultSection('square'), { allowRigid: true, rigid: !section });
   if (section) {
     const p = sectionProps(section);
-    info.push(`Elastic: axial stiffness E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m. ${sectionInfo(section)}`);
-    info.push('Bending and buckling are not modelled. An elastic Stab also makes statically indeterminate trusses solvable.');
+    const pcr = (Math.PI ** 2 * p.EI) / (Math.max(d, 1e-9) ** 2);
+    const slender = d / Math.sqrt(p.inertia / p.area);
+    const params = stab.type === 'bar' ? stab.params : {};
+    info.length = 0;
+    info.push(`Length ${fixed(d)} m. Elastic steel member, pinned at both ends: axial stiffness E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m.`);
+    info.push(sectionInfo(section));
+    info.push(`It buckles in the plane when the compression reaches the Euler load π² E I / L² = ${fixedForce(pcr)} (slenderness L / i = ${fixed(slender, 0)}); `
+      + 'the force labels show the percentage while it is compressed. It bends under its own weight.');
+    const massMode = draft.massMode || (params.mass === undefined ? 'steel' : 'given');
+    fields.push(num('segments', 'Elements', '', params.segments ?? DEFAULT_SEGMENTS, { min: 1, max: 16, integer: true }));
+    fields.push(select('massMode', 'Mass', massMode, [['steel', 'Steel'], ['given', 'Given']], { reshape: true }));
+    if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(params.mass ?? 7850 * p.area * d, 6), { minExclusive: 0 }));
+    fields.push(
+      num('damping', 'Damping α', '1/s', params.damping ?? 0, { min: 0 }),
+      num('bow', 'Initial bow', 'mm', round((params.imperfection ?? DEFAULT_BOW) * d * MM, 4), { min: 0 }),
+    );
+    info.push('Elements: 1 is the pure axial bar (massless, cannot bend or buckle). The initial bow (a half sine) is what lets a straight column buckle at all.');
   } else {
-    info.push('Rigid: infinitely stiff. Give it a cross section to make it elastic.');
+    info.push('Rigid: infinitely stiff, no mass, cannot buckle. Give it a cross section to make it an elastic steel bar.');
   }
-  return {
-    title: `${section ? 'Stab (elastic)' : 'Stab'} ${stab.id}`,
-    info,
-    fields: sectionFields(section || defaultSection('square'), { allowRigid: true, rigid: !section }),
-    section,
-  };
+  return { title: `${section ? 'Stab (elastic)' : 'Stab'} ${stab.id}`, info, fields, section };
 }
+
+// What the submitted form says about an elastic Stab beyond its section (the bar parameters), for a Stab of length d.
+function stabParams(parsed, d) {
+  const params = { damping: parsed.damping, segments: parsed.segments === DEFAULT_SEGMENTS ? null : parsed.segments };
+  params.mass = parsed.massMode === 'given' ? parsed.mass : null;
+  const ratio = parsed.bow / MM / Math.max(d, 1e-9);
+  params.imperfection = Math.abs(ratio - DEFAULT_BOW) < 1e-9 ? null : ratio;
+  return params;
+}
+
+const fixedForce = (n) => (n >= 1e4 ? `${fixed(n / 1e3, 1)} kN` : `${fixed(n, 0)} N`);
 
 function jointForm(joint) {
   const at = `Joins ${joint.a.body} and ${joint.b.body}.`;
@@ -167,7 +193,7 @@ function bodyForm(body, draft) {
   const v = body.velocity || [0, 0];
   const fields = [num('mass', 'Mass', 'kg', p.mass, { minExclusive: 0 })];
   if (body.type === 'node') {
-    fields.push(num('vx', 'Initial vx', 'm/s', v[0]), num('vy', 'Initial vy', 'm/s', v[1]));
+    fields.push(num('vx', 'Initial vx', 'm/s', v[0]), num('vy', 'Initial vy', 'm/s', v[1]), num('damping', 'Damping α', '1/s', p.damping ?? 0, { min: 0 }));
     return {
       title: `Node ${body.id}`,
       info: ['A node (Knoten) is a point mass where Stabs meet. Supports and forces can sit on it. '
@@ -214,6 +240,7 @@ function beamForm(body, draft) {
   ];
   if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(p.mass ?? steelMass, 6), { minExclusive: 0 }));
   fields.push(
+    num('damping', 'Damping α', '1/s', p.damping ?? 0, { min: 0 }),
     num('segments', 'Finite elements', '', p.segments ?? 8, { min: 2, integer: true, max: 64 }),
     num('angle', 'Angle', '°', round((body.angle || 0) / RAD, 4)),
     num('vx', 'Initial vx', 'm/s', v[0]),
@@ -226,7 +253,8 @@ function beamForm(body, draft) {
     info: [
       `${sectionInfo(section)} Mass ${fixed(m, 3)} kg (steel: 7850 kg/m³ × A × L, or given).`,
       'Bends in the plane (Euler-Bernoulli, large rotations allowed). Supports, springs and loads may attach anywhere along it. '
-        + 'The nodes are placed by the engine, evenly and at every attachment.',
+        + 'The nodes are placed by the engine, evenly and at every attachment. Damping α (viscous, force -α m v) lets it settle: '
+        + 'every mode decays like e^(-α t / 2); 0 = it swings for ever (and a free beam keeps flying).',
     ],
     fields,
     section,
@@ -335,7 +363,10 @@ export function applyProperties(model, id, values) {
     model.updateRope(id, { length: Math.abs(parsed.length - d) < 1e-6 ? null : parsed.length });
   } else if (kind === 'constraint' && found.obj.type === 'rod') {
     const section = sectionFromValues(parsed);
-    if (section) model.setStabSection(id, section);
+    if (section) {
+      const extra = stabParams(parsed, installedLength(model, found.obj));
+      model.setStabSection(id, section, Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)));
+    }
   } else if (kind === 'constraint' && isJoint(found.obj)) {
     if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
   } else if (kind === 'body') {
@@ -343,17 +374,19 @@ export function applyProperties(model, id, values) {
     if (found.obj.type === 'node') {
       delete patch.angle;
       delete patch.omega;
+      patch.damping = parsed.damping;
     }
     for (const key of ['width', 'height', 'radius', 'length']) if (key in parsed) patch[key] = parsed[key];
     if (found.obj.type === 'beam') {
       patch.section = sectionFromValues(parsed);
       patch.mass = parsed.massMode === 'given' ? parsed.mass : null;
       patch.segments = parsed.segments === 8 && found.obj.params.segments === undefined ? undefined : parsed.segments;
+      patch.damping = parsed.damping;
     }
     model.updateBody(id, patch);
   } else if (kind === 'element' && found.obj.type === 'bar') {
     const section = sectionFromValues(parsed);
-    if (section) model.updateBar(id, { section });
+    if (section) model.updateBar(id, { section, ...stabParams(parsed, installedLength(model, found.obj)) });
     else model.setStabSection(id, null);
   } else if (kind === 'element' && 'c' in parsed) {
     model.updateElement(id, { c: parsed.c });

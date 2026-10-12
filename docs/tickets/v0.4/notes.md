@@ -57,7 +57,7 @@ example of an unsupported version is "0.5"). Not touched: `CMakeLists.txt`, `pyp
 
 ## Not done / ideas
 
-- Plastic yielding and buckling (the stress is the linear-elastic value; a thin steel strip swinging widely shows stresses above yield).
+- Plastic yielding (buckling of bars: see v0.4b; the stress is the linear-elastic value; a thin steel strip swinging widely shows stresses above yield).
 - Structural damping of beams (use a damper). Rayleigh damping would also tame the highest numerical modes.
 - Unsymmetric bending (L, T bending out of the symmetry plane), shear deformation (Timoshenko), out-of-plane motion.
 - Graphs of velocities, accelerations, forces and bar forces against time; graphs of nodes of a beam other than the middle (the tip).

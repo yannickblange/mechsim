@@ -1,4 +1,4 @@
-# Equations of motion (v0.1, extended in v0.2, v0.3 and v0.4)
+# Equations of motion (v0.1, extended in v0.2, v0.3, v0.4 and v0.4b)
 
 ## Coordinates
 
@@ -156,17 +156,45 @@ tan(delta) = 2 zeta eta / (1 - eta^2),    eta = Omega / omega0,   zeta = c / (2 
 (`tests/validation/test_v04_physics.py` checks amplitude, frequency and phase). Free vibration: `omega0 = sqrt(k/m)`,
 damped `omega_d = omega0 sqrt(1 - zeta^2)`, successive peaks fall by `exp(-2 pi zeta / sqrt(1 - zeta^2))`.
 
-### Elastic bar, v0.4
+### Elastic bar, v0.4 and v0.4b
 
-An axial spring `k = E A / L0` between two anchors (`rest length = installed length L0`), force `k (L - L0)`, tension positive,
-potential `1/2 k (L - L0)^2`. It joins the force elements; unlike the rigid rod it adds no constraint rows, so statically
-indeterminate trusses have a unique solution (the direct stiffness method; `mechsim.analysis.truss` is the reference).
+*One element* (`segments = 1`): an axial spring `k = E A / L0` between two anchors (rest length = installed length `L0`), force
+`k (L - L0)`, tension positive, potential `1/2 k (L - L0)^2`; massless, cannot bend or buckle (the bar of v0.4).
 
-### Beam, v0.4
+*The elastic Stab proper* (v0.4b, default 4 elements) is a **beam-column**: a chain of the corotational beam elements below, pinned at both
+anchors (the end rotation is not a variable: the end carries no moment), with hidden internal nodes. They carry its mass
+(`7850 kg/m^3 x A x L` unless given; half of the two end segments hangs on the anchors as weight), so the bar **sags under its
+own weight** and **buckles in the plane** when the compression reaches the Euler load of the pinned column
+
+```
+P_cr = pi^2 E I / L^2          (I about the axis normal to the plane: the section's I; slenderness L / i, i = sqrt(I / A))
+```
+
+An initial bow `imperfection x L` (a half sine, stress-free; default 1e-5, 20 micrometres on 2 m) seeds the instability, because a perfectly
+straight column only buckles when round-off grows. Below `P_cr` a bow `w0` is magnified to `w0 / (1 - P / P_cr)`; above it the straight shape is
+unstable and the column goes to the post-buckled shape of Euler's elastica under a dead load: with `2 K(k) / pi = sqrt(P / P_cr)` the lateral
+deflection is `k L / K(k)` (`K` the complete elliptic integral of the first kind): 0.37 L for `P = 1.3 P_cr`. Both are checked in
+`tests/native/elements/test_bar.cpp` and `tests/validation/test_v04_physics.py`.
+
+A truss of such members is not exactly the direct stiffness method of `mechsim.analysis.truss`: a heavy slender member sags, and a sagging member is
+softer than `E A / L` (its chord shortens by `8 w^2 / 3 L`, micrometres, as much as the load deforms a stiff truss). Statically determinate members
+are not affected; the redundant ones of the example `truss_elastic` shift by a few ten per cent of the largest force. With `segments = 1` or light
+members the engine reproduces the stiffness method exactly.
+
+### Damping, v0.4b
+
+Every body has a viscous damping rate `alpha` (1/s): force `-alpha m v` and torque `-alpha J omega` (nodes, beams, the internal nodes of elastic Stabs; default 0).
+Mass-proportional damping decays **every** mode like `exp(-alpha t / 2)` whatever its frequency, so a load applied suddenly makes a beam overshoot once
+and then hold its static deflection (an undamped elastic system swings between 0 and twice the static response for ever). It is explicit, so `alpha dt`
+is limited to 0.5 per substep. It acts on rigid-body motion as well (like a viscous medium): keep it 0 for a beam that flies free.
+(Stiffness-proportional damping, the usual choice for structures, is not stable with explicit steps for stiff steel at useful rates: the highest mode would need
+`beta omega^2 dt < 2`, i.e. hundreds of substeps per millisecond.)
+
+### Beam, v0.4 (with the changes of v0.4b)
 
 A bendable beam of length `L`, section area `A`, second moment `I`, Young's modulus `E` is a chain of node bodies
 (x, y, phi each, i.e. exactly the unknowns of a beam finite element). Between neighbours i -> j a corotational
-Euler-Bernoulli element: with the chord `u = (p_j - p_i) / L`, `n = perp(u)`, the elongation `e = L - L0`, the chord rotation
+Euler-Bernoulli element (v0.4b adds the bowing term, see below): with the chord `u = (p_j - p_i) / L`, `n = perp(u)`, the elongation `e = L - L0`, the chord rotation
 `dbeta` (angle from the undeformed chord to `u`) and the end rotations against the chord
 `theta_i = phi_i - phi0_i - dbeta`, `theta_j = phi_j - phi0_j - dbeta` (wrapped to +-pi):
 
@@ -176,7 +204,11 @@ N = (EA / L0) e,   M_i = (EI / L0)(4 theta_i + 2 theta_j),   M_j = (EI / L0)(2 t
 F_i = +N u - ((M_i + M_j) / L) n,   F_j = -F_i,   tau_i = -M_i,   tau_j = -M_j
 ```
 
-(`-dU/dq`; the shear pair comes from `d dbeta / d p = -+ n / L`; no net force or moment). Rigid-body motion costs nothing, for any
+(`-dU/dq`; the shear pair comes from `d dbeta / d p = -+ n / L`; no net force or moment). **Bowing (v0.4b)**: the chord of a bent element is shorter than the
+arc, so the axial strain is `e_ax = (L - L0) + (L0 / 30)(2 theta_i^2 - theta_i theta_j + 2 theta_j^2)` and `N = (EA / L0) e_ax`; this adds
+`N (L0 / 30)(4 theta_i - theta_j)` to `M_i` and `N (L0 / 30)(-theta_i + 4 theta_j)` to `M_j`. It is the geometric stiffness of the consistent beam:
+a compressed member loses bending stiffness and buckles at the Euler load. A hinged end has no rotation variable: its `theta` minimises `U`
+(`dU/dtheta = 0`, a few Newton steps from `-theta_other / 2`; by the envelope theorem the same forces are right and no moment acts on the end). Rigid-body motion costs nothing, for any
 rotation; for small deformations this is the exact stiffness matrix of the linear beam, so a cantilever with a load at its tip
 bends by `P L^3 / 3 E I` however few elements it has (and `P L^2 / 2 E I` at the tip). Mass is lumped: node k gets the mass
 of the slice of beam of its own half segments, and the rotary inertia `m (trib^2 + depth^2) / 12` (the end nodes

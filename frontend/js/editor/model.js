@@ -9,6 +9,7 @@ export const DEFAULT_SPRING_K = 100.0;
 export const DEFAULT_DAMPING = 10.0; // N s / m
 export const DEFAULT_NODE_MASS = 1.0; // kg of a Knoten (the weight is small next to typical truss loads)
 export const DEFAULT_FREQUENCY = 1.0; // Hz of a new harmonic load
+export const DEFAULT_ELEMENT_DAMPING = 5.0; // 1/s: new beams and elastic Stabs settle (every mode decays like e^(-alpha t / 2))
 const HISTORY_LIMIT = 100;
 
 const SUPPORT_TYPES = {
@@ -201,7 +202,7 @@ export class SceneModel {
       const L = dist(start, end);
       const side = Math.min(0.1, Math.max(0.01, roundTo(L / 40, 0.005)));
       const d = sub(end, start);
-      const params = { length: tidy(L), section: section || defaultSection('square', side) };
+      const params = { length: tidy(L), section: section || defaultSection('square', side), damping: DEFAULT_ELEMENT_DAMPING };
       if (mass !== undefined) params.mass = mass;
       s.bodies.push({
         id, type: 'beam', position: tidyPoint([(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]),
@@ -284,8 +285,9 @@ export class SceneModel {
   }
 
   // The Stab becomes elastic with a cross section ({ type, ...dimensions }, a bar: axial stiffness
-  // E A / L), or rigid again for null. Same id, same ends.
-  setStabSection(id, section) {
+  // E A / L; it also bends and buckles), or rigid again for null. Same id, same ends. `params` are
+  // more bar parameters (segments, mass, damping, imperfection); a new bar settles (damping 5 / s).
+  setStabSection(id, section, params = {}) {
     const found = this.find(id);
     if (!found || !['rod', 'bar'].includes(found.obj.type)) throw new Error(`no Stab "${id}"`);
     return this.#edit((s) => {
@@ -294,7 +296,7 @@ export class SceneModel {
       s.elements = s.elements.filter((e) => e.id !== id);
       if (section) {
         stab.type = 'bar';
-        stab.params = { section: clone(section) };
+        stab.params = { section: clone(section), damping: DEFAULT_ELEMENT_DAMPING, ...params };
         s.elements.push(stab);
       } else {
         stab.type = 'rod';
@@ -304,12 +306,19 @@ export class SceneModel {
     });
   }
 
-  // patch for a bar: { section }.
+  // patch for a bar: { section, segments, mass, damping, imperfection }. null removes segments, mass and
+  // imperfection (back to the default: 4 elements, the mass of the steel, a bow of L / 1000).
   updateBar(id, patch) {
     const found = this.find(id);
     if (!found || found.obj.type !== 'bar') throw new Error(`no bar "${id}"`);
     return this.#edit((s) => {
-      if (patch.section) s.elements.find((e) => e.id === id).params.section = clone(patch.section);
+      const params = s.elements.find((e) => e.id === id).params;
+      if (patch.section) params.section = clone(patch.section);
+      for (const key of ['segments', 'mass', 'imperfection']) {
+        if (patch[key] === null) delete params[key];
+        else if (patch[key] !== undefined) params[key] = key === 'segments' ? patch[key] : tidy(patch[key]);
+      }
+      if (patch.damping !== undefined) params.damping = tidy(patch.damping);
     });
   }
 
@@ -402,6 +411,10 @@ export class SceneModel {
       const old = { ...body.params };
       for (const key of ['mass', 'width', 'height', 'radius', 'length']) {
         if (patch[key] !== undefined && patch[key] !== null && key in body.params) body.params[key] = tidy(patch[key]);
+      }
+      if (patch.damping !== undefined && (body.type === 'beam' || body.type === 'node')) {
+        if (patch.damping > 0 || body.type === 'beam') body.params.damping = tidy(patch.damping);
+        else delete body.params.damping;
       }
       if (body.type === 'beam') {
         if (patch.mass === null) delete body.params.mass;

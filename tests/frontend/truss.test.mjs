@@ -178,12 +178,15 @@ test('node properties: mass and start velocity', () => {
   const { model, tools } = setup();
   click(tools.get('node'), [0, 0]);
   const form = propertyFields(model, 'N1');
-  assert.deepEqual(form.fields.map((f) => f.key), ['mass', 'vx', 'vy']);
+  assert.deepEqual(form.fields.map((f) => f.key), ['mass', 'vx', 'vy', 'damping']);
   assert.match(form.title, /Node/);
-  assert.equal(applyProperties(model, 'N1', { mass: '2.5', vx: '0', vy: '0.5' }).ok, true);
+  assert.equal(applyProperties(model, 'N1', { mass: '2.5', vx: '0', vy: '0.5', damping: '0' }).ok, true);
   assert.equal(model.body('N1').params.mass, 2.5);
+  assert.equal('damping' in model.body('N1').params, false, 'no damping is not stored');
   assert.deepEqual(model.body('N1').velocity, [0, 0.5]);
-  assert.equal(applyProperties(model, 'N1', { mass: '0', vx: '0', vy: '0' }).ok, false);
+  assert.equal(applyProperties(model, 'N1', { mass: '2.5', vx: '0', vy: '0', damping: '4' }).ok, true);
+  assert.equal(model.body('N1').params.damping, 4);
+  assert.equal(applyProperties(model, 'N1', { mass: '0', vx: '0', vy: '0', damping: '0' }).ok, false);
 });
 
 test('a Stab becomes elastic with a cross section and rigid again, keeping id and ends', () => {
@@ -197,14 +200,15 @@ test('a Stab becomes elastic with a cross section and rigid again, keeping id an
 
   // the select was changed to I: the form is built again with default I dimensions
   form = propertyFields(model, 'S1', { sectionType: 'I' });
-  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_b', 'sec_h', 'sec_tf', 'sec_tw']);
+  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_b', 'sec_h', 'sec_tf', 'sec_tw', 'segments', 'massMode', 'damping', 'bow']);
   assert.ok(form.section && form.section.type === 'I');
+  assert.match(form.info.join(' '), /Euler load/);
 
-  const values = { sectionType: 'I', sec_b: '100', sec_h: '200', sec_tf: '10', sec_tw: '6' };
+  const values = { sectionType: 'I', sec_b: '100', sec_h: '200', sec_tf: '10', sec_tw: '6', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' };
   assert.equal(applyProperties(model, 'S1', values).ok, true);
   assert.equal(rods(model).length, 0);
   const bar = model.scene.elements.find((e) => e.id === 'S1');
-  assert.deepEqual(bar, { id: 'S1', type: 'bar', a: before.a, b: before.b, params: { section: { type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.006 } } });
+  assert.deepEqual(bar, { id: 'S1', type: 'bar', a: before.a, b: before.b, params: { section: { type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.006 }, damping: 5 } });  // a bow of 0.02 mm on 2 m is the default: not stored
 
   form = propertyFields(model, 'S1');
   assert.match(form.title, /elastic/);
@@ -224,19 +228,58 @@ test('a Stab becomes elastic with a cross section and rigid again, keeping id an
 test('an impossible cross section is refused with the reason', () => {
   const { model, tools } = setup();
   click(tools.get('rod'), [0, 0]); click(tools.get('rod'), [2, 0]);
-  const r = applyProperties(model, 'S1', { sectionType: 'I', sec_b: '100', sec_h: '20', sec_tf: '12', sec_tw: '6' });
+  const r = applyProperties(model, 'S1', { sectionType: 'I', sec_b: '100', sec_h: '20', sec_tf: '12', sec_tw: '6', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' });
   assert.equal(r.ok, false);
   assert.match(r.errors.join(' '), /flanges/);
   assert.equal(rods(model).length, 1, 'nothing changed');
-  const nan = applyProperties(model, 'S1', { sectionType: 'square', sec_a: 'abc' });
+  const nan = applyProperties(model, 'S1', { sectionType: 'square', sec_a: 'abc', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' });
   assert.equal(nan.ok, false);
 });
 
 test('bars are selectable, movable by their ends, and deleted with their node', () => {
   const { model, tools } = setup();
   click(tools.get('rod'), [0, 0]); click(tools.get('rod'), [2, 0]);
-  applyProperties(model, 'S1', { sectionType: 'square', sec_a: '20' });
+  applyProperties(model, 'S1', { sectionType: 'square', sec_a: '20', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' });
   assert.deepEqual(hitTest(model.scene, [1, 0.002], 400), { kind: 'element', id: 'S1' });
   assert.deepEqual(model.remove('N1').sort(), ['N1', 'S1']);
   assert.equal(model.scene.elements.length, 0);
+});
+
+// --- v0.4b: an elastic Stab bends and buckles ------------------------------------------------------------------
+
+test('elastic Stab form: Euler load, elements, mass, damping and the bow in mm', () => {
+  const { model, tools } = setup();
+  click(tools.get('rod'), [0, 0]); click(tools.get('rod'), [2, 0]); // 2 m long
+  const values = { sectionType: 'square', sec_a: '20', segments: '8', massMode: 'given', mass: '5', damping: '12', bow: '4' };
+  assert.equal(applyProperties(model, 'S1', values).ok, true);
+  const bar = model.find('S1').obj;
+  assert.deepEqual(bar.params, { section: { type: 'square', a: 0.02 }, damping: 12, segments: 8, mass: 5, imperfection: 0.002 });
+
+  const form = propertyFields(model, 'S1');
+  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_a', 'segments', 'massMode', 'mass', 'damping', 'bow']);
+  assert.equal(form.fields.find((f) => f.key === 'bow').value, 4);
+  assert.equal(form.fields.find((f) => f.key === 'segments').value, 8);
+  const pcr = (Math.PI ** 2 * 210e9 * 0.02 ** 4 / 12) / 4; // 6909 N
+  assert.match(form.info.join(' '), /Euler load .* 6909 N/);
+  assert.match(form.info.join(' '), /slenderness L \/ i = 346/);
+  assert.ok(pcr > 6900 && pcr < 6910);
+
+  // back to the defaults: 4 elements, steel, the standard bow (0.02 mm on 2 m) are not stored
+  const back = { ...values, segments: '4', massMode: 'steel', bow: '0.02' };
+  assert.equal(applyProperties(model, 'S1', back).ok, true);
+  assert.deepEqual(model.find('S1').obj.params, { section: { type: 'square', a: 0.02 }, damping: 12 });
+  assert.equal(applyProperties(model, 'S1', { ...back, segments: '0' }).ok, false);
+  assert.equal(applyProperties(model, 'S1', { ...back, segments: '17' }).ok, false);
+  assert.equal(applyProperties(model, 'S1', { ...back, damping: '-1' }).ok, false);
+  assert.equal(applyProperties(model, 'S1', { ...back, bow: '-1' }).ok, false);
+  assert.equal(applyProperties(model, 'S1', { ...back, bow: '0' }).ok, true, 'a perfectly straight bar is allowed');
+  assert.equal(model.find('S1').obj.params.imperfection, 0);
+});
+
+test('a bar made from a rigid Stab carries the chosen parameters in one step', () => {
+  const { model, tools } = setup();
+  click(tools.get('rod'), [0, 0]); click(tools.get('rod'), [2, 0]);
+  const values = { sectionType: 'H', sec_b: '50', sec_h: '80', sec_tf: '6', sec_tw: '4', segments: '1', massMode: 'steel', damping: '0', bow: '0.02' };
+  assert.equal(applyProperties(model, 'S1', values).ok, true);
+  assert.deepEqual(model.find('S1').obj.params, { section: { type: 'H', b: 0.05, h: 0.08, tf: 0.006, tw: 0.004 }, damping: 0, segments: 1 });
 });

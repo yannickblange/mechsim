@@ -24,7 +24,7 @@ test('beam tool: drag along the axis makes a beam (midpoint, angle, length, defa
   assert.equal(b.id, 'b1');
   closePoint(b.position, [1, 0]);
   close(b.angle, 0);
-  assert.deepEqual(b.params, { length: 2, section: { type: 'square', a: 0.05 } });
+  assert.deepEqual(b.params, { length: 2, section: { type: 'square', a: 0.05 }, damping: 5 }); // a new beam settles
   assert.deepEqual(log.created.at(-1), ['body', 'b1']);
 
   // the angle snaps like surfaces do: 30 degrees
@@ -87,7 +87,8 @@ test('beam form: length, section select with its dimensions in mm, mass from ste
   const m = new SceneModel();
   const id = m.addBeam({ start: [0, 0], end: [2, 0] });
   let form = propertyFields(m, id);
-  assert.deepEqual(form.fields.map((f) => f.key), ['length', 'sectionType', 'sec_a', 'massMode', 'segments', 'angle', 'vx', 'vy', 'omega']);
+  assert.deepEqual(form.fields.map((f) => f.key), ['length', 'sectionType', 'sec_a', 'massMode', 'damping', 'segments', 'angle', 'vx', 'vy', 'omega']);
+  assert.equal(form.fields.find((f) => f.key === 'damping').value, 5);
   assert.equal(form.fields.find((f) => f.key === 'sec_a').value, 50);
   assert.equal(form.fields.find((f) => f.key === 'sec_a').unit, 'mm');
   assert.equal(form.fields.find((f) => f.key === 'massMode').value, 'steel');
@@ -111,13 +112,13 @@ test('beam form: applying changes length, section, mass and keeps attachments in
   const id = m.addBeam({ start: [0, 0], end: [2, 0] });
   m.addLoad({ body: id, point: [1, 0], force: [0, -5] }); // the right end
   const values = {
-    length: '4', sectionType: 'I', sec_b: '60', sec_h: '120', sec_tf: '7', sec_tw: '4', massMode: 'steel', segments: '12',
+    length: '4', sectionType: 'I', sec_b: '60', sec_h: '120', sec_tf: '7', sec_tw: '4', massMode: 'steel', segments: '12', damping: '3',
     angle: '10', vx: '0', vy: '0', omega: '0',
   };
   const r = applyProperties(m, id, values);
   assert.equal(r.ok, true, r.errors.join());
   const b = m.body(id);
-  assert.deepEqual(b.params, { length: 4, section: { type: 'I', b: 0.06, h: 0.12, tf: 0.007, tw: 0.004 }, segments: 12 });
+  assert.deepEqual(b.params, { length: 4, section: { type: 'I', b: 0.06, h: 0.12, tf: 0.007, tw: 0.004 }, segments: 12, damping: 3 });
   close(b.angle, (10 * Math.PI) / 180, 1e-9);
   assert.deepEqual(m.scene.elements[0].point, [2, 0], 'the load stays at the end of the longer beam');
 
@@ -130,11 +131,12 @@ test('beam form: applying changes length, section, mass and keeps attachments in
 test('beam form: bad input is refused', () => {
   const m = new SceneModel();
   const id = m.addBeam({ start: [0, 0], end: [2, 0] });
-  const ok = { length: '2', sectionType: 'square', sec_a: '50', massMode: 'steel', segments: '8', angle: '0', vx: '0', vy: '0', omega: '0' };
+  const ok = { length: '2', sectionType: 'square', sec_a: '50', massMode: 'steel', damping: '5', segments: '8', angle: '0', vx: '0', vy: '0', omega: '0' };
   assert.equal(applyProperties(m, id, { ...ok, segments: '1' }).ok, false);
   assert.equal(applyProperties(m, id, { ...ok, segments: '8.5' }).ok, false);
   assert.equal(applyProperties(m, id, { ...ok, segments: '99' }).ok, false);
   assert.equal(applyProperties(m, id, { ...ok, length: '0' }).ok, false);
+  assert.equal(applyProperties(m, id, { ...ok, damping: '-1' }).ok, false);
   assert.equal(applyProperties(m, id, { ...ok, sec_a: '-3' }).ok, false);
   const t = applyProperties(m, id, { ...ok, sectionType: 'T', sec_b: '100', sec_h: '100', sec_tf: '100', sec_tw: '10' });
   assert.equal(t.ok, false);

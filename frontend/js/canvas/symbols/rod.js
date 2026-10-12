@@ -1,7 +1,10 @@
 // rod.js - Stab: a thick bar with a hinge at each end (it takes push and pull). A rigid Stab is a solid
 // line, an elastic one (a bar with a cross section) an outlined one. While the simulation runs the
 // axial force is written next to it and the bar is drawn in the colour of the force: tension blue,
-// compression red.
+// compression red. An elastic bar (v0.4b) is drawn along its bent shape (entry.nodes, with the Bending
+// exaggeration of the toolbar) and, while compressed, says how much of its Euler load it carries.
+import { beamCurve, exaggerate } from './beam.js';
+
 const HINGE = 4; // px
 const MIN_FORCE = 1e-6; // N: below this no label
 
@@ -11,19 +14,28 @@ export const formatForce = (f) => {
   return `${f < 0 ? '−' : '+'}${text}`;
 };
 
+// The path of a Stab on the screen: the bent curve of an elastic bar through its nodes, else the straight line.
+function stabPath(cam, entry) {
+  if (entry.nodes && entry.nodes.length > 2) {
+    return beamCurve(exaggerate(entry.nodes, cam.bendScale || 1)).map((p) => cam.toScreen(p));
+  }
+  return [cam.toScreen(entry.p1), cam.toScreen(entry.p2)];
+}
+
 export function strokeStab(ctx, cam, entry, theme, elastic) {
-  const [ax, ay] = cam.toScreen(entry.p1);
-  const [bx, by] = cam.toScreen(entry.p2);
+  const path = stabPath(cam, entry);
+  const [ax, ay] = path[0];
+  const [bx, by] = path[path.length - 1];
   const force = entry.force || 0;
   const colour = Math.abs(force) < MIN_FORCE ? theme.ink : force > 0 ? theme.force : theme.compression;
 
   ctx.save();
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.strokeStyle = colour;
   ctx.fillStyle = colour;
   ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(bx, by);
+  path.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
   if (elastic) {
     ctx.lineWidth = 6;
     ctx.stroke();
@@ -51,14 +63,18 @@ export function strokeStab(ctx, cam, entry, theme, elastic) {
     const len = Math.hypot(bx - ax, by - ay);
     const nx = -(by - ay) / len;
     const ny = (bx - ax) / len;
-    // beside the middle, on the upper side of the bar
+    // beside the middle of the bar, on the upper side of the chord
     const side = ny > 0 || (ny === 0 && nx > 0) ? -1 : 1;
-    const mx = (ax + bx) / 2 + side * nx * 13;
-    const my = (ay + by) / 2 + side * ny * 13;
-    ctx.font = '11px system-ui, sans-serif';
+    const mid = path[Math.floor(path.length / 2)];
+    const mx = mid[0] + side * nx * 14;
+    const my = mid[1] + side * ny * 14;
+    // a compressed elastic bar: how much of its Euler load it carries
+    const ratio = elastic && force < 0 && entry.pcr > 0 ? -force / entry.pcr : 0;
+    let text = formatForce(force);
+    if (ratio >= 0.05) text += `  (${Math.round(ratio * 100)} % of Pcr${ratio >= 1 ? ', buckled' : ''})`;
+    ctx.font = `${ratio >= 0.9 ? 'bold ' : ''}11px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const text = formatForce(force);
     const w = ctx.measureText(text).width + 6;
     ctx.fillStyle = theme.labelBg;
     ctx.fillRect(mx - w / 2, my - 8, w, 16);

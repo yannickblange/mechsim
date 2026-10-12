@@ -8,7 +8,8 @@ with a relaxed-length "ghost", constant and impulsive force/moment loads, Festla
 v0.3 adds rope (tension only, infinitely strong), Stab (rod), hinge and rigid joints, a Festlager in free space, a
 move tool and connection markers. v0.3c adds the damper (Dämpfer). v0.4 adds displacement graphs, a light and a dark
 colour scheme, nodes (Knoten) and elastic bars for Fachwerke, bendable steel beams with square, L, T, H and I
-sections, harmonic loads and example scenes for free, harmonic and forced vibrations.
+sections, harmonic loads and example scenes for free, harmonic and forced vibrations. v0.4b lets elastic Stabs bend and
+buckle (Euler) and adds viscous damping so that loaded beams settle.
 
 ## Quick start
 
@@ -59,10 +60,14 @@ dark one (remembered in the browser).
 
 - *Fachwerk*: draw Stabs with the Stab tool (free ends become nodes, existing nodes are reused), put a Festlager and a Loslager
   on nodes, a force on a node. While the simulation runs every Stab shows its force, tension blue and compression red.
-  Rigid Stabs give the forces of statically determinate trusses (method of joints); with cross sections the Stabs are elastic bars
-  and indeterminate trusses work too. Example scenes `truss_bridge`, `truss_elastic`.
+  Rigid Stabs give the forces of statically determinate trusses (method of joints); with cross sections the Stabs are elastic steel bars
+  and indeterminate trusses work too. An elastic Stab is a beam-column: it sags under its own weight and **buckles** when its compression reaches the
+  Euler load π² E I / L² (shown on its label as a percentage; the right-click popup tells the load and the slenderness; the initial bow, the number of
+  elements and the damping are adjustable). Example scenes `truss_bridge`, `truss_elastic`, `buckling_columns`.
 - *Beams*: Euler-Bernoulli with large rotations, one material (steel: E = 210 GPa, 7850 kg/m³), sections square, L, T, H, I.
-  Supports, springs, loads and joints attach anywhere along the beam. Example scenes `cantilever_beam`, `beam_i_section`.
+  Supports, springs, loads and joints attach anywhere along the beam. A load that is applied suddenly makes an elastic beam swing about its static
+  deflection; the **damping α** (1/s, in the properties of beams, elastic Stabs and nodes; 5 for new beams and bars) lets it settle. Example scenes
+  `cantilever_beam` (undamped: it swings), `beam_i_section` (damped: it settles).
 - *Vibrations*: example scenes `harmonic_oscillation`, `free_vibration`, `forced_vibration` (a harmonic load F sin(2π f t + φ)).
 
 ## Layout

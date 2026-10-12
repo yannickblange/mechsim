@@ -88,3 +88,16 @@ Impulses are an optional interface (`elements/impulse_source.hpp`, found with `d
   the Stab tool makes nodes at free ends (`SceneModel.addRod` with `{ node: true }` ends, one undo step); `setStabSection` turns a rod into an
   elastic bar and back; property forms can reshape (a select with `reshape` rebuilds the form: cross-section type, load type);
   symbols `node.js`, `beam.js` (smooth deformed shape, bending exaggeration about the chord), `rod.js` (force labels, tension blue, compression red).
+
+## v0.4b: bars that bend and buckle, damping
+
+- `elements/beam_element.*` is one class for both uses: a `Beam` (hidden, reported through its body) and a `Bar` (an element of the frame with its own id). The ends of a
+  segment are `End`s: a node body, or an anchor (a point of a body or of the ground) that is **hinged** (no rotation variable, condensed out). The strain has
+  the bowing term, so a compressed member loses stiffness and buckles at the Euler load.
+- `io/beam_builder.*::addBar` builds the chain for an elastic Stab (anchors already remapped to beam nodes, like for every element): hidden internal bodies
+  (`Body::hidden`, not reported, carrying the mass), a half-sine initial bow, the weight of the end halves on the anchors. The loader calls it for `type: "bar"`
+  instead of a registry factory; `elements/bar.*` is gone.
+- `Body::damping` (viscous rate, applied in `solver/assembler.cpp`) is set from the `damping` parameter of nodes, beams and bars. Replaces the stiffness-proportional
+  damping tried first (see the notes).
+- Frontend: `rod.js` draws an elastic bar along its `nodes` (Hermite curve, `exaggerate` of `beam.js`) and labels the compression as a percentage of `pcr`;
+  `properties.js` has the Euler load, slenderness, elements, mass, damping and initial bow of an elastic Stab.

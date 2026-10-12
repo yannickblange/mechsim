@@ -1,0 +1,226 @@
+{
+  "version": "0.4",
+  "name": "Knicken: two steel columns, 70 % and 130 % of the Euler load",
+  "description": "Two identical steel columns (2 m long, 20 mm square, pinned at both ends: a Festlager below, a guide above that lets the top slide vertically) carry a dead load. The Euler load is P_cr = pi^2 E I / L^2 = 6909 N. The left column carries 0.7 P_cr: it only bows a little more than its initial imperfection (2 mm): the bow is magnified by 1 / (1 - P/P_cr) = 3.3. The right one carries 1.3 P_cr: the straight shape is unstable, the column buckles sideways within a fraction of a second and settles in the post-buckled shape of Euler's elastica (about 0.75 m of deflection). The force labels show the compression as a percentage of P_cr. Right-click a Stab to change its cross section: a thicker or an H / I section moves the Euler load (the H buckles about its weak axis).",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.7
+    ],
+    "width": 5.4
+  },
+  "surfaces": [
+    {
+      "id": "floor",
+      "p1": [
+        -2.2,
+        0
+      ],
+      "p2": [
+        2.2,
+        0
+      ]
+    },
+    {
+      "id": "wallL",
+      "p1": [
+        -1.5,
+        2.6
+      ],
+      "p2": [
+        -1.5,
+        1.4
+      ]
+    },
+    {
+      "id": "wallR",
+      "p1": [
+        1.5,
+        1.4
+      ],
+      "p2": [
+        1.5,
+        2.6
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "N1",
+      "type": "node",
+      "position": [
+        -1.0,
+        2.0
+      ],
+      "angle": 0,
+      "params": {
+        "mass": 2.0,
+        "damping": 6.0
+      }
+    },
+    {
+      "id": "N2",
+      "type": "node",
+      "position": [
+        1.0,
+        2.0
+      ],
+      "angle": 0,
+      "params": {
+        "mass": 2.0,
+        "damping": 6.0
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "S1",
+      "type": "bar",
+      "a": {
+        "body": null,
+        "point": [
+          -1.0,
+          0.0
+        ]
+      },
+      "b": {
+        "body": "N1",
+        "point": [
+          0,
+          0
+        ]
+      },
+      "params": {
+        "section": {
+          "type": "square",
+          "a": 0.02
+        },
+        "segments": 8,
+        "damping": 6.0,
+        "imperfection": 0.001
+      }
+    },
+    {
+      "id": "S2",
+      "type": "bar",
+      "a": {
+        "body": null,
+        "point": [
+          1.0,
+          0.0
+        ]
+      },
+      "b": {
+        "body": "N2",
+        "point": [
+          0,
+          0
+        ]
+      },
+      "params": {
+        "section": {
+          "type": "square",
+          "a": 0.02
+        },
+        "segments": 8,
+        "damping": 6.0,
+        "imperfection": 0.001
+      }
+    },
+    {
+      "id": "F1",
+      "type": "load",
+      "body": "N1",
+      "point": [
+        0,
+        0
+      ],
+      "params": {
+        "force": [
+          0,
+          -4836.1
+        ],
+        "moment": 0,
+        "mode": "constant"
+      }
+    },
+    {
+      "id": "F2",
+      "type": "load",
+      "body": "N2",
+      "point": [
+        0,
+        0
+      ],
+      "params": {
+        "force": [
+          0,
+          -8981.3
+        ],
+        "moment": 0,
+        "mode": "constant"
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "A1",
+      "type": "pin_support",
+      "body": null,
+      "point": [
+        -1.0,
+        0.0
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "A2",
+      "type": "pin_support",
+      "body": null,
+      "point": [
+        1.0,
+        0.0
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "B1",
+      "type": "roller_support",
+      "body": "N1",
+      "point": [
+        0,
+        0
+      ],
+      "surface": "wallL",
+      "params": {
+        "angle": -1.5707963267948966
+      }
+    },
+    {
+      "id": "B2",
+      "type": "roller_support",
+      "body": "N2",
+      "point": [
+        0,
+        0
+      ],
+      "surface": "wallR",
+      "params": {
+        "angle": 1.5707963267948966
+      }
+    }
+  ]
+}

@@ -155,8 +155,10 @@ function fachwerkElastic() {
   drag(tools.get('load'), [2, 0], [2, -2]);
   model.updateElement('F1', { force: [0, -1000] });
   for (const c of [...model.scene.constraints]) {
-    if (c.type === 'rod') model.setStabSection(c.id, { type: 'square', a: 0.02 });
+    // elastic steel bars of one element (the pure axial bar: no weight, no bending), damping 5 / s
+    if (c.type === 'rod') model.setStabSection(c.id, { type: 'square', a: 0.02 }, { segments: 1 });
   }
+  for (const b of model.scene.bodies) model.updateBody(b.id, { damping: 5 }); // the nodes settle as well
   return model.toJSON();
 }
 
@@ -165,7 +167,7 @@ function fachwerkElastic() {
 function cantileverBeam() {
   const { model, tools } = setup(undefined, SCALE);
   drag(tools.get('beam'), [0, 0], [2, 0]);
-  model.updateBody('b1', { section: { type: 'square', a: 0.01 } });
+  model.updateBody('b1', { section: { type: 'square', a: 0.01 }, damping: 0 }); // undamped: it swings
   support(tools.get('fixed'), [0, 0]); // the start of the axis (a snap point of the beam)
   drag(tools.get('load'), [2, 0], [2, -0.4]);
   model.updateElement('F1', { force: [0, -2] });

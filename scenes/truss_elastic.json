@@ -1,7 +1,7 @@
 {
   "version": "0.4",
   "name": "Fachwerk: statically indeterminate truss with elastic bars",
-  "description": "The same truss with an extra Stab D-C: 2 j = 10 < 8 members + 3 reactions, so equilibrium alone cannot say how the load is shared. Every Stab is an elastic bar with a cross section (I, T, L, H, square; one Young's modulus, 210 GPa), whose axial stiffness E A / L decides: the stiffer members carry more. The nodes swing by micrometres about the static state; the labels show the forces.",
+  "description": "The same truss with an extra Stab D-C: 2 j = 10 < 8 members + 3 reactions, so equilibrium alone cannot say how the load is shared. Every Stab is an elastic bar with a cross section (I, T, L, H, square; one Young's modulus, 210 GPa), whose axial stiffness E A / L decides: the stiffer members carry more. The bars are steel beam-columns (they sag by their own weight and would buckle under enough compression); with the viscous damping of 5 / s everything settles within a second and the labels show the forces.",
   "gravity": [
     0,
     -9.81
@@ -39,7 +39,8 @@
       ],
       "angle": 0,
       "params": {
-        "mass": 1.0
+        "mass": 1.0,
+        "damping": 5.0
       }
     },
     {
@@ -51,7 +52,8 @@
       ],
       "angle": 0,
       "params": {
-        "mass": 1.0
+        "mass": 1.0,
+        "damping": 5.0
       }
     },
     {
@@ -63,7 +65,8 @@
       ],
       "angle": 0,
       "params": {
-        "mass": 1.0
+        "mass": 1.0,
+        "damping": 5.0
       }
     },
     {
@@ -75,7 +78,8 @@
       ],
       "angle": 0,
       "params": {
-        "mass": 1.0
+        "mass": 1.0,
+        "damping": 5.0
       }
     },
     {
@@ -87,7 +91,8 @@
       ],
       "angle": 0,
       "params": {
-        "mass": 1.0
+        "mass": 1.0,
+        "damping": 5.0
       }
     }
   ],
@@ -116,7 +121,8 @@
           "h": 0.1,
           "tf": 0.007,
           "tw": 0.005
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -143,7 +149,8 @@
           "h": 0.1,
           "tf": 0.007,
           "tw": 0.005
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -169,7 +176,8 @@
           "b": 0.05,
           "h": 0.05,
           "t": 0.005
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -193,7 +201,8 @@
         "section": {
           "type": "square",
           "a": 0.03
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -220,7 +229,8 @@
           "h": 0.06,
           "tf": 0.006,
           "tw": 0.006
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -244,7 +254,8 @@
         "section": {
           "type": "square",
           "a": 0.03
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -270,7 +281,8 @@
           "b": 0.05,
           "h": 0.05,
           "t": 0.005
-        }
+        },
+        "damping": 5.0
       }
     },
     {
@@ -297,7 +309,8 @@
           "h": 0.08,
           "tf": 0.006,
           "tw": 0.004
-        }
+        },
+        "damping": 5.0
       }
     },
     {
