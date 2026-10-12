@@ -20,6 +20,12 @@ void assemble(World& world, double t, System& sys) {
     for (auto& b : world.bodies) {
         b.clearForces();
         b.applyForce(b.mass * world.gravity);
+        if (b.damping > 0.0) {
+            // explicit, so alpha dt must stay below 1: a larger alpha acts as the largest stable one
+            const double alpha = world.substepDt > 0.0 ? std::min(b.damping, 0.5 / world.substepDt) : b.damping;
+            b.applyForce(-alpha * b.mass * b.vel);
+            b.torque -= alpha * b.inertia * b.omega;
+        }
     }
     for (auto& e : world.elements) e->applyForces(world, t);
 

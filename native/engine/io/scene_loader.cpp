@@ -74,6 +74,14 @@ void loadElement(const json& rawSpec, const BeamPlans& beams, World& world, std:
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
     const std::string type = spec.at("type").get<std::string>();
+    if (type == "bar") {  // v0.4b: an elastic Stab is a chain of beam elements and hidden nodes
+        try {
+            addBar(spec, world);
+        } catch (const std::exception& e) {
+            throw std::runtime_error(id + ": " + e.what());
+        }
+        return;
+    }
     ElementFactoryFn make = findElementType(type);
     if (!make) throw std::runtime_error("element '" + id + "': unknown type '" + type + "'");
     world.elements.push_back(callFactory(make, spec, world, id));

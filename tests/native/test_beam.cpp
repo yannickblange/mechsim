@@ -284,3 +284,41 @@ TEST_CASE("a soft system does not use substeps", "[substeps]") {
     for (int i = 0; i < 3000; ++i) stiff->step(1e-3);
     CHECK(std::abs(stiff->bodies[0].pos.y) < 1.0);
 }
+
+// --- v0.4b: viscous damping lets a beam settle ------------------------------------------------------------------
+
+TEST_CASE("a damped beam settles at the static deflection and stays there (an undamped one keeps swinging)", "[beam][damping]") {
+    const double P = 10.0;
+    auto build = [&](double damping) {
+        json b = beamBody(0.0, {{"params", {{"length", kL}, {"damping", damping}, {"section", {{"type", "square"}, {"a", kA}}}}}});
+        json els = json::array({{{"id", "F"}, {"type", "load"}, {"body", "b"}, {"point", {kL / 2, 0.0}}, {"params", {{"force", {0.0, -P}}}}}});
+        return load(scene({b}, els, json::array({clamp("b", -kL / 2)})));
+    };
+    const double delta = P * kL * kL * kL / (3.0 * kEI);
+    auto still = build(8.0);
+    auto swinging = build(0.0);
+    double minSwing = 0, maxSwing = -1;
+    for (int i = 0; i < 12000; ++i) {
+        still->step(1e-3);
+        swinging->step(1e-3);
+        if (i > 6000) {
+            minSwing = std::min(minSwing, tipY(*swinging));
+            maxSwing = std::max(maxSwing, tipY(*swinging));
+        }
+    }
+    CHECK_THAT(-tipY(*still), WithinRel(delta, 5e-3));
+    for (int k : still->beams[0].nodes) CHECK(ms::length(still->bodies[k].vel) < 1e-6);  // at rest
+    CHECK(maxSwing - minSwing > 0.5 * delta);  // the undamped beam still moves by about its static deflection
+    CHECK_THROWS_WITH(load(scene({beamBody(0.0, {{"params", {{"length", kL}, {"damping", -1.0}, {"section", {{"type", "square"}, {"a", kA}}}}}})}, json::array(), json::array())),
+                      ContainsSubstring("damping"));
+}
+
+TEST_CASE("a damped free beam in the air decays its motion; damping 0 does not touch it", "[beam][damping]") {
+    auto w0 = load(scene({beamBody(0.0, {{"velocity", {1.0, 0.0}}})}, json::array(), json::array()));
+    for (int i = 0; i < 1000; ++i) w0->step(1e-3);
+    CHECK_THAT(w0->bodies[w0->beams[0].centre].vel.x, WithinAbs(1.0, 1e-9));
+    json b = beamBody(0.0, {{"velocity", {1.0, 0.0}}, {"params", {{"length", kL}, {"damping", 2.0}, {"section", {{"type", "square"}, {"a", kA}}}}}});
+    auto w2 = load(scene({b}, json::array(), json::array()));
+    for (int i = 0; i < 1000; ++i) w2->step(1e-3);
+    CHECK_THAT(w2->bodies[w2->beams[0].centre].vel.x, WithinRel(std::exp(-2.0 * 1.0), 2e-2));  // v e^(-alpha t): it acts like a viscous medium
+}

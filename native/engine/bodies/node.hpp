@@ -12,7 +12,7 @@ namespace ms {
 // freedom stays regular.
 constexpr double kNodeRadius = 0.05;  // m
 
-// params: {"mass": m}. Sets body.type = "node", mass and inertia m r^2 / 2.
+// params: {"mass": m, "damping"?: alpha (1/s)}. Sets body.type = "node", mass and inertia m r^2 / 2.
 void initNode(Body& body, const nlohmann::json& params);
 
 }  // namespace ms

@@ -77,9 +77,17 @@
   wide, `tf` thick) on top of a stem (`tw` wide), total height `h`; the I two flanges (`b`, `tf`) at the top and bottom of a web (`tw`);
   the H is the I turned by 90 degrees (weak axis). Bending in the simulation plane is about z: **I = integral of y^2 dA** about the
   centroid, y along "up". The product of inertia of the L is neglected. The axis of a member is the line of the centroids.
-- **Bar** (`bar`, an element): an elastic Stab, a pin-ended two-force member with axial stiffness `E A / L0` (`L0` the installed
-  length: it starts unstressed). Frame: `force` (tension positive) and `stress` = force / A (Pa). The rigid `rod` stays a constraint.
-  Bending and buckling of bars are not modelled.
+- **Bar** (`bar`, an element): an elastic Stab of steel, pinned at both anchors, axial stiffness `E A / L0` (`L0` the installed
+  length: it starts unstressed). The rigid `rod` stays a constraint (massless, never bends or buckles). Since **v0.4b** a bar is a
+  beam-column: `params.segments` (default 4; **1 = the pure axial bar of v0.4, massless**) beam elements with hidden internal nodes that
+  carry its mass (`params.mass`, default density x A x L), so it bends under its own weight and **buckles** in the plane at the Euler load
+  `P_cr = pi^2 E I / L^2` (I about the axis normal to the plane, the section's I). `params.imperfection` (default 1e-5) is the initial bow as a
+  fraction of the length. Frame: `p1`, `p2`, `force` (the normal force of the element that carries the most, tension positive), `stress`
+  (largest normal stress, axial plus bending; with one segment |force| / A), `nodes` (`[x, y, phi]` from end a to end b, the bent shape) and
+  `pcr` (the Euler load): the bar has buckled when `-force` reaches `pcr`.
+- **Damping** (`params.damping` of `node`, `beam` and `bar`, 1/s): viscous damping rate alpha, force `-alpha m v` and torque `-alpha J omega` on every node
+  (a bar: its internal nodes). Every mode decays like `exp(-alpha t / 2)`; a load applied suddenly settles at its static response instead of
+  swinging for ever. It acts on rigid-body motion too. Default 0 in the engine; the editor gives new beams and elastic Stabs 5 / s.
 - **Beam** (`beam`, a body): `params.length`, `params.section`, optional `params.mass` (default density x A x L) and `params.segments`
   (finite elements, default 8). It lies along its local x axis; `position` is the point of the centroid axis at the middle, `angle`
   the direction of the axis. Attachments (`body: <beam>`, body-local `point`, x within +-length/2) may be anywhere along it; the

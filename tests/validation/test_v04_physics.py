@@ -1,6 +1,7 @@
 """v0.4 example scenes against theory: vibrations (free, harmonic, forced), Fachwerke, beams."""
 from __future__ import annotations
 
+import copy
 import math
 
 import numpy as np
@@ -145,29 +146,47 @@ def test_truss_bridge_forces_by_the_method_of_joints(load_example):
         assert (b["x"], b["y"]) == pytest.approx((a["x"], a["y"]), abs=1e-6)
 
 
+def settle(scene, steps=8000):
+    with Simulation(scene) as sim:
+        sim.step(n=steps)  # damped: it rests after a few seconds
+        return sim.frame()
+
+
 def test_elastic_truss_shares_the_load_by_stiffness(load_example):
     scene = load_example("truss_elastic")
-    expected = truss.stiffness_forces(scene)
     with pytest.raises(ValueError):
         truss.joint_forces(scene)  # indeterminate: one member too many
-    sums = {k: 0.0 for k in expected}
-    n = 2000
-    with Simulation(scene) as sim:
-        for _ in range(n):
-            sim.step()
-            for e in sim.frame()["elements"]:
-                if e["type"] == "bar":
-                    sums[e["id"]] += e["force"]
-        frame = sim.frame()
-    for sid, value in expected.items():
-        assert sums[sid] / n == pytest.approx(value, rel=0.03, abs=3.0), sid
-    # every bar reports its stress = force / area (Pa)
+
+    # (a) the pure axial bars of v0.4 (one element: no weight, no bending): exactly the direct stiffness method
+    axial = copy.deepcopy(scene)
+    for e in axial["elements"]:
+        if e["type"] == "bar":
+            e["params"]["segments"] = 1
+    expected = truss.stiffness_forces(axial)
+    frame = settle(axial)
     bars = {e["id"]: e for e in frame["elements"] if e["type"] == "bar"}
-    for sid, bar in bars.items():
+    for sid, value in expected.items():
+        assert bars[sid]["force"] == pytest.approx(value, rel=0.02, abs=2.0), sid
+        area = section_properties(next(e for e in axial["elements"] if e["id"] == sid)["params"]["section"])["area"]
+        assert bars[sid]["stress"] == pytest.approx(abs(bars[sid]["force"]) / area, rel=1e-9)  # no bending
+    assert all(abs(b["vx"]) + abs(b["vy"]) < 1e-6 for b in frame["bodies"])
+    assert abs(expected["S8"]) > 100  # the redundant diagonal carries a share
+
+    # (b) the steel members as they are (4 elements, their own weight): they sag, and a sagging member is
+    # softer than E A / L (the chord shortens by 8 w^2 / 3 L, micrometres, as much as the load deforms them): the
+    # statically determinate members are unaffected, the redundant ones shift by a few ten per cent of the largest force
+    expected = truss.stiffness_forces(scene)
+    frame = settle(scene)
+    bars = {e["id"]: e for e in frame["elements"] if e["type"] == "bar"}
+    largest = max(abs(v) for v in expected.values())
+    for sid, value in expected.items():
+        assert bars[sid]["force"] == pytest.approx(value, abs=0.2 * largest), sid
+    for sid in ("S1", "S3"):  # equilibrium of the end nodes fixes them
+        assert bars[sid]["force"] == pytest.approx(expected[sid], rel=0.01)
+    for sid, bar in bars.items():  # the stress now includes the bending of the sag
         area = section_properties(next(e for e in scene["elements"] if e["id"] == sid)["params"]["section"])["area"]
-        assert bar["stress"] == pytest.approx(bar["force"] / area, rel=1e-9)
-    # a stiffer member attracts more load: the redundant diagonal (H, area 0.0006) carries something
-    assert abs(expected["S8"]) > 100
+        assert bar["stress"] >= abs(bar["force"]) / area * (1 - 1e-9)
+        assert len(bar["nodes"]) == 5 and bar["pcr"] > 0
 
 
 def test_trusses_conserve_energy_on_the_scale_of_the_energy_that_moves(load_example):
@@ -180,20 +199,19 @@ def test_trusses_conserve_energy_on_the_scale_of_the_energy_that_moves(load_exam
             e = sim.frame()["energy"]
             totals.append(e["kinetic"] + e["potential"])
     assert max(totals) - min(totals) < 1e-9
-    # the elastic truss oscillates by micrometres about its static state; the strain energy that goes back
-    # and forth is the scale: the total stays within 6 % of it (the stiffest modes run at omega dt_substep = 0.25,
-    # where the scheme's energy error is a few per cent of what they carry)
+    # the damped elastic truss only loses energy: the total never rises (within round-off of the scheme)
+    # and what it had to give up is the work of the load on its way to the static state
     scene = load_example("truss_elastic")
-    totals, potentials = [], []
+    totals = []
     with Simulation(scene) as sim:
         for _ in range(500):
             sim.step(n=10)
             e = sim.frame()["energy"]
             totals.append(e["kinetic"] + e["potential"])
-            potentials.append(e["potential"])
-    moving = max(potentials) - min(potentials)
-    assert moving > 1e-3
-    assert max(totals) - min(totals) < 0.06 * moving
+    scale = max(totals) - min(totals)
+    assert scale > 1e-3
+    assert all(b <= a + 0.02 * scale for a, b in zip(totals, totals[1:]))
+    assert totals[-1] < totals[0]
 
 
 # --- beams ---------------------------------------------------------------------------------------------------
@@ -225,25 +243,91 @@ def test_cantilever_beam_with_a_tip_mass_swings_at_the_cantilever_frequency(load
     assert nodes[0][1] == pytest.approx(0.0, abs=1e-9)
 
 
-def test_i_beam_on_two_supports_deflects_like_the_textbook_formula(load_example):
+def ellipticK(k):
+    a, b = 1.0, math.sqrt(1 - k * k)
+    for _ in range(40):
+        a, b = (a + b) / 2, math.sqrt(a * b)
+    return math.pi / (2 * a)
+
+
+def test_i_beam_settles_at_the_static_deflection_when_damped_and_swings_when_not(load_example):
     scene = load_example("beam_i_section")
     beam = scene["bodies"][0]["params"]
+    assert beam["damping"] > 0  # the example's beam has some structural damping
     L = beam["length"]
     props = section_properties(beam["section"])
     EI = 210e9 * props["inertia"]
     q = 7850 * props["area"] * G
     P = -scene["elements"][0]["params"]["force"][1]
     static = P * L**3 / (48 * EI) + 5 * q * L**4 / (384 * EI)
-    t, y = trajectory(scene, 6.0, key=lambda f: f["bodies"][0]["y"], every=5)
-    assert -np.mean(y) == pytest.approx(static, rel=0.05)  # the mean over many periods of an oscillation about it
-    assert -y.min() == pytest.approx(2 * static, rel=0.06)
-    # the same beam as an H (weak axis) is much softer, as a stiffer I would be stiffer
-    softer = load_example("beam_i_section")
-    softer["bodies"][0]["params"]["section"] = {"type": "H", **{k: v for k, v in beam["section"].items() if k != "type"}}
-    t2, y2 = trajectory(softer, 4.0, key=lambda f: f["bodies"][0]["y"], every=5)
-    assert -y2.min() > 5 * -y.min()
+
+    # damped: a suddenly applied constant force overshoots once and then HOLDS the static deflection
+    t, y = trajectory(scene, 3.0, key=lambda f: f["bodies"][0]["y"], every=5)
+    assert -y.min() > 1.05 * static  # it overshoots ...
+    assert -y.min() < 2.0 * static  # ... by less than the undamped factor 2
+    assert np.all(-y[t > 1.5] == pytest.approx(static, rel=0.03))  # and then it stays
+    assert np.ptp(y[t > 2.0]) < 0.01 * static  # no more movement
     with Simulation(scene) as sim:
         sim.step(n=3000)
         frame = sim.frame()["bodies"][0]
+    assert frame["vy"] == pytest.approx(0.0, abs=1e-4)  # (m/s: still decaying like exp(-4 t))
     assert frame["EI"] == pytest.approx(EI, rel=1e-12)
     assert frame["stress"] > 1e6  # Pa: millions, as for a loaded steel beam
+
+    # undamped (the same beam with damping 0): it swings between 0 and twice the static deflection for ever
+    swing = copy.deepcopy(scene)
+    swing["bodies"][0]["params"]["damping"] = 0
+    t2, y2 = trajectory(swing, 3.0, key=lambda f: f["bodies"][0]["y"], every=5)
+    assert -y2.min() == pytest.approx(2 * static, rel=0.06)
+    assert -np.mean(y2) == pytest.approx(static, rel=0.05)
+    assert np.ptp(y2[t2 > 2.0]) > 1.5 * static  # still swinging at t > 2 s
+
+    # as an H (weak axis) the beam is much softer, as a stiffer I would be stiffer
+    softer = copy.deepcopy(scene)
+    softer["bodies"][0]["params"]["section"] = {"type": "H", **{k: v for k, v in beam["section"].items() if k != "type"}}
+    t3, y3 = trajectory(softer, 4.0, key=lambda f: f["bodies"][0]["y"], every=5)
+    assert -y3.min() > 5 * -y.min()
+
+
+def test_columns_buckle_above_the_euler_load_and_only_then(load_example):
+    scene = load_example("buckling_columns")
+    L = 2.0
+    props = section_properties({"type": "square", "a": 0.02})
+    Pcr = math.pi**2 * 210e9 * props["inertia"] / L**2
+    bars = {e["id"]: e for e in scene["elements"] if e["type"] == "bar"}
+    loads = {e["body"]: -e["params"]["force"][1] for e in scene["elements"] if e["type"] == "load"}
+    ratios = {"N1": loads["N1"] / Pcr, "N2": loads["N2"] / Pcr}
+    assert ratios["N1"] == pytest.approx(0.7, abs=1e-3) and ratios["N2"] == pytest.approx(1.3, abs=1e-3)
+    with Simulation(scene) as sim:
+        sim.step(n=300)
+        early = {e["id"]: e for e in sim.frame()["elements"] if e["type"] == "bar"}
+        sim.step(n=6000)
+        frame = sim.frame()
+    final = {e["id"]: e for e in frame["elements"] if e["type"] == "bar"}
+    sway = lambda bar: max(abs(n[0] - bar["p1"][0]) for n in bar["nodes"])  # largest lateral deflection of a bar
+    assert final["S1"]["pcr"] == pytest.approx(Pcr, rel=1e-9)
+
+    # the left column (0.7 Pcr): the 2 mm bow grows by 1 / (1 - 0.7) = 3.3, and it stays there
+    bow = bars["S1"]["params"]["imperfection"] * L
+    weight_share = 0.5 * 7850 * props["area"] * L * G / Pcr  # the column's own weight adds to the compression
+    assert sway(final["S1"]) == pytest.approx(bow / (1 - ratios["N1"] - weight_share), rel=0.1)
+    assert sway(final["S1"]) < 0.01 * L
+    assert -final["S1"]["force"] / Pcr == pytest.approx(ratios["N1"] + weight_share, rel=0.03)
+
+    # the right column (1.3 Pcr): buckled, held in the post-buckled shape of Euler's elastica
+    ratio = ratios["N2"] + weight_share
+    lo, hi = 1e-6, 0.99
+    for _ in range(80):
+        k = (lo + hi) / 2
+        lo, hi = (lo, k) if 2 * ellipticK(k) / math.pi > math.sqrt(ratio) else (k, hi)
+    k = (lo + hi) / 2
+    assert sway(final["S2"]) == pytest.approx(k * L / ellipticK(k), rel=0.06)
+    assert sway(final["S2"]) > 0.3 * L
+    # the label's input: how much of the Euler load is carried (the most compressed element carries all of P)
+    # (at mid-height the tangent is vertical: N = P; the most compressed of 8 elements is a few degrees off: cos ~ 0.96)
+    assert -final["S2"]["force"] / Pcr == pytest.approx(ratio, rel=0.06)
+    # at rest in both
+    assert all(abs(b["vx"]) + abs(b["vy"]) < 1e-3 for b in frame["bodies"])
+    assert sway(early["S2"]) < sway(final["S2"])  # it needs time to buckle: it grows from the bow
+
+

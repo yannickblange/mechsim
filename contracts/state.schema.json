@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/state.schema.json",
-  "title": "MechSim frame v0.4",
+  "title": "MechSim frame v0.4b",
   "description": "One simulation frame, produced by ms_world_frame_json() and sent to the browser.",
   "type": "object",
   "required": ["t", "bodies", "elements", "constraints", "energy"],
@@ -48,8 +48,14 @@
           "type": { "type": "string" },
           "p1": { "$ref": "#/$defs/vec2", "description": "World position of anchor a (load: application point)." },
           "p2": { "$ref": "#/$defs/vec2", "description": "World position of anchor b (load: the same point as p1)." },
-          "force": { "type": "number", "description": "Axial force, positive = tension (spring, damper, bar); magnitude of the force or impulse, amplitude of a harmonic load (load)." },
-          "stress": { "type": "number", "description": "bar only: normal stress force / A, Pa, tension positive." },
+          "force": { "type": "number", "description": "Axial force, positive = tension (spring, damper; bar: the normal force of the element that carries the most); magnitude of the force or impulse, amplitude of a harmonic load (load)." },
+          "stress": { "type": "number", "description": "bar only: largest normal stress (axial plus bending), Pa. A bar with one segment: |force| / A." },
+          "nodes": {
+            "type": "array",
+            "items": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+            "description": "bar only: [x, y, phi] of the nodes along the bar from end a to end b (the bent shape); phi is the tangent."
+          },
+          "pcr": { "type": "number", "description": "bar only: the Euler load pi^2 E I / L^2 of the pinned bar, N. A bar buckles when its compression (negative force) reaches it." },
           "vector": { "$ref": "#/$defs/vec2", "description": "load only: force or impulse vector, world frame (harmonic: the instantaneous value)." },
           "moment": { "type": "number", "description": "load only: moment or angular impulse (harmonic: the instantaneous value)." },
           "mode": { "enum": ["constant", "impulse", "harmonic"], "description": "load only." },

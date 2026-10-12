@@ -13,8 +13,9 @@ ALL_SCENES = sorted(p.stem for p in (Path(__file__).resolve().parents[2] / "scen
 
 # A rope that snaps taut is an inelastic collision and a damper dissipates: energy is lost by design
 # (tests/validation/test_v03_physics.py and test_v03c_damper.py check what happens instead); a
-# harmonic force does work on the system (tests/validation/test_v04_physics.py checks the response).
-DISSIPATIVE = {"rope_catch", "spring_damper", "free_vibration", "forced_vibration"}
+# harmonic force does work on the system (tests/validation/test_v04_physics.py checks the response); beams,
+# bars and nodes with a damping rate lose energy by design (they settle).
+DISSIPATIVE = {"rope_catch", "spring_damper", "free_vibration", "forced_vibration", "beam_i_section", "buckling_columns"}
 # The drift is measured against the peak kinetic energy, which is (almost) zero for a structure at rest
 # and micro-joules for a stiff steel truss: tests/validation/test_v04_physics.py checks their energy
 # on the scale of the energy that moves.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.4",
-  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads. Version 0.1 to 0.3 scenes remain valid.",
+  "title": "MechSim scene v0.4b",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads; v0.4b lets elastic bars bend and buckle and adds viscous damping. Version 0.1 to 0.3 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
@@ -139,13 +139,20 @@
         "radius": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "dampingRate": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Viscous damping rate alpha in 1/s (v0.4b): every node feels the force -alpha m v (and the torque -alpha J omega), so every mode decays like exp(-alpha t / 2) whatever its frequency; a load applied suddenly settles at its static response. It acts on rigid-body motion too (like a viscous medium), so leave it 0 for a body that flies free."
+    },
     "nodeParams": {
       "type": "object",
       "required": ["mass"],
       "additionalProperties": false,
       "description": "Knoten (v0.4): a point mass where Stabs meet. Stabs, supports and loads attach at its centre, [0, 0].",
       "properties": {
-        "mass": { "type": "number", "exclusiveMinimum": 0 }
+        "mass": { "type": "number", "exclusiveMinimum": 0 },
+        "damping": { "$ref": "#/$defs/dampingRate" }
       }
     },
     "beamParams": {
@@ -167,7 +174,8 @@
           "maximum": 64,
           "default": 8,
           "description": "Number of finite elements between the evenly spaced nodes (odd numbers are rounded up). Attachments get nodes of their own."
-        }
+        },
+        "damping": { "$ref": "#/$defs/dampingRate" }
       }
     },
     "length": { "type": "number", "exclusiveMinimum": 0 },
@@ -270,8 +278,29 @@
       "type": "object",
       "required": ["section"],
       "additionalProperties": false,
-      "description": "Elastic Stab (v0.4): a pin-ended two-force member with axial stiffness E A / L, unstressed as installed. Unlike the rigid rod (a constraint) it makes statically indeterminate trusses solvable.",
-      "properties": { "section": { "$ref": "#/$defs/section" } }
+      "description": "Elastic Stab (v0.4): a pin-ended member of steel with the given cross section, axial stiffness E A / L, unstressed as installed. Unlike the rigid rod (a constraint) it makes statically indeterminate trusses solvable. Since v0.4b it is also a beam-column: a chain of beam elements with hidden internal nodes, so it bends (under its own weight) and buckles (Euler load pi^2 E I / L^2, in the plane, about the axis of the section's I).",
+      "properties": {
+        "section": { "$ref": "#/$defs/section" },
+        "segments": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "default": 4,
+          "description": "Beam elements along the bar. 1 = the pure axial bar of v0.4: massless, no bending, never buckles."
+        },
+        "mass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Total mass, kg. Default: density 7850 kg/m^3 times section area times length. The internal nodes carry it; half of the end segments hangs on the anchors as weight."
+        },
+        "imperfection": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.00001,
+          "description": "Initial bow (a half sine, stress-free) as a fraction of the length: a seed for buckling (a perfectly straight column would only buckle when round-off grows). The default 1e-5 does not disturb the statics of a truss; 1e-3 is a typical real imperfection and magnifies the deflection of a column below its Euler load by 1 / (1 - P / Pcr). 0 = straight."
+        },
+        "damping": { "$ref": "#/$defs/dampingRate" }
+      }
     },
     "damperParams": {
       "type": "object",

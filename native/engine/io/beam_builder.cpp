@@ -5,6 +5,7 @@
 #include <cmath>
 #include <stdexcept>
 
+#include "../constraints/anchor_spec.hpp"
 #include "../core/material.hpp"
 #include "../core/section.hpp"
 #include "../elements/beam_element.hpp"
@@ -14,6 +15,8 @@ namespace ms {
 namespace {
 
 using nlohmann::json;
+
+constexpr double kPi = 3.14159265358979323846;
 
 constexpr int kDefaultSegments = 8;
 constexpr int kMaxSegments = 64;
@@ -106,6 +109,13 @@ void addBeam(const json& spec, const BeamPlan& plan, World& world) {
     const std::string what = "beam '" + plan.id + "'";
     const json& params = spec.at("params");
     const Section section = parseSection(params.at("section"), what);
+    double damping = 0.0;
+    if (params.contains("damping")) {
+        if (!params["damping"].is_number() || params["damping"].get<double>() < 0.0) {
+            throw std::runtime_error(what + ": 'damping' must be a number >= 0");
+        }
+        damping = params["damping"].get<double>();
+    }
 
     double mass = kDensity * section.area * plan.length;
     if (params.contains("mass")) {
@@ -134,6 +144,7 @@ void addBeam(const json& spec, const BeamPlan& plan, World& world) {
         b.id = nodeId(plan.id, k);
         b.type = "beam_node";
         b.beam = group;
+        b.damping = damping;
         b.mass = mass * trib / plan.length;
         // A slice of length trib and height depth about its centre: m (trib^2 + depth^2) / 12; the
         // end nodes carry half a slice that hangs on one side of the node: m (trib^2 / 3 + depth^2 / 12).
@@ -157,16 +168,110 @@ void addBeam(const json& spec, const BeamPlan& plan, World& world) {
     const Vec2 axis = rotate({1.0, 0.0}, angle);
     for (std::size_t k = 0; k + 1 < n; ++k) {
         BeamElement::Segment s;
-        s.i = g.nodes[k];
-        s.j = g.nodes[k + 1];
+        s.a = {g.nodes[k], {0.0, 0.0}, false};
+        s.b = {g.nodes[k + 1], {0.0, 0.0}, false};
         s.L0 = plan.xs[k + 1] - plan.xs[k];
         s.u0 = axis;
-        s.phi0_i = s.phi0_j = angle;
+        s.phi0_a = s.phi0_b = angle;
         fe->segments.push_back(s);
     }
     g.fe = fe.get();
     world.elements.push_back(std::move(fe));
     world.beams.push_back(std::move(g));
+}
+
+void addBar(const json& spec, World& world) {
+    const std::string id = spec.at("id").get<std::string>();
+    const std::string what = "bar '" + id + "'";
+    const Anchor a = parseAnchorSpec(what, spec.at("a"), world, true);
+    const Anchor b = parseAnchorSpec(what, spec.at("b"), world, true);
+    if (a.body == GROUND && b.body == GROUND) throw std::runtime_error(what + ": at least one end must be on a mass");
+    if (a.body == b.body) throw std::runtime_error(what + ": both ends are on the same mass");
+    const Vec2 pA = world.anchorWorld(a), pB = world.anchorWorld(b);
+    const double L0 = length(pB - pA);
+    if (L0 < 1e-6) throw std::runtime_error(what + ": the ends coincide");
+
+    const json& params = spec.at("params");
+    if (!params.contains("section")) throw std::runtime_error(what + ": 'section' is required");
+    const Section section = parseSection(params.at("section"), what);
+    int segments = 4;
+    if (params.contains("segments")) {
+        if (!params["segments"].is_number_integer() || params["segments"].get<int>() < 1 || params["segments"].get<int>() > 16) {
+            throw std::runtime_error(what + ": 'segments' must be an integer from 1 to 16");
+        }
+        segments = params["segments"].get<int>();
+    }
+    double mass = kDensity * section.area * L0;
+    if (params.contains("mass")) {
+        if (!params["mass"].is_number() || !(params["mass"].get<double>() > 0.0)) {
+            throw std::runtime_error(what + ": 'mass' must be a number > 0");
+        }
+        mass = params["mass"].get<double>();
+    }
+    auto nonNegative = [&](const char* key, double fallback) {
+        if (!params.contains(key)) return fallback;
+        if (!params[key].is_number() || params[key].get<double>() < 0.0) {
+            throw std::runtime_error(what + ": '" + key + "' must be a number >= 0");
+        }
+        return params[key].get<double>();
+    };
+    const double damping = nonNegative("damping", 0.0);
+    const double imperfection = nonNegative("imperfection", 0.00001);
+
+    auto fe = std::make_unique<BeamElement>();
+    fe->id = id;
+    fe->kind = BeamElement::Kind::Bar;
+    fe->section = section;
+    fe->EA = kYoungModulus * section.area;
+    fe->EI = kYoungModulus * section.inertia;
+    fe->installedLength = L0;
+
+    const Vec2 u = (pB - pA) / L0;
+    const Vec2 nrm = perp(u);
+    const double chordAngle = std::atan2(u.y, u.x);
+    const double bow = imperfection * L0;
+    const Vec2 vA = world.anchorVelocity(a), vB = world.anchorVelocity(b);
+
+    // internal nodes: along the chord with a half sine of amplitude `bow` (the stress-free initial shape)
+    std::vector<int> inner;
+    std::vector<Vec2> points = {pA};
+    std::vector<double> angles = {0.0};
+    const double ell = L0 / segments;
+    for (int k = 1; k < segments; ++k) {
+        const double s = static_cast<double>(k) / segments;
+        Body body;
+        body.id = id + "#" + std::to_string(k);
+        body.type = "bar_node";
+        body.hidden = true;
+        body.damping = damping;
+        body.mass = mass * ell / L0;
+        body.inertia = body.mass * (ell * ell + section.depth() * section.depth()) / 12.0;
+        body.pos = pA + s * L0 * u + bow * std::sin(kPi * s) * nrm;
+        body.phi = chordAngle + std::atan2(bow * kPi * std::cos(kPi * s), L0);
+        body.vel = vA + s * (vB - vA);
+        inner.push_back(static_cast<int>(world.bodies.size()));
+        points.push_back(body.pos);
+        angles.push_back(body.phi);
+        world.bodies.push_back(std::move(body));
+    }
+    points.push_back(pB);
+    angles.push_back(0.0);
+    if (segments > 1) fe->endWeight = mass / (2.0 * segments);  // the end halves hang on the anchors
+
+    for (int k = 0; k < segments; ++k) {
+        BeamElement::Segment seg;
+        if (k == 0) seg.a = {a.body, a.point, true};
+        else seg.a = {inner[k - 1], {0.0, 0.0}, false};
+        if (k == segments - 1) seg.b = {b.body, b.point, true};
+        else seg.b = {inner[k], {0.0, 0.0}, false};
+        const Vec2 d = points[k + 1] - points[k];
+        seg.L0 = length(d);
+        seg.u0 = d / seg.L0;
+        seg.phi0_a = angles[k];
+        seg.phi0_b = angles[k + 1];
+        fe->segments.push_back(seg);
+    }
+    world.elements.push_back(std::move(fe));
 }
 
 json remapBeamAnchors(const json& spec, const BeamPlans& plans) {

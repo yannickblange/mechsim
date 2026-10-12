@@ -59,7 +59,9 @@ int World::substepsFor(double dt) const {
 void World::step(double dt) {
     if (solver.integrator == "semi_implicit_euler") {
         const int n = substepsFor(dt);
+        substepDt = dt / n;
         for (int i = 0; i < n; ++i) stepSemiImplicitEuler(*this, dt / n);  // advances `time`
+        substepDt = 0.0;
         return;
     }
     throw std::runtime_error("unknown integrator '" + solver.integrator + "'");
@@ -93,6 +95,7 @@ std::vector<World::BodyState> World::sceneBodies() const {
     };
     for (std::size_t i = 0; i < bodies.size(); ++i) {
         const Body& b = bodies[i];
+        if (b.hidden) continue;
         if (b.beam < 0) {
             out.push_back(state(b.id, b));
         } else if (static_cast<int>(i) == beams[b.beam].nodes.front()) {

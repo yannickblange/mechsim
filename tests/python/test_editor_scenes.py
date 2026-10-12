@@ -250,18 +250,14 @@ def test_elastic_fachwerk_with_a_redundant_bar_matches_the_stiffness_method(scen
     with pytest.raises(ValueError):
         truss.joint_forces(scene)  # statics alone cannot do it
     expected = truss.stiffness_forces(scene)
-    # the bars start unstressed and oscillate about the static solution: the mean force over a few
-    # thousand steps is the static force
-    sums = {k: 0.0 for k in expected}
-    n = 3000
+    # the bars (and nodes) have a damping of 5 / s: after 8 s the truss rests in its static state
     with Simulation(scene) as sim:
-        for _ in range(n):
-            sim.step()
-            for e in sim.frame()["elements"]:
-                if e["type"] == "bar":
-                    sums[e["id"]] += e["force"]
+        sim.step(n=8000)
+        frame = sim.frame()
+    forces = {e["id"]: e["force"] for e in frame["elements"] if e["type"] == "bar"}
     for k, v in expected.items():
-        assert sums[k] / n == pytest.approx(v, rel=0.03, abs=2.0), k
+        assert forces[k] == pytest.approx(v, rel=0.05, abs=5.0), k
+    assert all(abs(b["vx"]) + abs(b["vy"]) < 1e-6 for b in frame["bodies"]), "at rest"
     assert min(expected.values()) < 0 < max(expected.values())  # tension and compression
 
 

@@ -35,6 +35,8 @@ public:
     Vec2 gravity{0.0, -9.81};
     SolverSettings solver;
     double time = 0.0;
+    // Size of the (sub)step being taken, for elements whose damping must stay stable (v0.4b). 0 outside step().
+    double substepDt = 0.0;
 
     std::vector<Body> bodies;
     std::vector<std::unique_ptr<Element>> elements;

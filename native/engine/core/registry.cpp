@@ -11,7 +11,6 @@
 #include "../constraints/link.hpp"
 #include "../constraints/pin_support.hpp"
 #include "../constraints/roller_support.hpp"
-#include "../elements/bar.hpp"
 #include "../elements/damper.hpp"
 #include "../elements/load.hpp"
 #include "../elements/spring.hpp"
@@ -33,7 +32,6 @@ ElementFactoryFn findElementType(const std::string& type) {
         {"spring", &makeSpring},
         {"load", &makeLoad},
         {"damper", &makeDamper},
-        {"bar", &makeBar},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;

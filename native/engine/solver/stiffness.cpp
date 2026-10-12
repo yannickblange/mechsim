@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include "../core/world.hpp"
@@ -32,6 +33,14 @@ double estimateMaxOmega(World& world) {
     const int n = 3 * nb;
     if (n == 0 || world.elements.empty()) return 0.0;
 
+    // The velocities are set aside: damping forces depend on them and must not enter K.
+    std::vector<std::pair<Vec2, double>> saved;
+    for (auto& b : world.bodies) {
+        saved.emplace_back(b.vel, b.omega);
+        b.vel = {0.0, 0.0};
+        b.omega = 0.0;
+    }
+
     // K by central differences: column j = -(f(q + h e_j) - f(q - h e_j)) / 2h.
     const double h = 1e-7;
     std::vector<double> K(static_cast<std::size_t>(n) * n, 0.0), fp, fm;
@@ -45,7 +54,11 @@ double estimateMaxOmega(World& world) {
         q = q0;
         for (int i = 0; i < n; ++i) K[static_cast<std::size_t>(i) * n + j] = -(fp[i] - fm[i]) / (2.0 * h);
     }
-    for (auto& b : world.bodies) b.clearForces();
+    for (std::size_t i = 0; i < world.bodies.size(); ++i) {
+        world.bodies[i].vel = saved[i].first;
+        world.bodies[i].omega = saved[i].second;
+        world.bodies[i].clearForces();
+    }
 
     // S = M^-1/2 K M^-1/2 (symmetrised), largest eigenvalue by power iteration.
     std::vector<double> minv(n);

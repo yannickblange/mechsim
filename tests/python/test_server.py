@@ -13,6 +13,7 @@ from mechsim.server.mock import MockSimulation
 
 SCENES = [
     "beam_i_section",
+    "buckling_columns",
     "cantilever_beam",
     "cantilever_clamp",
     "disc_spring_moment",

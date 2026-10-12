@@ -14,6 +14,8 @@ from typing import Any
 
 import numpy as np
 
+from mechsim.analysis.sections import section_area
+
 E_MODULUS = 210e9  # Pa, the one material of v0.4
 G = 9.81
 
@@ -43,6 +45,17 @@ def _external(scene, nodes, index, gravity=G) -> np.ndarray:
     for e in scene["elements"]:
         if e["type"] == "load" and e["body"] in index and e["params"].get("mode", "constant") == "constant":
             f[2 * index[e["body"]]: 2 * index[e["body"]] + 2] += e["params"]["force"]
+    # an elastic Stab has a weight of its own (v0.4b; not with one segment, the massless axial bar): half of it
+    # reaches each end of a member that is simply supported by its nodes
+    for e in scene["elements"]:
+        params = e.get("params", {})
+        if e["type"] != "bar" or params.get("segments", 4) == 1:
+            continue
+        a, b = (np.array(nodes[e[end]["body"]]["position"], float) for end in ("a", "b"))
+        mass = params.get("mass", 7850.0 * section_area(params["section"]) * float(np.linalg.norm(b - a)))
+        for end in ("a", "b"):
+            if e[end]["body"] in index:
+                f[2 * index[e[end]["body"]] + 1] -= 0.5 * mass * gravity
     return f
 
 
@@ -76,8 +89,6 @@ def joint_forces(scene: dict[str, Any], gravity: float = G) -> dict[str, float]:
 
 def stiffness_forces(scene: dict[str, Any], gravity: float = G) -> dict[str, float]:
     """Member forces of a truss of elastic bars by the direct stiffness method (K u = f)."""
-    from mechsim.analysis.sections import section_area
-
     nodes, index, members, supports = _truss(scene)
     if any(m["type"] != "bar" for m in members):
         raise ValueError("every member must be an elastic bar")
