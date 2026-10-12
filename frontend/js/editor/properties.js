@@ -48,6 +48,7 @@ export function propertyFields(model, id) {
       fields: [],
     };
   }
+  if (obj.type === 'damper') return damperForm(model, obj);
   return obj.type === 'spring' ? springForm(model, obj) : loadForm(obj);
 }
 
@@ -118,6 +119,17 @@ function bodyForm(body) {
     title: `${body.type === 'disc' ? 'Circular' : 'Rectangular'} mass ${body.id}`,
     info: [`Moment of inertia J = ${fixed(inertia, 4)} kg·m² about the centre of mass.`],
     fields,
+  };
+}
+
+function damperForm(model, damper) {
+  const a = anchorWorld(model.scene, damper.a);
+  const b = anchorWorld(model.scene, damper.b);
+  return {
+    title: `Damper ${damper.id}`,
+    info: [`Between two points ${fixed(a && b ? dist(a, b) : 0)} m apart. The force is c times the rate of change of the length: `
+      + 'it resists every relative motion of its ends, stores no energy and has no relaxed length.'],
+    fields: [num('c', 'Damping c', 'N·s/m', damper.params.c, { min: 0 })],
   };
 }
 
@@ -196,6 +208,8 @@ export function applyProperties(model, id, values) {
     const patch = { mass: parsed.mass, angle: parsed.angle * RAD, velocity: [parsed.vx, parsed.vy], omega: parsed.omega };
     for (const key of ['width', 'height', 'radius']) if (key in parsed) patch[key] = parsed[key];
     model.updateBody(id, patch);
+  } else if (kind === 'element' && 'c' in parsed) {
+    model.updateElement(id, { c: parsed.c });
   } else if (kind === 'element' && 'k' in parsed) {
     model.updateElement(id, { k: parsed.k, restLength: parsed.restLength });
   } else if (kind === 'element') {

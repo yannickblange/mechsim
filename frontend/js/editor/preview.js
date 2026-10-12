@@ -3,6 +3,7 @@
 import { drawBlock } from '../canvas/symbols/block.js';
 import { drawFixedJoint, drawPinJoint } from '../canvas/symbols/joint.js';
 import { drawLoad } from '../canvas/symbols/load.js';
+import { drawDamper } from '../canvas/symbols/damper.js';
 import { drawRod } from '../canvas/symbols/rod.js';
 import { drawRope } from '../canvas/symbols/rope.js';
 import { drawSpring, drawSpringGhost } from '../canvas/symbols/spring.js';
@@ -182,6 +183,7 @@ function drawToolPreview(ctx, cam, theme, pv, scene) {
       break;
     case 'link':
       if (pv.kind === 'rope') drawRope(ctx, cam, {}, { p1: pv.a, p2: pv.b, taut: true }, theme);
+      else if (pv.kind === 'damper') drawDamper(ctx, cam, {}, { p1: pv.a, p2: pv.b }, theme);
       else drawRod(ctx, cam, {}, { p1: pv.a, p2: pv.b }, theme);
       label(ctx, cam, theme, pv.b, pv.label);
       break;
@@ -294,7 +296,7 @@ function drawSelection(ctx, cam, theme, scene, sel) {
     if (s) line(s.p1, s.p2);
   } else if (sel.kind === 'element') {
     const e = find(scene.elements);
-    if (e && e.type === 'spring') {
+    if (e && e.a && e.b) {
       const a = anchorWorld(scene, e.a);
       const b = anchorWorld(scene, e.b);
       if (a && b) line(a, b);

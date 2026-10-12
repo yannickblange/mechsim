@@ -5,6 +5,7 @@ import { normalizeRopes } from './moves.js';
 
 export const DEFAULT_MASS = 1.0;
 export const DEFAULT_SPRING_K = 100.0;
+export const DEFAULT_DAMPING = 10.0; // N s / m
 const HISTORY_LIMIT = 100;
 
 const SUPPORT_TYPES = {
@@ -210,6 +211,15 @@ export class SceneModel {
     });
   }
 
+  // Damper between two ends { body: id | null, point } (at least one on a mass, different masses).
+  addDamper({ a, b, c = DEFAULT_DAMPING }) {
+    return this.#edit((s) => {
+      const id = nextId('c', this.allIds());
+      s.elements.push({ id, type: 'damper', a: anchor(a), b: anchor(b), params: { c } });
+      return id;
+    });
+  }
+
   addLoad({ body, point, force = [0, 0], moment = 0, mode = 'constant' }) {
     return this.#edit((s) => {
       const id = nextId('F', this.allIds());
@@ -348,6 +358,7 @@ export class SceneModel {
     return this.#edit((s) => {
       const el = s.elements.find((e) => e.id === id);
       if (patch.k !== undefined) el.params.k = patch.k;
+      if (patch.c !== undefined) el.params.c = patch.c;
       if (patch.restLength === null) delete el.params.rest_length;
       else if (patch.restLength !== undefined) el.params.rest_length = tidy(patch.restLength);
       if (patch.force !== undefined) el.params.force = tidyPoint(patch.force);
@@ -389,7 +400,7 @@ export class SceneModel {
 function rescaleAttachments(scene, bodyId, sx, sy) {
   const scalePoint = (p) => tidyPoint([p[0] * sx, p[1] * sy]);
   for (const el of scene.elements) {
-    if (el.type === 'spring') {
+    if (el.a) { // spring, damper
       for (const end of [el.a, el.b]) if (end.body === bodyId) end.point = scalePoint(end.point);
     } else if (el.body === bodyId) {
       el.point = scalePoint(el.point);

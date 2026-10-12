@@ -114,13 +114,14 @@
     // v0.3: rope (taut and slack), Stab, joints.
     import { Camera } from '/js/canvas/camera.js';
     import { drawFixedJoint, drawPinJoint } from '/js/canvas/symbols/joint.js';
+    import { drawDamper } from '/js/canvas/symbols/damper.js';
     import { drawRod } from '/js/canvas/symbols/rod.js';
     import { drawRope } from '/js/canvas/symbols/rope.js';
     import { drawPinSupport } from '/js/canvas/symbols/supports.js';
 
     const theme = {
       background: '#22332b', ink: '#e9eee4', muted: '#9fb0a4', spring: '#f0c96a', support: '#9cc3e6',
-      force: '#e8868a', rope: '#dcae78',
+      force: '#e8868a', rope: '#dcae78', damper: '#8fd1c0',
     };
     const ctx = document.getElementById('c3').getContext('2d');
     ctx.fillStyle = theme.background;
@@ -136,6 +137,9 @@
     rope([-4, -0.2], [-3.2, -1.2], 1.8, false); // slack, diagonal
     rope([-1.5, 1.4], [-1.5, 0.2], 1.6, false); // slack, vertical: sideways
     drawRod(ctx, cam, {}, { p1: [-0.6, 1.3], p2: [1.0, 0.2] }, theme);
+    drawDamper(ctx, cam, {}, { p1: [2.0, 1.3], p2: [3.6, 1.3] }, theme);
+    drawDamper(ctx, cam, {}, { p1: [2.0, 0.9], p2: [2.5, 0.9] }, theme);
+    drawDamper(ctx, cam, {}, { p1: [4.0, 1.4], p2: [4.0, -0.2] }, theme);
     drawRod(ctx, cam, {}, { p1: [0.2, -1.2], p2: [1.8, -1.2] }, theme);
     drawPinSupport(ctx, cam, { params: { angle: 0 } }, { position: [-0.6, 1.3] }, theme); // a free-space Festlager
     drawPinJoint(ctx, cam, {}, { position: [2.4, 0.5] }, theme);

@@ -10,6 +10,7 @@
 //     theme colours, see Renderer.readTheme()
 // Surfaces are not part of frames; the renderer draws them with drawSurface(ctx, cam, surface, theme).
 import { drawBlock } from './block.js';
+import { drawDamper } from './damper.js';
 import { drawDisc } from './disc.js';
 import { drawFixedJoint, drawPinJoint } from './joint.js';
 import { drawLoad } from './load.js';
@@ -23,7 +24,7 @@ export { drawSpringGhost } from './spring.js';
 export { supportHeight };
 
 export const bodySymbols = { block: drawBlock, disc: drawDisc };
-export const elementSymbols = { spring: drawSpring, load: drawLoad };
+export const elementSymbols = { spring: drawSpring, load: drawLoad, damper: drawDamper };
 export const constraintSymbols = {
   pin_support: drawPinSupport,
   fixed_support: drawFixedSupport,

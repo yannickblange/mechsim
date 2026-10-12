@@ -14,7 +14,7 @@ const floorScene = () => sceneWith({
 
 test('the toolbox offers every component', () => {
   assert.deepEqual(TOOL_DEFS.map((d) => d.id), [
-    'select', 'move', 'rect', 'circle', 'surface', 'spring', 'rope', 'rod', 'load', 'pin', 'fixed', 'roller', 'joint', 'weld',
+    'select', 'move', 'rect', 'circle', 'surface', 'spring', 'damper', 'rope', 'rod', 'load', 'pin', 'fixed', 'roller', 'joint', 'weld',
   ]);
 });
 

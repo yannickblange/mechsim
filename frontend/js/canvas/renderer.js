@@ -14,6 +14,7 @@ const THEME_VARS = {
   support: ['--c-support', '#9cc3e6'],
   force: ['--c-force', '#e8868a'],
   rope: ['--c-rope', '#dcae78'],
+  damper: ['--c-damper', '#8fd1c0'],
 };
 
 const SUPPORT_TYPES = ['pin_support', 'fixed_support', 'roller_support'];

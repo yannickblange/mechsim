@@ -94,7 +94,7 @@ export function movePin(scene, id, delta, tol) {
   const moved = (anchor) => {
     if (anchor.body === null && dist(anchor.point, old) < 1e-6) anchor.point = tidyPoint(add(anchor.point, delta));
   };
-  for (const e of scene.elements) if (e.type === 'spring') { moved(e.a); moved(e.b); }
+  for (const e of scene.elements) if (e.a) { moved(e.a); moved(e.b); } // springs, dampers
   for (const c of scene.constraints) if (isLink(c)) { moved(c.a); moved(c.b); }
   pin.point = tidyPoint(add(old, delta));
   const surface = nearestSurface(scene, pin.point, tol);

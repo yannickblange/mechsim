@@ -74,6 +74,18 @@ G  = [ n_x  n_y  n · perp(r) ]       γ₀ = ω² n · r      γ = γ₀ − 2 
 The reaction is `λ n`. The supported point slides, so the rotation of the body is free; a body with a
 single Loslager can tip over. Two Loslager on the same surface keep it from tipping.
 
+### Damper (damper), v0.3c
+
+Viscous element between two anchors, `u = (p_b − p_a)/|p_b − p_a|`, anchor velocities `v_a`, `v_b`:
+
+```
+F = c u · (v_b − v_a)          force on a: +F u at the anchor point, on b: −F u   (c ≥ 0, tension positive)
+```
+
+Dissipated power `c (dL/dt)²`, no potential energy. The velocities at the start of the step are used (explicit
+damping), so the semi-implicit Euler scheme stays stable while `c dt / m_eff < 2` (at dt = 1 ms: `c / m < 2000 1/s`); beyond that
+the damping overshoots and the motion oscillates numerically.
+
 ### Stab and rope (rod, rope), v0.3
 
 Two anchors, world positions `p_a`, `p_b`, anchor velocities `v_a`, `v_b`, `d = p_b − p_a`, `u = d/|d|`,
@@ -162,6 +174,8 @@ Energy is not exactly conserved but stays bounded (oscillates with relative ampl
 - Clamped block (fixed Lager) of length L: reaction `Fy = m g`, `M = m g L / 2` (balances the clockwise weight).
 - Disc of radius r on a Festlager at its centre with a spring at the rim (stiffness k, vertical): small
   oscillations with `ω = sqrt(2 k / m)`, independent of r.
+- Mass–spring–damper: `ζ = c / (2 √(k m))`, damped frequency `ω_d = ω₀ √(1 − ζ²)`, successive peaks shrink by
+  `exp(−ζ ω₀ T_d)`; a mass hanging on a damper alone reaches the terminal velocity `m g / c`.
 - Block of mass m hanging from two Stabs from `(±0.5, 1.5)` to its top corners `(±0.2, 0.6)`: each rod
   carries `m g / (2 cos θ)` with `cos θ = 0.9 / |(0.3, 0.9)|`.
 - A mass falling 0.414 m onto a rope that goes taut loses `½ m v_r²` (`v_r` the velocity component along the rope

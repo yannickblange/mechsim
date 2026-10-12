@@ -1,4 +1,4 @@
-# Units and conventions (frozen for v0.1; v0.2 and v0.3 additions at the end)
+# Units and conventions (frozen for v0.1; v0.2 and v0.3 / v0.3c additions at the end)
 
 - **SI units everywhere**: m, kg, s, N, N·m, rad. No mm, no degrees inside the engine or JSON.
 - **Coordinate system**: right-handed, x to the right, **y up**. Gravity is a vector, default `[0, -9.81]`.
@@ -55,3 +55,11 @@
 - **Festlager in free space**: `pin_support` with `body: null` and a **world** point. It has no equations of its
   own; it marks a fixed point that spring, rope and rod ends are attached to (as ground anchors at the same
   point) and that the editor's joint tool can pin a mass to. Its reaction is reported as `[0, 0]`.
+
+## v0.3c addition
+
+- **Damper** (`damper`, an element like the spring): ends are `{body, point}` anchors, at least one end on a mass, the two ends
+  on different masses. `params.c` in N s / m (>= 0). The force along the axis is `F = c * dL/dt` with `dL/dt = u . (v_b - v_a)`,
+  `u = (p_b - p_a) / |p_b - p_a|`: tension positive (the ends move apart), compression negative, so it always resists the
+  relative motion. Force on a: `+F u`, on b: `-F u`. It has no relaxed length and stores no energy (it dissipates `c (dL/dt)^2`),
+  so the total energy of a system with a damper decreases. Frame: `p1`, `p2`, `force`.

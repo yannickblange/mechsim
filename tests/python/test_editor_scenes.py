@@ -46,14 +46,14 @@ def to_world(body, point):
     return [body["x"] + c * point[0] - s * point[1], body["y"] + s * point[0] + c * point[1]]
 
 
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped"])
 def test_exported_scene_is_valid(scenes, name):
     assert scene_module.validate_scene(scenes[name]) == []
     assert scenes[name]["version"] == "0.2"
 
 
 @pytest.mark.native
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped"])
 def test_exported_scene_runs_and_frames_are_valid(scenes, state_schema, name):
     for frame in run(scenes[name], 500, sample=100):
         jsonschema.validate(frame, state_schema)
@@ -199,3 +199,14 @@ def test_loslager_placed_with_a_gap_holds_the_mass_like_a_touching_one(scenes):
     m = block["params"]["mass"]
     total = sum(c["reaction"][1] for c in frames[-1]["constraints"])
     assert total == pytest.approx(m * G, rel=1e-6)
+
+
+@pytest.mark.native
+def test_damper_made_with_the_tool_gives_terminal_velocity(scenes):
+    s = scenes["damped"]
+    damper = s["elements"][0]
+    assert damper["type"] == "damper" and damper["params"]["c"] == 10
+    m = s["bodies"][0]["params"]["mass"]
+    frames = run(s, 2000, sample=100)
+    assert frames[-1]["bodies"][0]["vy"] == pytest.approx(-m * G / 10, rel=2e-3)
+    assert frames[-1]["elements"][0]["force"] == pytest.approx(m * G, rel=2e-3)

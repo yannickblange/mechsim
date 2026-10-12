@@ -112,6 +112,16 @@ function gap() {
   return model.toJSON();
 }
 
+// A block hung from a damper only: it falls at the terminal velocity m g / c.
+function damped() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('rect'), [-0.2, 0.4], [0.2, 0.6]);
+  const t = tools.get('damper');
+  click(t, [0, 1.5]);
+  click(t, [0, 0.6]); // top edge of the block
+  return model.toJSON();
+}
+
 process.stdout.write(JSON.stringify({
-  incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(), gap: gap(),
+  incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(), gap: gap(), damped: damped(),
 }));

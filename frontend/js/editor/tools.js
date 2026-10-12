@@ -589,10 +589,11 @@ export class SupportTool extends Tool {
 
 // --- rope and Stab ----------------------------------------------------------------------------------
 
-const LINK_NAMES = { rope: 'rope', rod: 'Stab' };
+const LINK_NAMES = { rope: 'rope', rod: 'Stab', damper: 'damper' };
 
 // Two ends, each on a mass, on a Festlager in free space, or on the ground. The rope never stretches
-// but may go slack; the Stab keeps its length and takes push and pull.
+// but may go slack; the Stab keeps its length and takes push and pull; the damper resists the
+// relative motion of its ends.
 export class LinkTool extends Tool {
   constructor(env, kind) {
     super(env);
@@ -608,7 +609,8 @@ export class LinkTool extends Tool {
 
   get hint() {
     if (this.a) return 'Click the second end (or release after dragging from the first).';
-    const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.' : '';
+    const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.'
+      : this.kind === 'damper' ? ' Set its damping c in its properties.' : '';
     return `Click the first end of the ${LINK_NAMES[this.kind]}: a point of a mass, a Festlager in free space, or the ground.${extra}`;
   }
 
@@ -651,8 +653,11 @@ export class LinkTool extends Tool {
       this.error = problem;
       return; // keep the first end, try the second again
     }
-    const id = this.kind === 'rope' ? this.env.model.addRope(link) : this.env.model.addRod(link);
-    this.env.created('constraint', id);
+    if (this.kind === 'damper') {
+      this.env.created('element', this.env.model.addDamper(link));
+    } else {
+      this.env.created('constraint', this.kind === 'rope' ? this.env.model.addRope(link) : this.env.model.addRod(link));
+    }
     this.reset();
   }
 
@@ -908,6 +913,7 @@ export const TOOL_DEFS = [
   { id: 'circle', label: 'Circular mass', icon: 'circle', make: (env) => new CircleTool(env) },
   { id: 'surface', label: 'Surface', icon: 'surface', make: (env) => new SurfaceTool(env) },
   { id: 'spring', label: 'Spring', icon: 'spring', make: (env) => new SpringTool(env) },
+  { id: 'damper', label: 'Damper', icon: 'damper', make: (env) => new LinkTool(env, 'damper') },
   { id: 'rope', label: 'Rope', icon: 'rope', make: (env) => new LinkTool(env, 'rope') },
   { id: 'rod', label: 'Stab (rod)', icon: 'rod', make: (env) => new LinkTool(env, 'rod') },
   { id: 'load', label: 'Force / moment', icon: 'load', make: (env) => new LoadTool(env) },

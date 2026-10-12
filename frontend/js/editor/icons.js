@@ -3,6 +3,7 @@ const wrap = (body) =>
   `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
 export const ICONS = {
+  damper: wrap('<path d="M2 12h5"/><path d="M13 7H7v10h6"/><path d="M11 8.5v7"/><path d="M11 12h11"/>'),
   move: wrap('<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>'),
   rope: wrap('<path d="M4 8c3 5 5 5 8 5s5 0 8-5" /><circle cx="4" cy="8" r="1.6" fill="currentColor"/><circle cx="20" cy="8" r="1.6" fill="currentColor"/>'),
   rod: wrap('<path d="M5 18L19 6" stroke-width="3.2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/>'),

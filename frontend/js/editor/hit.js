@@ -12,6 +12,8 @@ export const HIT_PX = { support: 14, load: 12, spring: 7, surface: 7, end: 11 };
 const LINK_TYPES = ['rope', 'rod'];
 const JOINT_TYPES = ['pin_joint', 'fixed_joint'];
 export const isLink = (c) => LINK_TYPES.includes(c.type);
+// Spring and damper: elements with two anchors.
+export const isAxialElement = (e) => e.type === 'spring' || e.type === 'damper';
 export const isJoint = (c) => JOINT_TYPES.includes(c.type);
 
 export function anchorWorld(scene, anchor) {
@@ -72,7 +74,7 @@ export function hitTest(scene, world, scale) {
     if (nearArrow || nearMoment || dist(p, world) <= px(HIT_PX.load)) return { kind: 'element', id: e.id };
   }
   const lines = [
-    ...scene.elements.filter((e) => e.type === 'spring').map((e) => ({ kind: 'element', obj: e })),
+    ...scene.elements.filter(isAxialElement).map((e) => ({ kind: 'element', obj: e })),
     ...scene.constraints.filter(isLink).map((c) => ({ kind: 'constraint', obj: c })),
   ].reverse();
   for (const { kind, obj } of lines) {
@@ -98,7 +100,7 @@ export function hitTest(scene, world, scale) {
 export function moveTarget(scene, world, scale) {
   const px = (n) => n / scale;
   const ends = [
-    ...scene.elements.filter((e) => e.type === 'spring').map((e) => ({ kind: 'element', obj: e })),
+    ...scene.elements.filter(isAxialElement).map((e) => ({ kind: 'element', obj: e })),
     ...scene.constraints.filter(isLink).map((c) => ({ kind: 'constraint', obj: c })),
   ].reverse();
   // A ground end that sits on a Festlager in free space is part of that pin (moving the pin moves
