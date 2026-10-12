@@ -271,3 +271,37 @@ test('Stab, joint and free pin forms', () => {
   assert.equal(applyProperties(m, 'G1', { jointType: 'bogus' }).ok, false);
   assert.match(propertyFields(m, 'A1').title, /free space/);
 });
+
+// --- slack rope geometry -------------------------------------------------------------------------
+
+import { ropeControlPoint, ropePolyline } from '../../frontend/js/canvas/symbols/rope.js';
+import { hitTest } from '../../frontend/js/editor/hit.js';
+
+test('slack rope: a taut rope has no curve; a slack one hangs down with the right arc length', () => {
+  assert.equal(ropeControlPoint([0, 0], [1, 0], 1), null);
+  assert.equal(ropeControlPoint([0, 0], [1, 0], 0.9), null);
+  const c = ropeControlPoint([0, 0], [1, 0], 1.1);
+  close(c[0], 0.5, 1e-12);
+  assert.ok(c[1] < 0, 'hangs down');
+  // arc length of the sampled curve is close to the rope length
+  const pts = ropePolyline([0, 0], [1, 0], 1.1, 200);
+  let len = 0;
+  for (let i = 0; i + 1 < pts.length; i++) len += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+  close(len, 1.1, 1e-2); // the parabola formula is accurate to < 1 % at this sag
+  // vertical rope: sideways; reversed direction gives the same side for the same chord
+  const v = ropeControlPoint([0, 1], [0, 0], 1.2);
+  assert.ok(v[0] > 0);
+  const swapped = ropeControlPoint([0, 0], [0, 1], 1.2);
+  closePoint(swapped, v, 1e-9);
+});
+
+test('hitTest finds a slack rope where it hangs, not on its chord', () => {
+  const m = new SceneModel(sceneWith({ bodies: [block('a', 1, 0, 0.2, 0.2)] }));
+  m.addRope({ a: { body: null, point: [0, 1] }, b: { body: 'a', point: [0, 0] }, length: 1.6 });
+  const s = m.scene;
+  const c = ropeControlPoint([0, 1], [1, 0], 1.6);
+  const mid = [0.5, 0.5]; // the middle of the straight chord
+  const onCurve = [0.5 * c[0] + 0.25 * 1, 0.25 * 1 + 0.5 * c[1]]; // the curve at t = 0.5 (B(t) = (p1 + 2c + p2) / 4)
+  assert.deepEqual(hitTest(s, onCurve, 400), { kind: 'constraint', id: 'R1' });
+  assert.equal(hitTest(s, mid, 400), null, 'the straight chord is empty space');
+});

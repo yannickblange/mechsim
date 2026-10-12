@@ -1,4 +1,4 @@
-# Units and conventions (frozen for v0.1; v0.2 additions at the end)
+# Units and conventions (frozen for v0.1; v0.2 and v0.3 additions at the end)
 
 - **SI units everywhere**: m, kg, s, N, N·m, rad. No mm, no degrees inside the engine or JSON.
 - **Coordinate system**: right-handed, x to the right, **y up**. Gravity is a vector, default `[0, -9.81]`.
@@ -34,3 +34,24 @@
   report their fixed world position.
 - **Spring `rest_length`**: the relaxed length (the editor's "ghost"). If it is shorter than the
   installed length the spring starts in tension, if longer in compression.
+
+## v0.3 additions
+
+- **Rope** (`rope`, a constraint): `|p_b - p_a| <= length`, tension only, infinitely strong (it never stretches).
+  `params.length` (m) defaults to the initial distance (taut) and must not be smaller; a larger value
+  starts the rope slack. A slack rope exerts no force. When it becomes taut the velocity that would
+  stretch it is removed at once (inelastic: energy is lost, no bounce). Frame: `force` (N, >= 0),
+  `taut` (false while slack), `length`.
+- **Stab / rod** (`rod`, a constraint): a massless two-force member, `|p_b - p_a| = L` with `L` the initial
+  distance. It carries tension **and** compression; frame `force` is tension positive, so a rod in
+  compression is negative.
+- Rope and rod ends are `{body, point}` anchors like a spring's (`body: null` = world point). At least one
+  end is on a mass and the two ends are on different masses. Frame `reaction` is the force on end b.
+- **Attachments are fixed to the mass.** Every body-local anchor (spring, rope, rod, support, load)
+  moves with its mass and does not slide; the end of a rope or rod is a hinge.
+- **Joints** (`pin_joint`, `fixed_joint`): between two different masses, anchors `a` and `b` that coincide at
+  t = 0 (otherwise the solver pulls them together at the start). `pin_joint` is a hinge, `fixed_joint` also
+  fixes the relative angle. Frame `reaction` is the force (and for `fixed_joint` the moment) on the mass of `a`.
+- **Festlager in free space**: `pin_support` with `body: null` and a **world** point. It has no equations of its
+  own; it marks a fixed point that spring, rope and rod ends are attached to (as ground anchors at the same
+  point) and that the editor's joint tool can pin a mass to. Its reaction is reported as `[0, 0]`.

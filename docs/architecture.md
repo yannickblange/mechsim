@@ -56,3 +56,16 @@ Data flow: the editor works on a local copy of the scene. **Done** / **Play** se
 Impulses are an optional interface (`elements/impulse_source.hpp`, found with `dynamic_cast`) so the frozen
 `Element` interface did not have to change; `World::initialize()` / `reset()` call
 `solver/impulse.cpp`.
+
+## v0.3: links, joints and the move tool
+
+- Engine: `constraints/link.cpp` (rope + rod), `constraints/joint.cpp`, `constraints/ground_pin.cpp` (Festlager in free
+  space, a `pin_support` with `body: null` that exerts no constraint). Ropes switch on and off, so they implement the
+  optional `constraints/unilateral.hpp` interface (found with `dynamic_cast`; `Constraint` itself is unchanged); the
+  integrator runs `updateUnilateral()` before and `releaseViolated()` after each solve (`solver/unilateral.cpp`),
+  and `solver/impulse.cpp::projectVelocities` removes the velocity that would stretch a rope that engages.
+- Editor additions in `frontend/js/editor/`: `placement.js` (where a support goes, shared by the support tools and the move
+  tool), `moves.js` (pure move operations: translate masses with their joint group, surfaces, free pins; re-attach ends,
+  supports and loads; contact snapping; rope normalisation), `connections.js` (attachment points grouped by position, and
+  what an object is connected to), tools `LinkTool`, `JointTool`, `MoveTool`. A move drag is a `SceneModel.transaction()`:
+  every pointer move re-applies the operation to the state at the start of the drag, release records one undo step.

@@ -12,7 +12,7 @@ import {
 } from '../canvas/symbols/supports.js';
 import { bodyToWorld, blockCorners } from './geometry.js';
 import { connectionPoints, neighbors } from './connections.js';
-import { anchorWorld, attachedPoint, isLink, linkEnds } from './hit.js';
+import { anchorWorld, attachedPoint, isLink, linkPath } from './hit.js';
 
 const SUPPORT_DRAW = {
   pin_support: drawPinSupport,
@@ -96,13 +96,14 @@ function drawNeighbors(ctx, cam, theme, scene, selection) {
   }
   for (const o of [...scene.elements, ...scene.constraints]) {
     if (!items.has(o.id)) continue;
-    const ends = o.a && o.b ? linkEnds(scene, o) : null;
-    const p = ends ? null : attachedPoint(scene, o);
+    const pts = o.a && o.b ? linkPath(scene, o) : null;
+    const p = pts ? null : attachedPoint(scene, o);
     ctx.beginPath();
-    if (ends) {
-      const [a, b] = ends.map((q) => cam.toScreen(q));
-      ctx.moveTo(a[0], a[1]);
-      ctx.lineTo(b[0], b[1]);
+    if (pts) {
+      pts.forEach((q, i) => {
+        const [x, y] = cam.toScreen(q);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
     } else if (p) {
       const [x, y] = cam.toScreen(p);
       ctx.arc(x, y, 16, 0, 2 * Math.PI);
@@ -259,14 +260,15 @@ function drawSelection(ctx, cam, theme, scene, sel) {
     ctx.arc(x, y, r, 0, 2 * Math.PI);
     ctx.stroke();
   };
-  const line = (a, b) => {
-    const [ax, ay] = cam.toScreen(a);
-    const [bx, by] = cam.toScreen(b);
+  const path = (pts) => {
     ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(bx, by);
+    pts.forEach((q, i) => {
+      const [x, y] = cam.toScreen(q);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
     ctx.stroke();
   };
+  const line = (a, b) => path([a, b]);
   if (sel.kind === 'body') {
     const body = find(scene.bodies);
     if (body) {
@@ -289,8 +291,8 @@ function drawSelection(ctx, cam, theme, scene, sel) {
   } else if (sel.kind === 'constraint') {
     const c = find(scene.constraints);
     if (c && isLink(c)) {
-      const ends = linkEnds(scene, c);
-      if (ends) line(ends[0], ends[1]);
+      const pts = linkPath(scene, c);
+      if (pts) path(pts);
     } else {
       const p = c && attachedPoint(scene, c);
       if (p) ring(p, 22);

@@ -1,5 +1,6 @@
 // hit.js - what is under the pointer? Used for selection and for right-click properties.
 import { FORCE_M_PER_N } from '../canvas/symbols/load.js';
+import { ropePolyline } from '../canvas/symbols/rope.js';
 import {
   bodyArea, bodyToWorld, closestOnSegment, dist, pointInBody,
 } from './geometry.js';
@@ -34,6 +35,21 @@ export function linkEnds(scene, obj) {
   return a && b ? [a, b] : null;
 }
 
+// The path of a spring, rope or rod as a polyline (a slack rope is the curve it hangs in), or null.
+export function linkPath(scene, obj) {
+  const ends = linkEnds(scene, obj);
+  if (!ends) return null;
+  return obj.type === 'rope' && obj.params.length !== undefined ? ropePolyline(ends[0], ends[1], obj.params.length) : ends;
+}
+
+// Distance of p from a spring / rope / rod.
+function lineDistance(p, ends, obj, scene) {
+  const pts = linkPath(scene, obj) || ends;
+  let best = Infinity;
+  for (let i = 0; i + 1 < pts.length; i++) best = Math.min(best, closestOnSegment(p, pts[i], pts[i + 1]).dist);
+  return best;
+}
+
 // Returns { kind: "surface" | "body" | "element" | "constraint", id } or null.
 // Small things win over big things: supports, joints and pins, loads, springs / ropes / rods,
 // then bodies, then surfaces.
@@ -61,7 +77,7 @@ export function hitTest(scene, world, scale) {
   ].reverse();
   for (const { kind, obj } of lines) {
     const ends = linkEnds(scene, obj);
-    if (ends && closestOnSegment(world, ends[0], ends[1]).dist <= px(HIT_PX.spring)) return { kind, id: obj.id };
+    if (ends && lineDistance(world, ends, obj, scene) <= px(HIT_PX.spring)) return { kind, id: obj.id };
   }
   const bodies = scene.bodies.filter((b) => pointInBody(b, world));
   if (bodies.length) {

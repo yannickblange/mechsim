@@ -1,4 +1,4 @@
-# Equations of motion (v0.1, extended in v0.2)
+# Equations of motion (v0.1, extended in v0.2 and v0.3)
 
 ## Coordinates
 
@@ -74,6 +74,44 @@ G  = [ n_x  n_y  n · perp(r) ]       γ₀ = ω² n · r      γ = γ₀ − 2 
 The reaction is `λ n`. The supported point slides, so the rotation of the body is free; a body with a
 single Loslager can tip over. Two Loslager on the same surface keep it from tipping.
 
+### Stab and rope (rod, rope), v0.3
+
+Two anchors, world positions `p_a`, `p_b`, anchor velocities `v_a`, `v_b`, `d = p_b − p_a`, `u = d/|d|`,
+`v_r = v_b − v_a`. One equation with the multiplier equal to the axial force (tension positive):
+
+```
+C  = L − |d|
+Ċ  = −u · v_r
+C̈  = −u · (a_b − a_a) − (|v_r|² − (u · v_r)²) / |d|        a_p = a_i + α perp(r) − ω² r
+G  = +u on body a, −u on body b  (columns x, y, φ: [u, u · perp(r)])
+γ₀ = −u · (ω_b² r_b − ω_a² r_a) + (|v_r|² − (u · v_r)²) / |d|        γ = γ₀ − 2 α Ċ − β² C
+```
+
+`G^T λ` pulls both ends together for λ > 0. The **rod** is always active. The **rope** is active only while
+taut:
+
+- at the start of a step it is engaged if `|d| + max(0, u·v_r) dt ≥ L` (taut now or within this step);
+  an engaging rope whose ends move apart (`u·v_r > 0`) first gets the outward velocity removed by the
+  velocity projection (below): an **inelastic snap**, no bounce;
+- after the solve a rope with λ < 0 (it would push) is released and the system is solved again
+  (active-set iteration, at most once per constraint per step);
+- its Baumgarte term only corrects a stretched rope (C < 0), never pushes a slack-by-a-few-mm one outward.
+
+**Velocity projection**: `M Δv = Gᵀ Λ, G (v + Δv) = 0`, the same system as an impulse with `J = 0`
+(`projectVelocities`).
+
+### Gelenk and rigid joint (pin_joint, fixed_joint), v0.3
+
+Between bodies a and b with local points `p_a`, `p_b`, `r = R(φ) p`:
+
+```
+C = (x_a + r_a) − (x_b + r_b)            rows [ I  perp(r_a) | −I  −perp(r_b) ]
+γ₀ = ω_a² r_a − ω_b² r_b                 γ = γ₀ − 2 α Ċ − β² C
+```
+
+`fixed_joint` adds `C₃ = φ_a − φ_b − Δφ₀` with row `[0 0 1 | 0 0 −1]` and
+`γ₃ = −2 α (ω_a − ω_b) − β² C₃`. λ is the force (and moment) on body a; body b gets the opposite.
+
 ### Loads, v0.2
 
 A constant force `F` at body-local point `p` and a couple `M` add `F` to the force and
@@ -124,4 +162,11 @@ Energy is not exactly conserved but stays bounded (oscillates with relative ampl
 - Clamped block (fixed Lager) of length L: reaction `Fy = m g`, `M = m g L / 2` (balances the clockwise weight).
 - Disc of radius r on a Festlager at its centre with a spring at the rim (stiffness k, vertical): small
   oscillations with `ω = sqrt(2 k / m)`, independent of r.
+- Block of mass m hanging from two Stabs from `(±0.5, 1.5)` to its top corners `(±0.2, 0.6)`: each rod
+  carries `m g / (2 cos θ)` with `cos θ = 0.9 / |(0.3, 0.9)|`.
+- A mass falling 0.414 m onto a rope that goes taut loses `½ m v_r²` (`v_r` the velocity component along the rope
+  at the snap); the tangential part is kept.
+- Double pendulum of two uniform bars: the Lagrange equations (integrated with RK4 in
+  `tests/validation/test_v03_physics.py`) with `I_cm = m (l² + w²) / 12`.
+- Rigid L of two welded bars on a Festlager: physical pendulum, `T = 2π √(I_A / (M g d))`.
 - Free fall with semi-implicit Euler from rest: `y_n = y_0 + g_y dt² n(n+1)/2` (exact for the scheme).
