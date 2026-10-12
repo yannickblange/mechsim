@@ -5,6 +5,7 @@
 #include <string>
 
 #include "../core/world.hpp"
+#include "ground_pin.hpp"
 
 namespace ms {
 
@@ -46,6 +47,7 @@ std::unique_ptr<Constraint> makePinSupport(const nlohmann::json& spec, const Wor
     std::string id = "?";
     try {
         id = spec.at("id").get<std::string>();
+        if (spec.at("body").is_null()) return makeGroundPin(spec, world);  // v0.3: free-space Festlager
         const std::string bodyId = spec.at("body").get<std::string>();
         auto c = std::make_unique<PinSupport>();
         c->id = id;

@@ -1,9 +1,16 @@
 // impulse.hpp - impulsive loads at t = 0 (v0.2).
 #pragma once
 
+#include <vector>
+
 namespace ms {
 
 class World;
+
+// Applies the generalised impulse J (length 3 * bodies) as a velocity jump that respects the
+// constraints: M dv = J + G^T Lambda, G (v + dv) = 0. With J = 0 this just projects the velocities
+// onto the constraints. Throws std::runtime_error if the constraint system is singular.
+void projectVelocities(World& world, const std::vector<double>& J);
 
 // Collects the impulse of every ImpulseSource element and applies the resulting velocity jump to
 // the bodies. The jump respects the constraints: with generalised impulse J and constraint

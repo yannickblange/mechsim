@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "../core/world.hpp"
@@ -12,16 +13,11 @@
 
 namespace ms {
 
-void applyInitialImpulses(World& world) {
+void projectVelocities(World& world, const std::vector<double>& J) {
     const int n = 3 * static_cast<int>(world.bodies.size());
-    std::vector<double> J(n, 0.0);
-    for (const auto& e : world.elements) {
-        if (const auto* src = dynamic_cast<const ImpulseSource*>(e.get())) src->addImpulse(world, J);
-    }
-    if (std::all_of(J.begin(), J.end(), [](double x) { return x == 0.0; })) return;
-
     System sys;
-    assemble(world, world.time, sys);  // M and G in the initial pose
+    assemble(world, world.time, sys);  // M and G in the current pose
+    if (sys.m == 0 && std::all_of(J.begin(), J.end(), [](double x) { return x == 0.0; })) return;
 
     // Same linear system as the accelerations: M dv = J + G^T Lambda, G dv = -G v.
     std::vector<double> v(n);
@@ -40,13 +36,24 @@ void applyInitialImpulses(World& world) {
 
     std::vector<double> dv, lambda;
     if (solveAccelerations(sys, dv, lambda) != 0) {
-        throw std::runtime_error("constraint system is singular while applying the impulse at t = 0");
+        throw std::runtime_error("constraint system is singular while projecting the velocities at t = " +
+                                 std::to_string(world.time));
     }
     for (std::size_t i = 0; i < world.bodies.size(); ++i) {
         Body& b = world.bodies[i];
         b.vel += Vec2{dv[3 * i], dv[3 * i + 1]};
         b.omega += dv[3 * i + 2];
     }
+}
+
+void applyInitialImpulses(World& world) {
+    const int n = 3 * static_cast<int>(world.bodies.size());
+    std::vector<double> J(n, 0.0);
+    for (const auto& e : world.elements) {
+        if (const auto* src = dynamic_cast<const ImpulseSource*>(e.get())) src->addImpulse(world, J);
+    }
+    if (std::all_of(J.begin(), J.end(), [](double x) { return x == 0.0; })) return;
+    projectVelocities(world, J);
 }
 
 }  // namespace ms

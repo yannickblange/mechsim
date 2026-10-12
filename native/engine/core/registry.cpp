@@ -6,6 +6,8 @@
 #include "../bodies/block.hpp"
 #include "../bodies/disc.hpp"
 #include "../constraints/fixed_support.hpp"
+#include "../constraints/joint.hpp"
+#include "../constraints/link.hpp"
 #include "../constraints/pin_support.hpp"
 #include "../constraints/roller_support.hpp"
 #include "../elements/load.hpp"
@@ -36,6 +38,10 @@ ConstraintFactoryFn findConstraintType(const std::string& type) {
         {"pin_support", &makePinSupport},
         {"fixed_support", &makeFixedSupport},
         {"roller_support", &makeRollerSupport},
+        {"rope", &makeRope},
+        {"rod", &makeRod},
+        {"pin_joint", &makePinJoint},
+        {"fixed_joint", &makeFixedJoint},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;

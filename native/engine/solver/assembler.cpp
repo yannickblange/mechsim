@@ -36,6 +36,7 @@ void assemble(World& world, double t, System& sys) {
 
     int row = 0;
     for (const auto& c : world.constraints) {
+        if (c->dim() == 0) continue;  // inactive rope, free-space Festlager
         c->fill(world, &sys.G[static_cast<std::size_t>(row) * sys.n], sys.n, &sys.gamma[row]);
         row += c->dim();
     }

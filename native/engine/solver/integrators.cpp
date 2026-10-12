@@ -8,6 +8,7 @@
 #include "../core/world.hpp"
 #include "assembler.hpp"
 #include "lagrange.hpp"
+#include "unilateral.hpp"
 
 namespace ms {
 
@@ -15,9 +16,18 @@ namespace ms {
 void stepSemiImplicitEuler(World& world, double dt) {
     System sys;
     std::vector<double> acc, lambda;
-    assemble(world, world.time, sys);
-    if (solveAccelerations(sys, acc, lambda) != 0) {
-        throw std::runtime_error("constraint system is singular at t = " + std::to_string(world.time));
+
+    // v0.3: ropes switch on and off. Engage the taut ones (removing the velocity that would
+    // stretch them), then solve; a rope whose multiplier would push is released and the system is
+    // solved again (active-set iteration, at most once per constraint).
+    updateUnilateral(world, dt);
+    const std::size_t maxIterations = world.constraints.size() + 1;
+    for (std::size_t it = 0;; ++it) {
+        assemble(world, world.time, sys);
+        if (solveAccelerations(sys, acc, lambda) != 0) {
+            throw std::runtime_error("constraint system is singular at t = " + std::to_string(world.time));
+        }
+        if (it >= maxIterations || !releaseViolated(world, lambda)) break;
     }
 
     int row = 0;
