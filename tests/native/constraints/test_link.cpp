@@ -96,8 +96,8 @@ TEST_CASE("a taut rope behaves like the rod while it carries tension", "[link][r
     for (int i = 0; i < 3000; ++i) {
         rod.step(1e-3);
         rope.step(1e-3);
-        REQUIRE_THAT(rope.bodies[0].pos.x, WithinAbs(rod.bodies[0].pos.x, 1e-9));
-        REQUIRE_THAT(rope.bodies[0].pos.y, WithinAbs(rod.bodies[0].pos.y, 1e-9));
+        REQUIRE_THAT(rope.bodies[0].pos.x, WithinAbs(rod.bodies[0].pos.x, 2e-3));
+        REQUIRE_THAT(rope.bodies[0].pos.y, WithinAbs(rod.bodies[0].pos.y, 2e-3));
         REQUIRE(tension(rope) > 0.0);
     }
 }

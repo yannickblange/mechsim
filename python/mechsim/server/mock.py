@@ -69,16 +69,7 @@ class MockSimulation:
                 }
             )
         elements = [self._element_frame(e, t) for e in self._scene.get("elements", [])]
-        constraints = []
-        for constraint in self._scene.get("constraints", []):
-            constraints.append(
-                {
-                    "id": constraint["id"],
-                    "type": constraint["type"],
-                    "position": self._constraint_point(constraint),
-                    "reaction": [0.0, 0.0, 0.0] if constraint["type"] == "fixed_support" else [0.0, 0.0],
-                }
-            )
+        constraints = [self._constraint_frame(c, t) for c in self._scene.get("constraints", [])]
         return {
             "t": t,
             "bodies": bodies,
@@ -113,6 +104,36 @@ class MockSimulation:
             "force": 0.0,
         }
 
+    def _constraint_frame(self, constraint: dict[str, Any], t: float) -> dict[str, Any]:
+        kind = constraint["type"]
+        if kind in ("rope", "rod"):
+            p1 = self._anchor_world(constraint["a"], t)
+            p2 = self._anchor_world(constraint["b"], t)
+            return {
+                "id": constraint["id"],
+                "type": kind,
+                "position": p1,
+                "reaction": [0.0, 0.0],
+                "p1": p1,
+                "p2": p2,
+                "force": 0.0,
+                "length": constraint.get("params", {}).get("length", math.dist(p1, p2)),
+                "taut": True,
+            }
+        if kind in ("pin_joint", "fixed_joint"):
+            return {
+                "id": constraint["id"],
+                "type": kind,
+                "position": self._anchor_world(constraint["a"], t),
+                "reaction": [0.0, 0.0, 0.0] if kind == "fixed_joint" else [0.0, 0.0],
+            }
+        return {
+            "id": constraint["id"],
+            "type": kind,
+            "position": self._constraint_point(constraint),
+            "reaction": [0.0, 0.0, 0.0] if kind == "fixed_support" else [0.0, 0.0],
+        }
+
     def _check_open(self) -> None:
         if self._closed:
             raise RuntimeError(f"MockSimulation({self._scene.get('name', '?')}) is closed")
@@ -136,6 +157,8 @@ class MockSimulation:
         return self._to_world(x, y, phi, anchor["point"])
 
     def _constraint_point(self, constraint: dict[str, Any]) -> list[float]:
+        if constraint["body"] is None:  # Festlager in free space: the point is a world point
+            return list(constraint["point"])
         # Fixed in the mock: world position of the point at t = 0.
         x, y, phi, _, _, _ = self._pose(self._bodies[constraint["body"]], 0.0)
         return self._to_world(x, y, phi, constraint["point"])

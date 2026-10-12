@@ -1,0 +1,96 @@
+{
+  "version": "0.3",
+  "name": "Double pendulum (pin joint)",
+  "description": "Two bars: the upper one on a Festlager, the lower one hinged to it with a pin joint (Gelenk).",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.7
+    ],
+    "width": 2.8
+  },
+  "surfaces": [
+    {
+      "id": "ceiling",
+      "p1": [
+        0.6,
+        1.4
+      ],
+      "p2": [
+        -0.6,
+        1.4
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "upper",
+      "type": "block",
+      "position": [
+        0.215206827,
+        1.190987987
+      ],
+      "angle": 0.8,
+      "params": {
+        "mass": 1.0,
+        "width": 0.08,
+        "height": 0.6
+      }
+    },
+    {
+      "id": "lower",
+      "type": "block",
+      "position": [
+        0.327544312,
+        0.700164161
+      ],
+      "angle": -0.35,
+      "params": {
+        "mass": 1.0,
+        "width": 0.08,
+        "height": 0.6
+      }
+    }
+  ],
+  "elements": [],
+  "constraints": [
+    {
+      "id": "A",
+      "type": "pin_support",
+      "body": "upper",
+      "point": [
+        0.0,
+        0.3
+      ],
+      "surface": "ceiling",
+      "params": {
+        "angle": 3.141592654
+      }
+    },
+    {
+      "id": "J",
+      "type": "pin_joint",
+      "a": {
+        "body": "upper",
+        "point": [
+          0.0,
+          -0.3
+        ]
+      },
+      "b": {
+        "body": "lower",
+        "point": [
+          0.0,
+          0.3
+        ]
+      }
+    }
+  ]
+}

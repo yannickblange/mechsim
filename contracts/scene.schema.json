@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.2",
-  "description": "v0.2 adds surfaces, discs, loads (force and moment), fixed and roller supports. Version 0.1 scenes remain valid.",
+  "title": "MechSim scene v0.3",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints and Festlager in free space. Version 0.1 and 0.2 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
   "properties": {
-    "version": { "enum": ["0.1", "0.2"] },
+    "version": { "enum": ["0.1", "0.2", "0.3"] },
     "name": { "type": "string" },
     "description": { "type": "string" },
     "gravity": { "$ref": "#/$defs/vec2", "default": [0, -9.81] },
@@ -193,25 +193,99 @@
         }
       }
     },
+    "bodyAnchor": {
+      "type": "object",
+      "required": ["body", "point"],
+      "additionalProperties": false,
+      "properties": {
+        "body": { "$ref": "#/$defs/id" },
+        "point": { "$ref": "#/$defs/vec2", "description": "Body-local point." }
+      }
+    },
     "constraint": {
       "type": "object",
-      "required": ["id", "type", "body", "point"],
+      "required": ["id", "type"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["pin_support", "fixed_support", "roller_support"] },
-        "body": { "$ref": "#/$defs/id" },
-        "point": {
-          "$ref": "#/$defs/vec2",
-          "description": "Body-local point. The support is fixed at its initial world position."
+        "type": {
+          "enum": ["pin_support", "fixed_support", "roller_support", "rope", "rod", "pin_joint", "fixed_joint"]
         },
-        "surface": {
-          "description": "Optional id of the surface the support sits on (editor reference only; the engine uses params.angle).",
+        "body": {
+          "description": "Supports: the mass the support is on. pin_support only: null = Festlager in free space (point is then a world point).",
           "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
         },
-        "params": { "$ref": "#/$defs/supportParams", "default": {} }
+        "point": {
+          "$ref": "#/$defs/vec2",
+          "description": "Supports: body-local point (world point for a free-space pin_support). The support is fixed at its initial world position."
+        },
+        "surface": {
+          "description": "Supports: optional id of the surface the support sits on (editor reference only; the engine uses params.angle).",
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "a": { "$ref": "#/$defs/anchor", "description": "rope, rod: first end. pin_joint, fixed_joint: point on the first mass." },
+        "b": { "$ref": "#/$defs/anchor", "description": "rope, rod: second end. pin_joint, fixed_joint: point on the second mass." },
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "pin_support" } } },
+          "then": {
+            "required": ["body", "point"],
+            "not": { "anyOf": [{ "required": ["a"] }, { "required": ["b"] }] },
+            "properties": { "params": { "$ref": "#/$defs/supportParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["fixed_support", "roller_support"] } } },
+          "then": {
+            "required": ["body", "point"],
+            "not": { "anyOf": [{ "required": ["a"] }, { "required": ["b"] }] },
+            "properties": { "body": { "$ref": "#/$defs/id" }, "params": { "$ref": "#/$defs/supportParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "rope" } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }, { "required": ["surface"] }] },
+            "properties": { "params": { "$ref": "#/$defs/ropeParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "rod" } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }, { "required": ["surface"] }] },
+            "properties": { "params": { "$ref": "#/$defs/noParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["pin_joint", "fixed_joint"] } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }, { "required": ["surface"] }] },
+            "properties": {
+              "a": { "$ref": "#/$defs/bodyAnchor" },
+              "b": { "$ref": "#/$defs/bodyAnchor" },
+              "params": { "$ref": "#/$defs/noParams" }
+            }
+          }
+        }
+      ]
+    },
+    "ropeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "length": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum length. If omitted, the initial distance between the ends is used (taut). Must not be shorter than the initial distance; longer means the rope starts slack."
+        }
       }
     },
+    "noParams": { "type": "object", "additionalProperties": false },
     "supportParams": {
       "type": "object",
       "additionalProperties": false,

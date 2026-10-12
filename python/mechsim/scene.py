@@ -110,7 +110,18 @@ def check_references(scene: dict[str, Any]) -> list[str]:
         else:
             need_body(element["id"], element["body"])
     for constraint in constraints:
-        need_body(constraint["id"], constraint["body"])
+        kind = constraint["type"]
+        if kind in ("rope", "rod", "pin_joint", "fixed_joint"):
+            ends = [constraint["a"]["body"], constraint["b"]["body"]]
+            for end in ends:
+                need_body(constraint["id"], end)
+            if ends[0] == ends[1]:
+                errors.append(
+                    f"'{constraint['id']}' connects "
+                    + ("the same mass to itself" if ends[0] is not None else "two points of the ground")
+                )
+            continue
+        need_body(constraint["id"], constraint["body"])  # None = Festlager in free space
         ref = constraint.get("surface")
         if ref is not None and ref not in surface_ids:
             errors.append(f"'{constraint['id']}' refers to unknown surface '{ref}'")

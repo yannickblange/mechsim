@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/state.schema.json",
-  "title": "MechSim frame v0.2",
+  "title": "MechSim frame v0.3",
   "description": "One simulation frame, produced by ms_world_frame_json() and sent to the browser.",
   "type": "object",
   "required": ["t", "bodies", "elements", "constraints", "energy"],
@@ -59,8 +59,13 @@
             "items": { "type": "number" },
             "minItems": 2,
             "maxItems": 3,
-            "description": "[Fx, Fy] or [Fx, Fy, M] exerted by the support on the body."
-          }
+            "description": "[Fx, Fy] or [Fx, Fy, M] exerted by the support on the body (rope, rod: force on end b; joints: on body a)."
+          },
+          "p1": { "$ref": "#/$defs/vec2", "description": "rope, rod: world position of end a." },
+          "p2": { "$ref": "#/$defs/vec2", "description": "rope, rod: world position of end b." },
+          "force": { "type": "number", "description": "rope, rod: axial force, tension positive (a rod in compression is negative)." },
+          "length": { "type": "number", "description": "rope, rod: the length L (rope: maximum length)." },
+          "taut": { "type": "boolean", "description": "rope: false while slack; rod: always true." }
         }
       }
     },

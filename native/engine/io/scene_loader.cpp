@@ -86,8 +86,8 @@ void loadConstraint(const json& spec, World& world, std::set<std::string>& ids) 
 
 std::unique_ptr<World> build(const json& scene) {
     if (!scene.is_object()) throw std::runtime_error("scene must be a JSON object");
-    if (!scene.contains("version") || (scene["version"] != "0.1" && scene["version"] != "0.2")) {
-        throw std::runtime_error("unsupported scene version (expected \"0.1\" or \"0.2\")");
+    if (!scene.contains("version") || (scene["version"] != "0.1" && scene["version"] != "0.2" && scene["version"] != "0.3")) {
+        throw std::runtime_error("unsupported scene version (expected \"0.1\", \"0.2\" or \"0.3\")");
     }
 
     auto world = std::make_unique<World>();

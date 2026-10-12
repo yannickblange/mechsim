@@ -1,0 +1,117 @@
+{
+  "version": "0.3",
+  "name": "Mass on two Stabs",
+  "description": "A block hangs from two Stabs (rods that take push and pull) whose upper ends are Festlager in free space. It swings sideways (the start velocity is the one the rods allow); the rod forces change in time.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.8
+    ],
+    "width": 2.8
+  },
+  "surfaces": [
+    {
+      "id": "ceiling",
+      "p1": [
+        0.9,
+        1.5
+      ],
+      "p2": [
+        -0.9,
+        1.5
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "block",
+      "type": "block",
+      "position": [
+        0.0,
+        0.5
+      ],
+      "velocity": [
+        0.6,
+        0.0
+      ],
+      "params": {
+        "mass": 2.0,
+        "width": 0.4,
+        "height": 0.2
+      },
+      "omega": -1.2
+    }
+  ],
+  "elements": [],
+  "constraints": [
+    {
+      "id": "P1",
+      "type": "pin_support",
+      "body": null,
+      "point": [
+        -0.5,
+        1.5
+      ],
+      "surface": "ceiling",
+      "params": {
+        "angle": 3.141592654
+      }
+    },
+    {
+      "id": "P2",
+      "type": "pin_support",
+      "body": null,
+      "point": [
+        0.5,
+        1.5
+      ],
+      "surface": "ceiling",
+      "params": {
+        "angle": 3.141592654
+      }
+    },
+    {
+      "id": "D1",
+      "type": "rod",
+      "a": {
+        "body": null,
+        "point": [
+          -0.5,
+          1.5
+        ]
+      },
+      "b": {
+        "body": "block",
+        "point": [
+          -0.2,
+          0.1
+        ]
+      }
+    },
+    {
+      "id": "D2",
+      "type": "rod",
+      "a": {
+        "body": null,
+        "point": [
+          0.5,
+          1.5
+        ]
+      },
+      "b": {
+        "body": "block",
+        "point": [
+          0.2,
+          0.1
+        ]
+      }
+    }
+  ]
+}

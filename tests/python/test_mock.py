@@ -13,6 +13,10 @@ SCENE_NAMES = [
     "physical_pendulum",
     "cantilever_clamp",
     "disc_spring_moment",
+    "double_pendulum",
+    "rod_truss",
+    "rope_catch",
+    "welded_pendulum",
     "impulse_pendulum",
     "incline_roller",
 ]

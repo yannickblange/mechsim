@@ -71,7 +71,9 @@ void Link::fill(const World& world, double* G, int cols, double* gamma) const {
 
     const double vu = dot(g.u, g.vrel);
     const double gamma0 = -(wb2r - wa2r) + (dot(g.vrel, g.vrel) - vu * vu) / std::max(g.dist, 1e-12);
-    const double C = length - g.dist;
+    // A rope that engages a few mm short of its full length (it is engaged one step early) is not
+    // pushed outward to reach L: only a stretched rope (C < 0) is corrected. A rod is exact.
+    const double C = kind == Kind::Rope ? std::min(0.0, length - g.dist) : length - g.dist;
     const double Cdot = -vu;
     const double alpha = world.solver.baumgarte_alpha;
     const double beta = world.solver.baumgarte_beta;

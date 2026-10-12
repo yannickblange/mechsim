@@ -14,12 +14,16 @@ from mechsim.server.mock import MockSimulation
 SCENES = [
     "cantilever_clamp",
     "disc_spring_moment",
+    "double_pendulum",
     "impulse_pendulum",
     "incline_roller",
     "physical_pendulum",
     "pinned_block_spring",
+    "rod_truss",
+    "rope_catch",
     "single_mass_spring",
     "two_mass_chain",
+    "welded_pendulum",
 ]
 
 

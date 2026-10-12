@@ -1,0 +1,94 @@
+{
+  "version": "0.3",
+  "name": "Welded L pendulum (fixed joint)",
+  "description": "A vertical and a horizontal bar welded together with a fixed joint and pinned at the top: it swings as one rigid L-shaped body.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0.2,
+      0.9
+    ],
+    "width": 2.8
+  },
+  "surfaces": [
+    {
+      "id": "ceiling",
+      "p1": [
+        0.6,
+        1.5
+      ],
+      "p2": [
+        -0.6,
+        1.5
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "vertical",
+      "type": "block",
+      "position": [
+        0.0,
+        1.1
+      ],
+      "params": {
+        "mass": 1.0,
+        "width": 0.08,
+        "height": 0.8
+      }
+    },
+    {
+      "id": "horizontal",
+      "type": "block",
+      "position": [
+        0.3,
+        0.7
+      ],
+      "params": {
+        "mass": 1.0,
+        "width": 0.6,
+        "height": 0.08
+      }
+    }
+  ],
+  "elements": [],
+  "constraints": [
+    {
+      "id": "A",
+      "type": "pin_support",
+      "body": "vertical",
+      "point": [
+        0.0,
+        0.4
+      ],
+      "surface": "ceiling",
+      "params": {
+        "angle": 3.141592654
+      }
+    },
+    {
+      "id": "W",
+      "type": "fixed_joint",
+      "a": {
+        "body": "vertical",
+        "point": [
+          0.0,
+          -0.4
+        ]
+      },
+      "b": {
+        "body": "horizontal",
+        "point": [
+          -0.3,
+          0.0
+        ]
+      }
+    }
+  ]
+}
