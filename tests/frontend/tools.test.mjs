@@ -12,8 +12,10 @@ const floorScene = () => sceneWith({
   bodies: [block('m1', 0.5, 0.1, 0.4, 0.2)],
 });
 
-test('the toolbox offers every v0.2 component', () => {
-  assert.deepEqual(TOOL_DEFS.map((d) => d.id), ['select', 'rect', 'circle', 'surface', 'spring', 'load', 'pin', 'fixed', 'roller']);
+test('the toolbox offers every component', () => {
+  assert.deepEqual(TOOL_DEFS.map((d) => d.id), [
+    'select', 'move', 'rect', 'circle', 'surface', 'spring', 'rope', 'rod', 'load', 'pin', 'fixed', 'roller', 'joint', 'weld',
+  ]);
 });
 
 // --- rectangle ---------------------------------------------------------------------------------
@@ -379,9 +381,9 @@ test('supports: the angle follows the surface and the side the mass is on', () =
   close(r.params.angle, a, 1e-6);
 });
 
-test('supports: not on a mass is an error, with an invalid marker', () => {
+test('supports: not on a mass is an error, with an invalid marker (except the Festlager)', () => {
   const { model, tools } = setup(floorScene());
-  const t = tools.get('pin');
+  const t = tools.get('fixed');
   t.move({ world: [1.5, 0.5] });
   assert.equal(t.marker.kind, 'invalid');
   assert.equal(t.preview.valid, false);

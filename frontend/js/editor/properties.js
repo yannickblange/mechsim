@@ -1,6 +1,6 @@
 // properties.js - the right-click property forms, as data. Pure: editor.js renders the fields and
 // calls applyProperties() with what the user typed.
-import { anchorWorld } from './hit.js';
+import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
 import { dist } from './geometry.js';
 
 const RAD = Math.PI / 180;
@@ -29,6 +29,17 @@ export function propertyFields(model, id) {
       fields: [],
     };
   }
+  if (kind === 'constraint' && isLink(obj)) return linkForm(model, obj);
+  if (kind === 'constraint' && isJoint(obj)) return jointForm(obj);
+  if (kind === 'constraint' && obj.type === 'pin_support' && obj.body === null) {
+    const where = obj.surface ? `on surface ${obj.surface}` : 'not on a surface';
+    return {
+      title: `Festlager ${obj.id} (free space)`,
+      info: [`At (${fixed(obj.point[0])}, ${fixed(obj.point[1])}) m, ${where}.`,
+        'Springs, ropes and Stabs can be attached to it; use the joint tool on it to pin a mass.'],
+      fields: [],
+    };
+  }
   if (kind === 'constraint') {
     const where = obj.surface ? `on surface ${obj.surface}` : 'not on a surface';
     return {
@@ -45,6 +56,42 @@ const SUPPORT_NOTES = {
   fixed_support: 'Locks x, y and rotation.',
   roller_support: 'Locks the direction normal to the surface; slides along it without friction.',
 };
+
+const JOINT_NAMES = { pin_joint: 'Hinge (Gelenk)', fixed_joint: 'Rigid joint' };
+
+function installedLength(model, link) {
+  const ends = linkEnds(model.scene, link);
+  return ends ? dist(ends[0], ends[1]) : 0;
+}
+
+function linkForm(model, link) {
+  const d = installedLength(model, link);
+  if (link.type === 'rod') {
+    return {
+      title: `Stab ${link.id}`,
+      info: [`Length ${fixed(d)} m (the distance between its ends). A massless two-force member: it takes push and pull and has no other properties.`],
+      fields: [],
+    };
+  }
+  const length = link.params.length ?? d;
+  return {
+    title: `Rope ${link.id}`,
+    info: [`Distance between the ends ${fixed(d)} m. The rope never stretches, only pulls, and hangs slack when the ends are closer than its length.`],
+    fields: [num('length', 'Length', 'm', round(length, 6), { min: round(d - 1e-9, 9) })],
+  };
+}
+
+function jointForm(joint) {
+  const at = `Joins ${joint.a.body} and ${joint.b.body}.`;
+  return {
+    title: `${JOINT_NAMES[joint.type]} ${joint.id}`,
+    info: [at, joint.type === 'pin_joint'
+      ? 'The masses can rotate against each other about this point.'
+      : 'The masses cannot move against each other at all.'],
+    fields: [{ key: 'jointType', label: 'Type', type: 'select', value: joint.type,
+      options: [['pin_joint', JOINT_NAMES.pin_joint], ['fixed_joint', JOINT_NAMES.fixed_joint]] }],
+  };
+}
 
 function bodyForm(body) {
   const p = body.params;
@@ -131,15 +178,21 @@ export function applyProperties(model, id, values) {
     } else if (f.minExclusive !== undefined && !(n > f.minExclusive)) {
       errors.push(`${f.label}: must be greater than ${f.minExclusive}`);
     } else if (f.min !== undefined && n < f.min) {
-      errors.push(`${f.label}: must be at least ${f.min}`);
+      errors.push(`${f.label}: must be at least ${fixed(f.min, 3)}`);
     } else {
       parsed[f.key] = n;
     }
   }
   if (errors.length) return { ok: false, errors };
 
-  const kind = model.find(id).kind;
-  if (kind === 'body') {
+  const found = model.find(id);
+  const kind = found.kind;
+  if (kind === 'constraint' && found.obj.type === 'rope') {
+    const d = installedLength(model, found.obj);
+    model.updateRope(id, { length: Math.abs(parsed.length - d) < 1e-6 ? null : parsed.length });
+  } else if (kind === 'constraint' && isJoint(found.obj)) {
+    if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
+  } else if (kind === 'body') {
     const patch = { mass: parsed.mass, angle: parsed.angle * RAD, velocity: [parsed.vx, parsed.vy], omega: parsed.omega };
     for (const key of ['width', 'height', 'radius']) if (key in parsed) patch[key] = parsed[key];
     model.updateBody(id, patch);

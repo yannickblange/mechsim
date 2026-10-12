@@ -46,14 +46,14 @@ def to_world(body, point):
     return [body["x"] + c * point[0] - s * point[1], body["y"] + s * point[0] + c * point[1]]
 
 
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain"])
 def test_exported_scene_is_valid(scenes, name):
     assert scene_module.validate_scene(scenes[name]) == []
     assert scenes[name]["version"] == "0.2"
 
 
 @pytest.mark.native
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain"])
 def test_exported_scene_runs_and_frames_are_valid(scenes, state_schema, name):
     for frame in run(scenes[name], 500, sample=100):
         jsonschema.validate(frame, state_schema)
@@ -136,3 +136,50 @@ def test_clamp_reaction_balances_weight_and_tip_load(scenes):
     assert fx == pytest.approx(0.0, abs=1e-6)
     assert fy == pytest.approx(m * G + tip_force, rel=1e-9)
     assert mz == pytest.approx(m * G * length / 2 + tip_force * length, rel=1e-9)
+
+
+def _con(frame, cid):
+    return next(c for c in frame["constraints"] if c["id"] == cid)
+
+
+@pytest.mark.native
+def test_hung_block_on_a_stab_and_a_rope(scenes):
+    s = scenes["hung"]
+    types = sorted(c["type"] for c in s["constraints"])
+    assert types == ["pin_support", "pin_support", "rod", "rope"]
+    assert all(c["body"] is None for c in s["constraints"] if c["type"] == "pin_support")
+    rod = next(c for c in s["constraints"] if c["type"] == "rod")
+    assert rod["a"] == {"body": None, "point": [0, 1.5]}, "the Stab hangs from the free-space Festlager"
+    frames = run(s, 3000, sample=10)
+    for f in frames:
+        stab, rope = _con(f, "S1"), _con(f, "R1")
+        assert math.dist(stab["p1"], stab["p2"]) == pytest.approx(stab["length"], abs=3e-3)
+        assert math.dist(rope["p1"], rope["p2"]) <= rope["length"] + 3e-3
+        assert rope["force"] >= -1e-6
+    # the block hangs on the two: their vertical force components carry its weight (m = 1)
+    last = frames[-1]
+    y_forces = 0.0
+    for cid in ("S1", "R1"):
+        c = _con(last, cid)
+        direction = [(c["p1"][i] - c["p2"][i]) / math.dist(c["p1"], c["p2"]) for i in range(2)]
+        y_forces += c["force"] * direction[1]
+    assert y_forces > 0
+
+
+@pytest.mark.native
+def test_chain_pinned_to_a_free_space_festlager_and_hinged(scenes):
+    s = scenes["chain"]
+    kinds = sorted(c["type"] for c in s["constraints"])
+    assert kinds == ["pin_joint", "pin_support"]
+    pin = next(c for c in s["constraints"] if c["type"] == "pin_support")
+    assert pin["body"] == "m1", "the joint tool turned the free pin into a Festlager on the upper bar"
+    frames = run(s, 3000, sample=10)
+    joint = next(c for c in s["constraints"] if c["type"] == "pin_joint")
+    for f in frames:
+        bu = next(b for b in f["bodies"] if b["id"] == joint["a"]["body"])
+        bl = next(b for b in f["bodies"] if b["id"] == joint["b"]["body"])
+        pa, pb = to_world(bu, joint["a"]["point"]), to_world(bl, joint["b"]["point"])
+        assert math.dist(pa, pb) < 6e-3  # first-order scheme
+        assert math.dist(to_world(next(b for b in f["bodies"] if b["id"] == pin["body"]), pin["point"]), [0.0, 1.5]) < 6e-3
+    angles = [f["bodies"][1]["phi"] - f["bodies"][0]["phi"] for f in frames]
+    assert max(angles) - min(angles) > 0.1, "the bars swing against each other"

@@ -1,6 +1,7 @@
 // model.js - the scene being edited: creation, editing, deletion (with cascades), undo / redo.
 // Holds a plain scene object (contracts/scene.schema.json, version 0.2) and never touches the DOM.
 import { nextId, tidy, tidyPoint } from './geometry.js';
+import { normalizeRopes } from './moves.js';
 
 export const DEFAULT_MASS = 1.0;
 export const DEFAULT_SPRING_K = 100.0;
@@ -12,7 +13,13 @@ const SUPPORT_TYPES = {
   roller_support: 'B', // Loslager
 };
 
+const JOINT_TYPES = {
+  pin_joint: 'G', // Gelenk
+  fixed_joint: 'W', // rigid connection ("weld")
+};
+
 const clone = (x) => JSON.parse(JSON.stringify(x));
+const anchor = ({ body, point }) => ({ body, point: tidyPoint(point) });
 
 export class SceneModel {
   constructor(scene = SceneModel.emptyScene()) {
@@ -76,6 +83,38 @@ export class SceneModel {
     this.revision++;
     this.emit();
     return result;
+  }
+
+  // A drag as one undoable step. update(fn) shows the result of fn(scene) applied to the scene as it
+  // was when the transaction began (so every pointer move starts from the same state); commit()
+  // records one undo step; cancel() restores the original.
+  transaction() {
+    const before = clone(this.scene);
+    let changed = false;
+    return {
+      update: (fn) => {
+        this.scene = clone(before);
+        fn(this.scene);
+        changed = true;
+        this.emit();
+      },
+      commit: () => {
+        // A drag that ended where it began (or was refused everywhere) records nothing.
+        if (!changed || JSON.stringify(this.scene) === JSON.stringify(before)) return false;
+        this.undoStack.push(before);
+        if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
+        this.redoStack = [];
+        this.dirty = true;
+        this.revision++;
+        this.emit();
+        return true;
+      },
+      cancel: () => {
+        if (!changed) return;
+        this.scene = before;
+        this.emit();
+      },
+    };
   }
 
   undo() {
@@ -182,6 +221,79 @@ export class SceneModel {
     });
   }
 
+  // Rope (infinitely strong, tension only) between two ends { body: id | null, point }. `length`
+  // (>= the distance between the ends) makes it slack; without it the rope starts taut.
+  addRope({ a, b, length }) {
+    return this.#edit((s) => {
+      const id = nextId('R', this.allIds());
+      const rope = { id, type: 'rope', a: anchor(a), b: anchor(b), params: {} };
+      if (length !== undefined) rope.params.length = tidy(length);
+      s.constraints.push(rope);
+      return id;
+    });
+  }
+
+  // Stab: massless two-force member; its length is the distance between its ends.
+  addRod({ a, b }) {
+    return this.#edit((s) => {
+      const id = nextId('S', this.allIds());
+      s.constraints.push({ id, type: 'rod', a: anchor(a), b: anchor(b), params: {} });
+      return id;
+    });
+  }
+
+  // type: pin_joint (Gelenk) | fixed_joint (rigid). a, b: { body, point } on two different masses.
+  addJoint(type, { a, b }) {
+    if (!JOINT_TYPES[type]) throw new Error(`unknown joint type "${type}"`);
+    return this.#edit((s) => {
+      const id = nextId(JOINT_TYPES[type], this.allIds());
+      s.constraints.push({ id, type, a: anchor(a), b: anchor(b), params: {} });
+      return id;
+    });
+  }
+
+  // Festlager in free space: a pin at a world point that spring, rope and rod ends can be attached to.
+  addGroundPin({ point, surface = null, angle = 0 }) {
+    return this.#edit((s) => {
+      const id = nextId('A', this.allIds());
+      s.constraints.push({
+        id, type: 'pin_support', body: null, point: tidyPoint(point), surface, params: { angle: tidy(angle) },
+      });
+      return id;
+    });
+  }
+
+  // Pins a mass to a Festlager in free space: the pin becomes a normal Festlager on that mass (same
+  // id, surface and angle; spring / rope / rod ends anchored at its point stay on the ground).
+  attachPin(id, { body, point }) {
+    const found = this.find(id);
+    if (!found || found.obj.type !== 'pin_support' || found.obj.body !== null) throw new Error(`no free-space Festlager "${id}"`);
+    return this.#edit((s) => {
+      const pin = s.constraints.find((c) => c.id === id);
+      pin.body = body;
+      pin.point = tidyPoint(point);
+    });
+  }
+
+  // Joint type switch (hinge <-> rigid) keeps the object, its place in the list and its anchors.
+  setJointType(id, type) {
+    if (!JOINT_TYPES[type]) throw new Error(`unknown joint type "${type}"`);
+    const found = this.find(id);
+    if (!found || found.kind !== 'constraint' || !found.obj.type.endsWith('_joint')) throw new Error(`no joint "${id}"`);
+    return this.#edit((s) => { s.constraints.find((c) => c.id === id).type = type; });
+  }
+
+  // patch for a rope: { length: number | null } (null = taut).
+  updateRope(id, patch) {
+    const found = this.find(id);
+    if (!found || found.obj.type !== 'rope') throw new Error(`no rope "${id}"`);
+    return this.#edit((s) => {
+      const rope = s.constraints.find((c) => c.id === id);
+      if (patch.length === null) delete rope.params.length;
+      else if (patch.length !== undefined) rope.params.length = tidy(patch.length);
+    });
+  }
+
   // type: pin_support | fixed_support | roller_support. angle: see supportAngle() in geometry.js.
   addSupport(type, { body, point, surface = null, angle = 0 }) {
     if (!SUPPORT_TYPES[type]) throw new Error(`unknown support type "${type}"`);
@@ -222,7 +334,10 @@ export class SceneModel {
       if (patch.omega !== undefined) body.omega = tidy(patch.omega);
       const sx = body.type === 'disc' ? body.params.radius / old.radius : body.params.width / old.width;
       const sy = body.type === 'disc' ? sx : body.params.height / old.height;
-      if (sx !== 1 || sy !== 1) rescaleAttachments(s, id, sx, sy);
+      if (sx !== 1 || sy !== 1) {
+        rescaleAttachments(s, id, sx, sy);
+        normalizeRopes(s);
+      }
     });
   }
 
@@ -257,6 +372,7 @@ export class SceneModel {
       }
       const removed = [id];
       if (found.kind === 'body') {
+        // springs, loads, supports, ropes, rods and joints on this mass cannot exist without it
         const dependent = (o) =>
           o.body === id || (o.a && o.a.body === id) || (o.b && o.b.body === id);
         for (const o of [...s.elements, ...s.constraints]) if (dependent(o)) removed.push(o.id);
@@ -279,5 +395,11 @@ function rescaleAttachments(scene, bodyId, sx, sy) {
       el.point = scalePoint(el.point);
     }
   }
-  for (const c of scene.constraints) if (c.body === bodyId) c.point = scalePoint(c.point);
+  for (const c of scene.constraints) {
+    if (c.a) {
+      for (const end of [c.a, c.b]) if (end.body === bodyId) end.point = scalePoint(end.point);
+    } else if (c.body === bodyId) {
+      c.point = scalePoint(c.point);
+    }
+  }
 }

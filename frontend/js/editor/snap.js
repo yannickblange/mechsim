@@ -17,11 +17,12 @@ export function gridStepFor(pxPerMetre) {
   return step;
 }
 
-// Priority: body features (centre > corner > edge midpoint > edge) > surface end points >
+// Priority: free-space Festlager > body features (centre > corner > edge midpoint > edge) > surface end points >
 // surface line > inside a body > grid. Result:
 //   { point: [x, y], kind, body: id | null, local: [x, y] | null, surface: id | null }
 // Options:
 //   scale          px per metre (converts the pixel tolerance to metres)
+//   pins           snap to Festlager in free space (default false); kind "pin", result.pin = its id
 //   bodies         snap to body features and outlines (default true)
 //   interior       report points inside a body as body points, kind "inside" (default false)
 //   surfaces       snap to surfaces (default false)
@@ -29,12 +30,16 @@ export function gridStepFor(pxPerMetre) {
 //   exclude        body ids to ignore
 export function snapPoint(world, scene, opts = {}) {
   const {
-    scale = 200, bodies = true, interior = false, surfaces = false, grid = true, exclude = [],
+    scale = 200, bodies = true, interior = false, surfaces = false, grid = true, exclude = [], pins = false,
   } = opts;
   const tol = SNAP_TOLERANCE_PX / scale;
   const step = gridStepFor(scale);
   const candidates = (scene.bodies || []).filter((b) => !exclude.includes(b.id));
 
+  if (pins) {
+    const pin = freePins(scene).find((c) => dist(c.point, world) <= tol);
+    if (pin) return { point: [...pin.point], kind: 'pin', body: null, local: null, surface: null, pin: pin.id };
+  }
   if (bodies) {
     const hit = snapToBodyFeature(world, candidates, tol);
     if (hit) return hit;
@@ -59,12 +64,23 @@ export function snapPoint(world, scene, opts = {}) {
 }
 
 function free(point, kind) {
-  return { point, kind, body: null, local: null, surface: null };
+  return { point, kind, body: null, local: null, surface: null, pin: null };
+}
+
+// Festlager in free space: pin_support with body null (its point is a world point).
+export const freePins = (scene) => (scene.constraints || []).filter((c) => c.type === 'pin_support' && c.body === null);
+
+// Bodies that contain `world` or whose outline is within the snap tolerance, topmost first.
+export function bodiesAt(world, scene, scale) {
+  const tol = SNAP_TOLERANCE_PX / scale;
+  return [...(scene.bodies || [])]
+    .reverse()
+    .filter((b) => pointInBody(b, world) || nearestOnOutline(b, world).dist <= tol);
 }
 
 function bodyHit(body, point, kind) {
   const local = worldToLocal(body, point);
-  return { point, kind, body: body.id, local: [tidy(local[0]), tidy(local[1])], surface: null };
+  return { point, kind, body: body.id, local: [tidy(local[0]), tidy(local[1])], surface: null, pin: null };
 }
 
 function snapToBodyFeature(world, bodies, tol) {
@@ -90,7 +106,7 @@ function snapToBodyFeature(world, bodies, tol) {
 }
 
 function snapToSurface(world, surfaces, tol) {
-  const result = (point, kind, surface) => ({ point, kind, body: null, local: null, surface });
+  const result = (point, kind, surface) => ({ point, kind, body: null, local: null, surface, pin: null });
   let end = null; // end points win over the line itself
   for (const s of surfaces) {
     for (const p of [s.p1, s.p2]) {

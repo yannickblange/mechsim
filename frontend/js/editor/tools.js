@@ -4,11 +4,16 @@
 // Event shape: { world: [x, y], shift: boolean }. down() returns true if the tool used the click
 // (the canvas must then not start panning). Every tool also has move(), up(), key(name), cancel().
 import {
-  add, dist, dot, length, normalizeAngle, rotate, roundTo, snapSegmentEnd, sub, supportAngle,
-  surfaceAngle, tidy,
+  add, dist, dot, length, normalizeAngle, rotate, roundTo, snapSegmentEnd, sub, surfaceAngle, tidy,
+  worldToLocal,
 } from './geometry.js';
-import { FORCE_M_PER_N, hitTest, anchorWorld } from './hit.js';
-import { gridStepFor, snapPoint, surfaceNear } from './snap.js';
+import { FORCE_M_PER_N, hitTest, anchorWorld, moveTarget } from './hit.js';
+import {
+  contactOffset, jointGroup, linkProblem, moveBodies, movePin, moveSurface, reattachEnd,
+  replaceLoad, replaceSupport,
+} from './moves.js';
+import { SUPPORT_LABELS, placeSupport } from './placement.js';
+import { SNAP_TOLERANCE_PX, bodiesAt, gridStepFor, snapPoint } from './snap.js';
 
 export const MIN_DRAG_PX = 6; // below this a press-release counts as a click
 export const MIN_SIZE_M = 0.05;
@@ -265,7 +270,7 @@ export class SpringTool extends Tool {
   }
 
   anchorFrom(world) {
-    const s = this.snap(world, { interior: true, surfaces: true });
+    const s = this.snap(world, { interior: true, surfaces: true, pins: true });
     return {
       body: s.body,
       point: s.body ? s.local : s.point,
@@ -336,7 +341,7 @@ export class SpringTool extends Tool {
       this.marker = null;
       return;
     }
-    const s = this.snap(e.world, { interior: true, surfaces: true });
+    const s = this.snap(e.world, { interior: true, surfaces: true, pins: true });
     this.cursor = s.point;
     this.marker = { point: s.point, kind: s.kind };
   }
@@ -478,12 +483,6 @@ export class LoadTool extends Tool {
 
 // --- supports -------------------------------------------------------------------------------------
 
-const SUPPORT_LABELS = {
-  pin_support: 'Festlager',
-  fixed_support: 'Lager (fixed)',
-  roller_support: 'Loslager',
-};
-
 export class SupportTool extends Tool {
   constructor(env, type) {
     super(env);
@@ -492,25 +491,15 @@ export class SupportTool extends Tool {
   }
 
   get hint() {
-    return this.type === 'roller_support'
-      ? 'Click a point of a mass that touches a surface. The Loslager slides along that surface.'
-      : `Click a point of a mass to place the ${SUPPORT_LABELS[this.type]}. It sits on the surface it touches.`;
+    if (this.type === 'roller_support') {
+      return 'Click a point of a mass that touches a surface. The Loslager slides along that surface.';
+    }
+    const free = this.type === 'pin_support' ? ' Click free space to place a Festlager that ropes, Stabs and springs can attach to.' : '';
+    return `Click a point of a mass to place the ${SUPPORT_LABELS[this.type]}. It sits on the surface it touches.${free}`;
   }
 
-  // Where would the support go for this pointer position? null if it cannot be placed here.
   place(world) {
-    const s = this.snap(world, { interior: true });
-    if (!s.body) return { error: 'Place the support on a mass.', point: s.point };
-    const body = this.env.model.body(s.body);
-    const surface = surfaceNear(s.point, this.scene.surfaces, this.scale);
-    if (!surface && this.type === 'roller_support') {
-      return { error: 'A Loslager needs a surface - draw one under the mass first.', point: s.point };
-    }
-    const angle = surface ? supportAngle(surface, body.position) : 0;
-    return {
-      body: s.body, point: s.point, local: s.local, kind: s.kind,
-      surface: surface ? surface.id : null, angle: normalizeAngle(angle),
-    };
+    return placeSupport(this.scene, this.type, world, this.scale);
   }
 
   move(e) {
@@ -525,9 +514,9 @@ export class SupportTool extends Tool {
       this.error = p.error;
       return true;
     }
-    const id = this.env.model.addSupport(this.type, {
-      body: p.body, point: p.local, surface: p.surface, angle: p.angle,
-    });
+    const id = p.free
+      ? this.env.model.addGroundPin({ point: p.point, surface: p.surface, angle: p.angle })
+      : this.env.model.addSupport(this.type, { body: p.body, point: p.local, surface: p.surface, angle: p.angle });
     this.env.created('constraint', id);
     return true;
   }
@@ -537,7 +526,7 @@ export class SupportTool extends Tool {
     if (!p) return null;
     return {
       type: 'support', supportType: this.type, point: p.point, angle: p.angle || 0,
-      valid: !p.error, label: p.error ? '' : SUPPORT_LABELS[this.type],
+      valid: !p.error, label: p.error ? '' : `${SUPPORT_LABELS[this.type]}${p.free ? ' (free space)' : ''}`,
     };
   }
 
@@ -547,19 +536,330 @@ export class SupportTool extends Tool {
   }
 }
 
+// --- rope and Stab ----------------------------------------------------------------------------------
+
+const LINK_NAMES = { rope: 'rope', rod: 'Stab' };
+
+// Two ends, each on a mass, on a Festlager in free space, or on the ground. The rope never stretches
+// but may go slack; the Stab keeps its length and takes push and pull.
+export class LinkTool extends Tool {
+  constructor(env, kind) {
+    super(env);
+    this.kind = kind;
+    this.reset();
+  }
+
+  reset() {
+    this.a = null;
+    this.cursor = null;
+    this.pressedAt = null;
+  }
+
+  get hint() {
+    if (this.a) return 'Click the second end (or release after dragging from the first).';
+    const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.' : '';
+    return `Click the first end of the ${LINK_NAMES[this.kind]}: a point of a mass, a Festlager in free space, or the ground.${extra}`;
+  }
+
+  anchorFrom(world) {
+    const s = this.snap(world, { interior: true, surfaces: true, pins: true });
+    return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind };
+  }
+
+  down(e) {
+    this.error = null;
+    if (!this.a) {
+      this.a = this.anchorFrom(e.world);
+      this.cursor = this.a.world;
+      this.pressedAt = e.world;
+    } else {
+      this.finish(e.world);
+    }
+    return true;
+  }
+
+  move(e) {
+    const s = this.anchorFrom(e.world);
+    this.cursor = s.world;
+    this.marker = this.a ? null : { point: s.world, kind: s.kind };
+  }
+
+  up(e) {
+    if (!this.a || !this.pressedAt) return;
+    const movedPx = dist(this.pressedAt, e.world) * this.scale;
+    this.pressedAt = null;
+    if (movedPx >= MIN_DRAG_PX) this.finish(e.world);
+  }
+
+  finish(world) {
+    const b = this.anchorFrom(world);
+    const strip = ({ body, point }) => ({ body, point });
+    const link = { a: strip(this.a), b: strip(b) };
+    const problem = linkProblem(this.scene, link);
+    if (problem) {
+      this.error = problem;
+      return; // keep the first end, try the second again
+    }
+    const id = this.kind === 'rope' ? this.env.model.addRope(link) : this.env.model.addRod(link);
+    this.env.created('constraint', id);
+    this.reset();
+  }
+
+  key(name) {
+    if (name === 'Escape' && this.a) {
+      this.cancel();
+      return true;
+    }
+    return false;
+  }
+
+  cancel() {
+    super.cancel();
+    this.reset();
+  }
+
+  get preview() {
+    if (!this.a) return null;
+    return {
+      type: 'link', kind: this.kind, a: this.a.world, b: this.cursor,
+      label: `${LINK_NAMES[this.kind]} ${dist(this.a.world, this.cursor).toFixed(2)} m`,
+    };
+  }
+}
+
+// --- joints ---------------------------------------------------------------------------------------
+
+const JOINT_NAMES = { pin_joint: 'hinge (Gelenk)', fixed_joint: 'rigid joint' };
+
+// Joins two masses where they touch or overlap (hinge or rigid connection); on a Festlager in free
+// space with a mass on it, it pins that mass to the Festlager.
+export class JointTool extends Tool {
+  constructor(env, type) {
+    super(env);
+    this.type = type;
+    this.last = null;
+  }
+
+  get hint() {
+    return `Click where two masses touch or overlap to join them with a ${JOINT_NAMES[this.type]}. `
+      + 'On a Festlager in free space it pins the mass that lies on it.';
+  }
+
+  find(world) {
+    const s = this.snap(world, { interior: true, pins: true });
+    if (s.kind === 'pin') {
+      const body = bodiesAt(s.point, this.scene, this.scale)[0];
+      if (!body) return { error: 'Move a mass onto the Festlager first.', point: s.point };
+      return { pin: s.pin, body, point: s.point };
+    }
+    const bodies = bodiesAt(s.point, this.scene, this.scale);
+    if (bodies.length < 2) {
+      return { error: 'A joint connects two masses: click where they touch or overlap.', point: s.point };
+    }
+    return { a: bodies[0], b: bodies[1], point: s.point, many: bodies.length > 2 };
+  }
+
+  move(e) {
+    this.last = this.find(e.world);
+    this.marker = { point: this.last.point, kind: this.last.error ? 'invalid' : 'joint' };
+  }
+
+  down(e) {
+    this.error = null;
+    const f = this.find(e.world);
+    if (f.error) {
+      this.error = f.error;
+      return true;
+    }
+    if (f.pin) {
+      this.env.model.attachPin(f.pin, { body: f.body.id, point: worldToLocal(f.body, f.point) });
+      this.env.created('constraint', f.pin);
+      return true;
+    }
+    const end = (body) => ({ body: body.id, point: worldToLocal(body, f.point) });
+    const id = this.env.model.addJoint(this.type, { a: end(f.a), b: end(f.b) });
+    if (f.many) this.error = 'More than two masses meet here: joined the top two.';
+    this.env.created('constraint', id);
+    return true;
+  }
+
+  get preview() {
+    const p = this.last;
+    if (!p || p.error) return null;
+    return { type: 'joint', jointType: this.type, point: p.point, label: p.pin ? 'pin the mass' : JOINT_NAMES[this.type] };
+  }
+
+  cancel() {
+    super.cancel();
+    this.last = null;
+  }
+}
+
+// --- move -----------------------------------------------------------------------------------------
+
+const selectionOf = (t) => {
+  if (t.type === 'end') return { kind: t.kind, id: t.id };
+  if (t.type === 'support' || t.type === 'pin') return { kind: 'constraint', id: t.id };
+  if (t.type === 'load') return { kind: 'element', id: t.id };
+  return { kind: t.type, id: t.id };
+};
+
+// Drag a mass (with what is attached to it and the masses joined to it), a surface or a Festlager in
+// free space; drag a support or load to another point of a mass; drag the end of a spring, rope or
+// Stab to attach it elsewhere. One drag is one undo step. Shift turns the grid snap off.
+export class MoveTool extends Tool {
+  constructor(env) {
+    super(env);
+    this.drag = null;
+    this.hover = null; // { type, id, end? } under the pointer, for the highlight
+  }
+
+  get tol() { return SNAP_TOLERANCE_PX / this.scale; }
+
+  get hint() {
+    if (this.drag) return 'Release to drop it here. Escape cancels. Hold Shift to switch the grid snap off.';
+    return 'Drag a mass, surface or Festlager to move it. Drag a support or load to re-place it, '
+      + 'or the end of a spring, rope or Stab to attach it elsewhere.';
+  }
+
+  move(e) {
+    if (this.drag) this.dragTo(e);
+    else this.hover = moveTarget(this.scene, e.world, this.scale);
+  }
+
+  down(e) {
+    this.error = null;
+    const target = moveTarget(this.scene, e.world, this.scale);
+    this.env.select(target ? selectionOf(target) : null);
+    if (!target) return false; // empty space: the canvas pans
+    const base = JSON.parse(JSON.stringify(this.scene));
+    const body = target.type === 'body' ? base.bodies.find((b) => b.id === target.id) : null;
+    this.drag = {
+      target, base, start: e.world, started: false, tx: this.env.model.transaction(),
+      group: body ? jointGroup(base, body.id) : null,
+    };
+    this.hover = target;
+    return true;
+  }
+
+  up(e) {
+    if (!this.drag) return;
+    this.dragTo(e);
+    this.drag.tx.commit();
+    this.drag = null;
+  }
+
+  cancel() {
+    super.cancel();
+    if (this.drag) this.drag.tx.cancel();
+    this.drag = null;
+    this.hover = null;
+  }
+
+  key(name) {
+    if (name === 'Escape' && this.drag) {
+      this.cancel();
+      return true;
+    }
+    return false;
+  }
+
+  snapTo(point, e) {
+    const step = this.step;
+    return e.shift ? point : [roundTo(point[0], step), roundTo(point[1], step)];
+  }
+
+  dragTo(e) {
+    const d = this.drag;
+    if (!d.started && dist(d.start, e.world) * this.scale < MIN_DRAG_PX) return;
+    d.started = true;
+    const raw = sub(e.world, d.start);
+    const t = d.target;
+    const { base, tx } = d;
+    this.error = null;
+
+    if (t.type === 'body') {
+      const body = base.bodies.find((b) => b.id === t.id);
+      const target = this.snapTo(add(body.position, raw), e);
+      let delta = sub(target, body.position);
+      delta = add(delta, contactOffset(base, t.id, delta, this.tol)); // lands exactly on a nearby surface
+      tx.update((scene) => moveBodies(scene, d.group, delta, this.tol));
+    } else if (t.type === 'surface') {
+      const s = base.surfaces.find((x) => x.id === t.id);
+      const delta = sub(this.snapTo(add(s.p1, raw), e), s.p1);
+      tx.update((scene) => moveSurface(scene, t.id, delta, this.tol));
+    } else if (t.type === 'pin') {
+      const pin = base.constraints.find((c) => c.id === t.id);
+      const target = snapPoint(add(pin.point, raw), base, { scale: this.scale, bodies: false, surfaces: true, grid: !e.shift }).point;
+      const delta = sub(target, pin.point);
+      tx.update((scene) => movePin(scene, t.id, delta, this.tol));
+    } else if (t.type === 'end') {
+      this.dragEnd(e, d);
+    } else if (t.type === 'support' || t.type === 'load') {
+      this.dragAttachment(e, d);
+    }
+  }
+
+  dragEnd(e, d) {
+    const { target: t, base, tx } = d;
+    const s = snapPoint(e.world, base, { scale: this.scale, interior: true, surfaces: true, pins: true, grid: !e.shift });
+    const anchor = { body: s.body, point: s.body ? s.local : s.point };
+    const test = JSON.parse(JSON.stringify(base));
+    reattachEnd(test, t.id, t.end, anchor);
+    const link = [...test.elements, ...test.constraints].find((o) => o.id === t.id);
+    const problem = linkProblem(test, link);
+    this.marker = { point: s.point, kind: problem ? 'invalid' : s.kind };
+    if (problem) {
+      this.error = problem;
+      tx.update(() => {});
+      return;
+    }
+    tx.update((scene) => reattachEnd(scene, t.id, t.end, anchor));
+  }
+
+  dragAttachment(e, d) {
+    const { target: t, base, tx } = d;
+    if (t.type === 'support') {
+      const type = base.constraints.find((c) => c.id === t.id).type;
+      const p = placeSupport(base, type, e.world, this.scale);
+      this.marker = { point: p.point, kind: p.error || p.free ? 'invalid' : p.kind };
+      if (p.error || p.free) {
+        this.error = p.error || 'A support must sit on a mass.';
+        tx.update(() => {});
+        return;
+      }
+      tx.update((scene) => replaceSupport(scene, t.id, p));
+    } else {
+      const s = snapPoint(e.world, base, { scale: this.scale, interior: true });
+      this.marker = { point: s.point, kind: s.body ? s.kind : 'invalid' };
+      if (!s.body) {
+        this.error = 'A load must act on a mass.';
+        tx.update(() => {});
+        return;
+      }
+      tx.update((scene) => replaceLoad(scene, t.id, { body: s.body, point: s.local }));
+    }
+  }
+}
+
 // --- registry -------------------------------------------------------------------------------------
 
 // The toolbox order. `icon` names are drawn by editor/icons.js.
 export const TOOL_DEFS = [
   { id: 'select', label: 'Select', icon: 'select', make: (env) => new SelectTool(env) },
+  { id: 'move', label: 'Move', icon: 'move', make: (env) => new MoveTool(env) },
   { id: 'rect', label: 'Rectangular mass', icon: 'rect', make: (env) => new RectTool(env) },
   { id: 'circle', label: 'Circular mass', icon: 'circle', make: (env) => new CircleTool(env) },
   { id: 'surface', label: 'Surface', icon: 'surface', make: (env) => new SurfaceTool(env) },
   { id: 'spring', label: 'Spring', icon: 'spring', make: (env) => new SpringTool(env) },
+  { id: 'rope', label: 'Rope', icon: 'rope', make: (env) => new LinkTool(env, 'rope') },
+  { id: 'rod', label: 'Stab (rod)', icon: 'rod', make: (env) => new LinkTool(env, 'rod') },
   { id: 'load', label: 'Force / moment', icon: 'load', make: (env) => new LoadTool(env) },
   { id: 'pin', label: 'Festlager', icon: 'pin', make: (env) => new SupportTool(env, 'pin_support') },
   { id: 'fixed', label: 'Lager (fixed)', icon: 'fixed', make: (env) => new SupportTool(env, 'fixed_support') },
   { id: 'roller', label: 'Loslager', icon: 'roller', make: (env) => new SupportTool(env, 'roller_support') },
+  { id: 'joint', label: 'Joint (hinge)', icon: 'joint', make: (env) => new JointTool(env, 'pin_joint') },
+  { id: 'weld', label: 'Rigid joint', icon: 'weld', make: (env) => new JointTool(env, 'fixed_joint') },
 ];
 
 export function createTools(env) {

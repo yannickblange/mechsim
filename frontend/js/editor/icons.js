@@ -3,6 +3,11 @@ const wrap = (body) =>
   `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
 export const ICONS = {
+  move: wrap('<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>'),
+  rope: wrap('<path d="M4 8c3 5 5 5 8 5s5 0 8-5" /><circle cx="4" cy="8" r="1.6" fill="currentColor"/><circle cx="20" cy="8" r="1.6" fill="currentColor"/>'),
+  rod: wrap('<path d="M5 18L19 6" stroke-width="3.2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/>'),
+  joint: wrap('<rect x="3" y="14" width="10" height="5" rx="1"/><rect x="11" y="5" width="10" height="5" rx="1"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
+  weld: wrap('<rect x="3" y="14" width="10" height="5" rx="1"/><rect x="11" y="5" width="10" height="5" rx="1"/><rect x="9.4" y="9.4" width="5.2" height="5.2" fill="currentColor"/>'),
   select: wrap('<path d="M6 3l12 8-5.5 1.3L9.5 18z"/>'),
   rect: wrap('<rect x="3.5" y="7" width="17" height="10" rx="1"/><circle cx="12" cy="12" r="1.8"/>'),
   circle: wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 12h8.5"/><circle cx="12" cy="12" r="1.2"/>'),

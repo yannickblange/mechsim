@@ -92,7 +92,7 @@ export class Editor {
     for (const b of this.toolbox.querySelectorAll('.tool')) {
       b.setAttribute('aria-pressed', String(b.dataset.tool === id));
     }
-    this.canvas.style.cursor = id === 'select' ? '' : 'crosshair';
+    this.canvas.style.cursor = id === 'select' ? '' : id === 'move' ? 'move' : 'crosshair';
     this.updateHint();
   }
 

@@ -11,7 +11,10 @@
 // Surfaces are not part of frames; the renderer draws them with drawSurface(ctx, cam, surface, theme).
 import { drawBlock } from './block.js';
 import { drawDisc } from './disc.js';
+import { drawFixedJoint, drawPinJoint } from './joint.js';
 import { drawLoad } from './load.js';
+import { drawRod } from './rod.js';
+import { drawRope } from './rope.js';
 import { drawSpring } from './spring.js';
 import { drawFixedSupport, drawPinSupport, drawRollerSupport } from './supports.js';
 
@@ -24,4 +27,8 @@ export const constraintSymbols = {
   pin_support: drawPinSupport,
   fixed_support: drawFixedSupport,
   roller_support: drawRollerSupport,
+  rope: drawRope,
+  rod: drawRod,
+  pin_joint: drawPinJoint,
+  fixed_joint: drawFixedJoint,
 };

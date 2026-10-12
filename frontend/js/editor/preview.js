@@ -1,14 +1,18 @@
 // preview.js - draws the editor overlay on top of the scene: snap marker, the tool's preview
 // (rubber band, ghost spring, force arrow ...) and the selection highlight.
 import { drawBlock } from '../canvas/symbols/block.js';
+import { drawFixedJoint, drawPinJoint } from '../canvas/symbols/joint.js';
 import { drawLoad } from '../canvas/symbols/load.js';
+import { drawRod } from '../canvas/symbols/rod.js';
+import { drawRope } from '../canvas/symbols/rope.js';
 import { drawSpring, drawSpringGhost } from '../canvas/symbols/spring.js';
 import { drawSurface } from '../canvas/symbols/surface.js';
 import {
   drawFixedSupport, drawPinSupport, drawRollerSupport,
 } from '../canvas/symbols/supports.js';
 import { bodyToWorld, blockCorners } from './geometry.js';
-import { anchorWorld, attachedPoint } from './hit.js';
+import { connectionPoints, neighbors } from './connections.js';
+import { anchorWorld, attachedPoint, isLink, linkEnds } from './hit.js';
 
 const SUPPORT_DRAW = {
   pin_support: drawPinSupport,
@@ -18,11 +22,105 @@ const SUPPORT_DRAW = {
 
 // tool: the active tool (preview, marker); selection: { kind, id } | null.
 export function drawOverlay(ctx, cam, theme, scene, tool, selection) {
-  if (selection) drawSelection(ctx, cam, theme, scene, selection);
+  drawConnections(ctx, cam, theme, scene);
+  if (selection) {
+    drawNeighbors(ctx, cam, theme, scene, selection);
+    drawSelection(ctx, cam, theme, scene, selection);
+  }
   if (!tool) return;
+  if (tool.hover && !(selection && tool.hover.id === selection.id)) drawHover(ctx, cam, theme, scene, tool.hover);
   const preview = tool.preview;
   if (preview) drawToolPreview(ctx, cam, theme, preview);
   if (tool.marker) drawMarker(ctx, cam, theme, tool.marker);
+}
+
+// Every attachment point: a small dot, and a ring where two or more things meet (or a joint or
+// free-space Festlager sits), so it is clear what is joined where.
+function drawConnections(ctx, cam, theme, scene) {
+  ctx.save();
+  ctx.lineWidth = 1.5;
+  for (const c of connectionPoints(scene)) {
+    const [x, y] = cam.toScreen(c.point);
+    if (c.hub) {
+      ctx.strokeStyle = theme.support;
+      ctx.globalAlpha = 0.55;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (c.items.length >= 3) {
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = theme.support;
+        ctx.font = '10px system-ui, sans-serif';
+        ctx.fillText(String(c.items.length), x + 12, y - 10);
+      }
+    } else {
+      ctx.fillStyle = theme.muted;
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.2, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function bodyPath(ctx, cam, body, pad) {
+  if (body.type === 'disc') {
+    const [x, y] = cam.toScreen(body.position);
+    ctx.beginPath();
+    ctx.arc(x, y, body.params.radius * cam.scale + pad, 0, 2 * Math.PI);
+    return;
+  }
+  const p = pad / cam.scale; // outline `pad` px outside the block
+  const pts = blockCorners(body).map(([cx, cy]) =>
+    cam.toScreen(bodyToWorld(body, [cx + Math.sign(cx) * p, cy + Math.sign(cy) * p])));
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+}
+
+// The things the selected object is connected to, outlined in the rope colour.
+function drawNeighbors(ctx, cam, theme, scene, selection) {
+  const { bodies, items } = neighbors(scene, selection);
+  ctx.save();
+  ctx.strokeStyle = theme.rope || theme.spring;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.8;
+  ctx.setLineDash([2, 4]);
+  for (const body of scene.bodies) {
+    if (!bodies.has(body.id)) continue;
+    bodyPath(ctx, cam, body, 5);
+    ctx.stroke();
+  }
+  for (const o of [...scene.elements, ...scene.constraints]) {
+    if (!items.has(o.id)) continue;
+    const ends = o.a && o.b ? linkEnds(scene, o) : null;
+    const p = ends ? null : attachedPoint(scene, o);
+    ctx.beginPath();
+    if (ends) {
+      const [a, b] = ends.map((q) => cam.toScreen(q));
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+    } else if (p) {
+      const [x, y] = cam.toScreen(p);
+      ctx.arc(x, y, 16, 0, 2 * Math.PI);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// What the move tool would grab: a faint outline.
+function drawHover(ctx, cam, theme, scene, hover) {
+  const sel = hover.type === 'end' || hover.type === 'support' || hover.type === 'pin' || hover.type === 'load'
+    ? { kind: hover.kind || (hover.type === 'load' ? 'element' : 'constraint'), id: hover.id }
+    : { kind: hover.type, id: hover.id };
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  drawSelection(ctx, cam, theme, scene, sel);
+  ctx.restore();
 }
 
 function label(ctx, cam, theme, worldPoint, text) {
@@ -80,6 +178,15 @@ function drawToolPreview(ctx, cam, theme, pv) {
       drawLoad(ctx, cam, { params: {} }, { p1: pv.point, vector: pv.force, moment: 0, mode: 'constant' }, theme);
       label(ctx, cam, theme, pv.point, pv.label);
       break;
+    case 'link':
+      if (pv.kind === 'rope') drawRope(ctx, cam, {}, { p1: pv.a, p2: pv.b, taut: true }, theme);
+      else drawRod(ctx, cam, {}, { p1: pv.a, p2: pv.b }, theme);
+      label(ctx, cam, theme, pv.b, pv.label);
+      break;
+    case 'joint':
+      (pv.jointType === 'fixed_joint' ? drawFixedJoint : drawPinJoint)(ctx, cam, {}, { position: pv.point }, theme);
+      label(ctx, cam, theme, pv.point, pv.label);
+      break;
     case 'support':
       if (pv.valid) {
         ctx.globalAlpha = 0.6;
@@ -113,6 +220,14 @@ function drawMarker(ctx, cam, theme, marker) {
     case 'edge-mid': // diamond
       ctx.moveTo(x, y - r - 1); ctx.lineTo(x + r + 1, y); ctx.lineTo(x, y + r + 1); ctx.lineTo(x - r - 1, y);
       ctx.closePath();
+      break;
+    case 'pin': // an existing free-space Festlager: ring around it
+      ctx.arc(x, y, r + 5, 0, 2 * Math.PI);
+      break;
+    case 'joint': // joint point: ring with a dot
+      ctx.arc(x, y, r + 1, 0, 2 * Math.PI);
+      ctx.moveTo(x + 1.5, y);
+      ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
       break;
     case 'edge':
     case 'surface': // small ring on the line
@@ -154,15 +269,8 @@ function drawSelection(ctx, cam, theme, scene, sel) {
   };
   if (sel.kind === 'body') {
     const body = find(scene.bodies);
-    if (body && body.type === 'disc') {
-      ring(body.position, body.params.radius * cam.scale + 5);
-    } else if (body) {
-      const pad = 5 / cam.scale; // outline 5 px outside the block
-      const pts = blockCorners(body).map(([cx, cy]) =>
-        cam.toScreen(bodyToWorld(body, [cx + Math.sign(cx) * pad, cy + Math.sign(cy) * pad])));
-      ctx.beginPath();
-      pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-      ctx.closePath();
+    if (body) {
+      bodyPath(ctx, cam, body, 5);
       ctx.stroke();
     }
   } else if (sel.kind === 'surface') {
@@ -180,8 +288,13 @@ function drawSelection(ctx, cam, theme, scene, sel) {
     }
   } else if (sel.kind === 'constraint') {
     const c = find(scene.constraints);
-    const p = c && attachedPoint(scene, c);
-    if (p) ring(p, 22);
+    if (c && isLink(c)) {
+      const ends = linkEnds(scene, c);
+      if (ends) line(ends[0], ends[1]);
+    } else {
+      const p = c && attachedPoint(scene, c);
+      if (p) ring(p, 22);
+    }
   }
   ctx.restore();
 }

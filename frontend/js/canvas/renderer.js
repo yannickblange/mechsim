@@ -13,6 +13,7 @@ const THEME_VARS = {
   spring: ['--c-spring', '#f0c96a'],
   support: ['--c-support', '#9cc3e6'],
   force: ['--c-force', '#e8868a'],
+  rope: ['--c-rope', '#dcae78'],
 };
 
 const rotate = ([x, y], phi) => {
@@ -89,6 +90,9 @@ export class Renderer {
     }
     const points = (scene.bodies || []).map((b) => b.position);
     for (const surface of scene.surfaces || []) points.push(surface.p1, surface.p2);
+    for (const c of scene.constraints || []) {
+      if (c.type === 'pin_support' && c.body === null) points.push(c.point);
+    }
     for (const el of scene.elements || []) {
       if (!el.a) continue;
       for (const anchor of [el.a, el.b]) if (anchor.body === null) points.push(anchor.point);
@@ -164,6 +168,20 @@ export class Renderer {
         moment: e.params.moment || 0, mode: e.params.mode || 'constant', active: true,
       };
     };
+    const constraintEntry = (c, toWorld) => {
+      if (c.type === 'rope' || c.type === 'rod') {
+        const p1 = toWorld(c.a.body, c.a.point);
+        const p2 = toWorld(c.b.body, c.b.point);
+        const d = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+        const length = c.type === 'rope' ? (c.params.length ?? d) : d;
+        return {
+          id: c.id, type: c.type, position: p1, reaction: [0, 0], p1, p2, force: 0, length,
+          taut: c.type === 'rod' || !(length > d + 1e-9),
+        };
+      }
+      if (c.a) return { id: c.id, type: c.type, position: toWorld(c.a.body, c.a.point), reaction: [0, 0] };
+      return { id: c.id, type: c.type, position: toWorld(c.body, c.point), reaction: [0, 0] };
+    };
     const world = (body, point) => {
       if (body === null) return point;
       const { pos, phi } = pose.get(body);
@@ -178,9 +196,7 @@ export class Renderer {
       elements: (scene.elements || []).map((e) => (e.type === 'load' ? loadEntry(e, world) : {
         id: e.id, type: e.type, p1: world(e.a.body, e.a.point), p2: world(e.b.body, e.b.point), force: 0,
       })),
-      constraints: (scene.constraints || []).map((c) => ({
-        id: c.id, type: c.type, position: world(c.body, c.point), reaction: [0, 0],
-      })),
+      constraints: (scene.constraints || []).map((c) => constraintEntry(c, world)),
     };
   }
 

@@ -4,14 +4,14 @@ import {
   bodyArea, bodyToWorld, closestOnSegment, dist, pointInBody,
 } from './geometry.js';
 
-export const HIT_PX = { support: 14, load: 12, spring: 7, surface: 7 };
 export { FORCE_M_PER_N };
 
-// World position of the point a load or support is attached to.
-export function attachedPoint(scene, obj) {
-  const body = scene.bodies.find((b) => b.id === obj.body);
-  return body ? bodyToWorld(body, obj.point) : null;
-}
+export const HIT_PX = { support: 14, load: 12, spring: 7, surface: 7, end: 11 };
+
+const LINK_TYPES = ['rope', 'rod'];
+const JOINT_TYPES = ['pin_joint', 'fixed_joint'];
+export const isLink = (c) => LINK_TYPES.includes(c.type);
+export const isJoint = (c) => JOINT_TYPES.includes(c.type);
 
 export function anchorWorld(scene, anchor) {
   if (anchor.body === null) return anchor.point;
@@ -19,12 +19,29 @@ export function anchorWorld(scene, anchor) {
   return body ? bodyToWorld(body, anchor.point) : null;
 }
 
+// World position of the point a load, support, free-space Festlager or joint is attached to.
+export function attachedPoint(scene, obj) {
+  if (obj.a) return anchorWorld(scene, obj.a); // joint (links are handled by their ends)
+  if (obj.body === null) return obj.point; // Festlager in free space: a world point
+  const body = scene.bodies.find((b) => b.id === obj.body);
+  return body ? bodyToWorld(body, obj.point) : null;
+}
+
+// The two end points (world) of a spring, rope or rod, or null.
+export function linkEnds(scene, obj) {
+  const a = anchorWorld(scene, obj.a);
+  const b = anchorWorld(scene, obj.b);
+  return a && b ? [a, b] : null;
+}
+
 // Returns { kind: "surface" | "body" | "element" | "constraint", id } or null.
-// Small things win over big things: supports, loads, springs, then bodies, then surfaces.
+// Small things win over big things: supports, joints and pins, loads, springs / ropes / rods,
+// then bodies, then surfaces.
 export function hitTest(scene, world, scale) {
   const px = (n) => n / scale;
 
   for (const c of [...scene.constraints].reverse()) {
+    if (isLink(c)) continue;
     const p = attachedPoint(scene, c);
     if (p && dist(p, world) <= px(HIT_PX.support)) return { kind: 'constraint', id: c.id };
   }
@@ -38,11 +55,13 @@ export function hitTest(scene, world, scale) {
     const nearMoment = (e.params.moment || 0) !== 0 && dist(p, world) <= px(HIT_PX.load + 12);
     if (nearArrow || nearMoment || dist(p, world) <= px(HIT_PX.load)) return { kind: 'element', id: e.id };
   }
-  for (const e of [...scene.elements].reverse()) {
-    if (e.type !== 'spring') continue;
-    const a = anchorWorld(scene, e.a);
-    const b = anchorWorld(scene, e.b);
-    if (a && b && closestOnSegment(world, a, b).dist <= px(HIT_PX.spring)) return { kind: 'element', id: e.id };
+  const lines = [
+    ...scene.elements.filter((e) => e.type === 'spring').map((e) => ({ kind: 'element', obj: e })),
+    ...scene.constraints.filter(isLink).map((c) => ({ kind: 'constraint', obj: c })),
+  ].reverse();
+  for (const { kind, obj } of lines) {
+    const ends = linkEnds(scene, obj);
+    if (ends && closestOnSegment(world, ends[0], ends[1]).dist <= px(HIT_PX.spring)) return { kind, id: obj.id };
   }
   const bodies = scene.bodies.filter((b) => pointInBody(b, world));
   if (bodies.length) {
@@ -51,6 +70,51 @@ export function hitTest(scene, world, scale) {
   }
   for (const s of [...scene.surfaces].reverse()) {
     if (closestOnSegment(world, s.p1, s.p2).dist <= px(HIT_PX.surface)) return { kind: 'surface', id: s.id };
+  }
+  return null;
+}
+
+// What the move tool would grab at `world`, or null:
+//   { type: "end", id, end: "a" | "b", kind }   an end of a spring, rope or rod (re-attach it)
+//   { type: "support" | "load", id }            re-place on a mass
+//   { type: "pin", id }                         Festlager in free space (carries its ground ends)
+//   { type: "body" | "surface", id }
+export function moveTarget(scene, world, scale) {
+  const px = (n) => n / scale;
+  const ends = [
+    ...scene.elements.filter((e) => e.type === 'spring').map((e) => ({ kind: 'element', obj: e })),
+    ...scene.constraints.filter(isLink).map((c) => ({ kind: 'constraint', obj: c })),
+  ].reverse();
+  // A ground end that sits on a Festlager in free space is part of that pin (moving the pin moves
+  // it), not a handle of its own.
+  const pins = scene.constraints.filter((c) => c.type === 'pin_support' && c.body === null);
+  const onPin = (anchor) => anchor.body === null && pins.some((c) => dist(c.point, anchor.point) < 1e-6);
+  for (const { kind, obj } of ends) {
+    for (const end of ['a', 'b']) {
+      if (onPin(obj[end])) continue;
+      const p = anchorWorld(scene, obj[end]);
+      if (p && dist(p, world) <= px(HIT_PX.end)) return { type: 'end', id: obj.id, end, kind };
+    }
+  }
+  for (const c of [...scene.constraints].reverse()) {
+    if (isLink(c) || isJoint(c)) continue;
+    const p = attachedPoint(scene, c);
+    if (p && dist(p, world) <= px(HIT_PX.support)) {
+      return { type: c.type === 'pin_support' && c.body === null ? 'pin' : 'support', id: c.id };
+    }
+  }
+  for (const e of [...scene.elements].reverse()) {
+    if (e.type !== 'load') continue;
+    const p = attachedPoint(scene, e);
+    if (p && dist(p, world) <= px(HIT_PX.load)) return { type: 'load', id: e.id };
+  }
+  const bodies = scene.bodies.filter((b) => pointInBody(b, world));
+  if (bodies.length) {
+    bodies.sort((p, q) => bodyArea(p) - bodyArea(q));
+    return { type: 'body', id: bodies[0].id };
+  }
+  for (const s of [...scene.surfaces].reverse()) {
+    if (closestOnSegment(world, s.p1, s.p2).dist <= px(HIT_PX.surface)) return { type: 'surface', id: s.id };
   }
   return null;
 }

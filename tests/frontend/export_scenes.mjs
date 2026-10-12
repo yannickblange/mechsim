@@ -67,4 +67,35 @@ function clamp() {
   return model.toJSON();
 }
 
-process.stdout.write(JSON.stringify({ incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp() }));
+// A block hung from two Festlager in free space: a Stab to one, a rope to the other.
+function hung() {
+  const { model, tools } = setup(undefined, SCALE);
+  click(tools.get('pin'), [0, 1.5]);
+  click(tools.get('pin'), [0.8, 1.5]);
+  drag(tools.get('rect'), [-0.2, 0.4], [0.2, 0.6]);
+  const rod = tools.get('rod');
+  click(rod, [0.004, 1.498]); // snaps onto the first pin
+  click(rod, [0, 0.6]); // top edge of the block
+  const rope = tools.get('rope');
+  click(rope, [0.8, 1.5]);
+  click(rope, [0.2, 0.5]); // right edge of the block
+  return model.toJSON();
+}
+
+// Two bars: the upper one pinned to a Festlager in free space (joint tool on the pin), the lower
+// one hinged to it (joint tool), and a moment on the lower one so that it swings.
+function chain() {
+  const { model, tools } = setup(undefined, SCALE);
+  click(tools.get('pin'), [0, 1.5]);
+  drag(tools.get('rect'), [-0.05, 1.5], [0.05, 0.9]);
+  drag(tools.get('rect'), [-0.05, 0.9], [0.05, 0.3]);
+  click(tools.get('joint'), [0, 1.5]); // pins the upper bar to the Festlager
+  click(tools.get('joint'), [0, 0.9]); // hinge between the bars
+  click(tools.get('load'), [0, 0.6]); // a moment on the lower bar ...
+  model.updateElement('F1', { moment: 1 }); // ... of 1 N m, like the property form would set
+  return model.toJSON();
+}
+
+process.stdout.write(JSON.stringify({
+  incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(),
+}));
