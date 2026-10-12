@@ -36,7 +36,7 @@ def test_version_01_scenes_still_validate(load_example):
         (lambda s: s["constraints"][2]["params"].update(friction=0.3), "friction"),
         (lambda s: s["constraints"][0].update(type="slider"), "slider"),
         (lambda s: s["surfaces"][0].pop("p2"), "p2"),
-        (lambda s: s.update(version="0.4"), "0.4"),
+        (lambda s: s.update(version="0.5"), "0.5"),
     ],
 )
 def test_invalid_variants_are_rejected(mutate, fragment):

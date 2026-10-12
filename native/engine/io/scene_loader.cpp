@@ -1,11 +1,14 @@
 // scene_loader.cpp - scene JSON (contracts/scene.schema.json) -> initialized World.
 #include "scene_loader.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <set>
 #include <stdexcept>
 #include <string>
 
 #include "../core/registry.hpp"
+#include "beam_builder.hpp"
 
 namespace ms {
 
@@ -66,7 +69,8 @@ auto callFactory(Fn fn, const json& spec, const World& world, const std::string&
     }
 }
 
-void loadElement(const json& spec, World& world, std::set<std::string>& ids) {
+void loadElement(const json& rawSpec, const BeamPlans& beams, World& world, std::set<std::string>& ids) {
+    const json spec = remapBeamAnchors(rawSpec, beams);  // attachments on a beam go to its nodes
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
     const std::string type = spec.at("type").get<std::string>();
@@ -75,7 +79,8 @@ void loadElement(const json& spec, World& world, std::set<std::string>& ids) {
     world.elements.push_back(callFactory(make, spec, world, id));
 }
 
-void loadConstraint(const json& spec, World& world, std::set<std::string>& ids) {
+void loadConstraint(const json& rawSpec, const BeamPlans& beams, World& world, std::set<std::string>& ids) {
+    const json spec = remapBeamAnchors(rawSpec, beams);
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
     const std::string type = spec.at("type").get<std::string>();
@@ -86,8 +91,10 @@ void loadConstraint(const json& spec, World& world, std::set<std::string>& ids) 
 
 std::unique_ptr<World> build(const json& scene) {
     if (!scene.is_object()) throw std::runtime_error("scene must be a JSON object");
-    if (!scene.contains("version") || (scene["version"] != "0.1" && scene["version"] != "0.2" && scene["version"] != "0.3")) {
-        throw std::runtime_error("unsupported scene version (expected \"0.1\", \"0.2\" or \"0.3\")");
+    static const char* const kVersions[] = {"0.1", "0.2", "0.3", "0.4"};
+    if (!scene.contains("version") || !scene["version"].is_string() ||
+        std::none_of(std::begin(kVersions), std::end(kVersions), [&](const char* v) { return scene["version"] == v; })) {
+        throw std::runtime_error("unsupported scene version (expected \"0.1\" to \"0.4\")");
     }
 
     auto world = std::make_unique<World>();
@@ -95,12 +102,25 @@ std::unique_ptr<World> build(const json& scene) {
     loadSolver(scene, *world);
 
     std::set<std::string> ids;
-    for (const json& spec : scene.at("bodies")) loadBody(spec, *world, ids);
+    const BeamPlans beams = planBeams(scene);  // v0.4: bendable beams become chains of node bodies
+    for (const json& spec : scene.at("bodies")) {
+        if (spec.at("type").get<std::string>() == "beam") {
+            const std::string id = spec.at("id").get<std::string>();
+            claimId(ids, id);
+            try {
+                addBeam(spec, beams.at(id), *world);
+            } catch (const std::exception& e) {
+                throw std::runtime_error(id + ": " + e.what());
+            }
+        } else {
+            loadBody(spec, *world, ids);
+        }
+    }
     if (scene.contains("elements")) {
-        for (const json& spec : scene["elements"]) loadElement(spec, *world, ids);
+        for (const json& spec : scene["elements"]) loadElement(spec, beams, *world, ids);
     }
     if (scene.contains("constraints")) {
-        for (const json& spec : scene["constraints"]) loadConstraint(spec, *world, ids);
+        for (const json& spec : scene["constraints"]) loadConstraint(spec, beams, *world, ids);
     }
     // "surfaces" (v0.2) are drawing/editor geometry: supports carry their own angle, so the
     // engine ignores them.

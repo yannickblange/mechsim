@@ -63,24 +63,76 @@ def _error_key(error: jsonschema.ValidationError) -> tuple:
     return (tuple(str(part) for part in error.path), error.message)
 
 
+def _matching_branch(error: jsonschema.ValidationError) -> list[jsonschema.ValidationError]:
+    """For a failed ``oneOf`` (the cross sections): the errors of the branch whose ``type`` matched.
+
+    "{...} is not valid under any of the given schemas" does not say what is wrong; the branch of the
+    section type that was written does ("'tw' is a required property").
+    """
+    branches: dict[Any, list[jsonschema.ValidationError]] = {}
+    for sub in error.context or []:
+        branches.setdefault(sub.schema_path[0], []).append(sub)
+    for subs in branches.values():
+        wrong_type = any(
+            "type" in list(sub.schema_path) and sub.validator in ("const", "enum") for sub in subs
+        )
+        if not wrong_type:
+            return subs
+    return []
+
+
 def _format_error(error: jsonschema.ValidationError) -> str:
     """Render one validation error as ``<json path>: <message>``.
 
     Example: ``bodies/0/params/mass: 0 is less than or equal to the minimum of 0``.
     Errors at the root document carry no path.
     """
+    if error.validator == "oneOf":
+        matching = _matching_branch(error)
+        if matching:
+            return "; ".join(_format_error_at(error, sub) for sub in matching)
+        if isinstance(error.instance, dict) and "type" in error.instance and list(error.path)[-1:] == ["section"]:
+            path = "/".join(str(part) for part in error.path)
+            return f"{path}: unknown section type {error.instance['type']!r} (square, L, T, H, I)"
     path = "/".join(str(part) for part in error.path)
     if path:
         return f"{path}: {error.message}"
     return error.message
 
 
+def _format_error_at(parent: jsonschema.ValidationError, sub: jsonschema.ValidationError) -> str:
+    path = "/".join(str(part) for part in [*parent.path, *sub.path])
+    return f"{path}: {sub.message}" if path else sub.message
+
+
 def _duplicates(ids: list[str]) -> list[str]:
     return sorted({i for i in ids if ids.count(i) > 1})
 
 
+def section_error(section: dict[str, Any]) -> str | None:
+    """Why a (schema-valid) cross section cannot exist, or None. Mirrors native/engine/core/section.cpp."""
+    kind = section["type"]
+    if kind in ("I", "H"):
+        if not 2 * section["tf"] < section["h"]:
+            return "the flanges (2 tf) must be thinner than the height h"
+        if not section["tw"] < section["b"]:
+            return "the web thickness tw must be smaller than the width b"
+    elif kind == "T":
+        if not section["tf"] < section["h"]:
+            return "the flange thickness tf must be smaller than the height h"
+        if not section["tw"] < section["b"]:
+            return "the stem width tw must be smaller than the flange width b"
+    elif kind == "L":
+        if not section["t"] < section["b"]:
+            return "the thickness t must be smaller than the foot width b"
+        if not section["t"] < section["h"]:
+            return "the thickness t must be smaller than the leg height h"
+    return None
+
+
 def check_references(scene: dict[str, Any]) -> list[str]:
-    """Problems the JSON schema cannot express: duplicate ids, dangling body / surface references.
+    """Problems the JSON schema cannot express: duplicate ids, dangling body / surface references,
+    cross sections that do not fit, attachments outside a beam.
 
     Assumes the scene already passed the schema.
     """
@@ -98,37 +150,53 @@ def check_references(scene: dict[str, Any]) -> list[str]:
 
     body_ids = {b["id"] for b in bodies}
     surface_ids = {s["id"] for s in surfaces}
+    beams = {b["id"]: b["params"]["length"] for b in bodies if b["type"] == "beam"}
 
-    def need_body(owner: str, body_id: str | None) -> None:
+    for body in bodies:
+        if body["type"] == "beam":
+            problem = section_error(body["params"]["section"])
+            if problem:
+                errors.append(f"beam '{body['id']}': {problem}")
+
+    def need_body(owner: str, body_id: str | None, point: list[float] | None = None) -> None:
         if body_id is not None and body_id not in body_ids:
             errors.append(f"'{owner}' refers to unknown body '{body_id}'")
+        elif body_id in beams and point is not None and abs(point[0]) > beams[body_id] / 2 + 1e-6:
+            errors.append(
+                f"'{owner}' is attached to beam '{body_id}' at x = {point[0]} m, outside the beam "
+                f"(length {beams[body_id]} m)"
+            )
 
     for element in elements:
-        if element["type"] in ("spring", "damper"):
+        if element["type"] == "bar":
+            problem = section_error(element["params"]["section"])
+            if problem:
+                errors.append(f"bar '{element['id']}': {problem}")
+        if element["type"] in ("spring", "damper", "bar"):
             ends = [element["a"]["body"], element["b"]["body"]]
-            for end in ends:
-                need_body(element["id"], end)
-            if element["type"] == "damper":
+            for end in ("a", "b"):
+                need_body(element["id"], element[end]["body"], element[end]["point"])
+            if element["type"] in ("damper", "bar"):
                 if ends[0] == ends[1]:
                     errors.append(
                         f"'{element['id']}' connects "
                         + ("the same mass to itself" if ends[0] is not None else "two points of the ground")
                     )
         else:
-            need_body(element["id"], element["body"])
+            need_body(element["id"], element["body"], element["point"])
     for constraint in constraints:
         kind = constraint["type"]
         if kind in ("rope", "rod", "pin_joint", "fixed_joint"):
             ends = [constraint["a"]["body"], constraint["b"]["body"]]
-            for end in ends:
-                need_body(constraint["id"], end)
+            for end in ("a", "b"):
+                need_body(constraint["id"], constraint[end]["body"], constraint[end]["point"])
             if ends[0] == ends[1]:
                 errors.append(
                     f"'{constraint['id']}' connects "
                     + ("the same mass to itself" if ends[0] is not None else "two points of the ground")
                 )
             continue
-        need_body(constraint["id"], constraint["body"])  # None = Festlager in free space
+        need_body(constraint["id"], constraint["body"], constraint["point"])  # None = Festlager in free space
         ref = constraint.get("surface")
         if ref is not None and ref not in surface_ids:
             errors.append(f"'{constraint['id']}' refers to unknown surface '{ref}'")

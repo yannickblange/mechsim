@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.3",
-  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper. Version 0.1 and 0.2 scenes remain valid.",
+  "title": "MechSim scene v0.4",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads. Version 0.1 to 0.3 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
   "properties": {
-    "version": { "enum": ["0.1", "0.2", "0.3"] },
+    "version": { "enum": ["0.1", "0.2", "0.3", "0.4"] },
     "name": { "type": "string" },
     "description": { "type": "string" },
     "gravity": { "$ref": "#/$defs/vec2", "default": [0, -9.81] },
@@ -90,7 +90,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["block", "disc"] },
+        "type": { "enum": ["block", "disc", "node", "beam"] },
         "position": { "$ref": "#/$defs/vec2" },
         "angle": { "type": "number", "default": 0 },
         "velocity": { "$ref": "#/$defs/vec2", "default": [0, 0] },
@@ -105,6 +105,14 @@
         {
           "if": { "properties": { "type": { "const": "disc" } } },
           "then": { "properties": { "params": { "$ref": "#/$defs/discParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "node" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/nodeParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "beam" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/beamParams" } } }
         }
       ]
     },
@@ -127,13 +135,79 @@
         "radius": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "nodeParams": {
+      "type": "object",
+      "required": ["mass"],
+      "additionalProperties": false,
+      "description": "Knoten (v0.4): a point mass where Stabs meet. Stabs, supports and loads attach at its centre, [0, 0].",
+      "properties": {
+        "mass": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "beamParams": {
+      "type": "object",
+      "required": ["length", "section"],
+      "additionalProperties": false,
+      "description": "Bendable beam (v0.4), lying along its local x axis. `position` is the point of the centroid axis at its middle. Anything may be attached to it at a body-local point (x within +-length/2).",
+      "properties": {
+        "length": { "type": "number", "exclusiveMinimum": 0 },
+        "section": { "$ref": "#/$defs/section" },
+        "mass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Total mass, kg. Default: density 7850 kg/m^3 times section area times length."
+        },
+        "segments": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 64,
+          "default": 8,
+          "description": "Number of finite elements between the evenly spaced nodes (odd numbers are rounded up). Attachments get nodes of their own."
+        }
+      }
+    },
+    "length": { "type": "number", "exclusiveMinimum": 0 },
+    "section": {
+      "description": "Cross section (v0.4), dimensions in m; one Young's modulus (210 GPa) for all. Bending is about the axis normal to the simulation plane. square: side a. L: leg height h, foot width b, thickness t. T: flange width b and thickness tf on a stem of width tw, total height h. I: two flanges (width b, thickness tf) at the top and bottom of a web (thickness tw), total height h. H: the I turned by 90 degrees (weak axis).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "a"],
+          "additionalProperties": false,
+          "properties": { "type": { "const": "square" }, "a": { "$ref": "#/$defs/length" } }
+        },
+        {
+          "type": "object",
+          "required": ["type", "b", "h", "t"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "L" },
+            "b": { "$ref": "#/$defs/length" },
+            "h": { "$ref": "#/$defs/length" },
+            "t": { "$ref": "#/$defs/length" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "b", "h", "tf", "tw"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "enum": ["T", "H", "I"] },
+            "b": { "$ref": "#/$defs/length" },
+            "h": { "$ref": "#/$defs/length" },
+            "tf": { "$ref": "#/$defs/length" },
+            "tw": { "$ref": "#/$defs/length" }
+          }
+        }
+      ]
+    },
     "element": {
       "type": "object",
       "required": ["id", "type", "params"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["spring", "load", "damper"] },
+        "type": { "enum": ["spring", "load", "damper", "bar"] },
         "a": { "$ref": "#/$defs/anchor" },
         "b": { "$ref": "#/$defs/anchor" },
         "body": { "$ref": "#/$defs/id", "description": "load: the body the load acts on." },
@@ -147,6 +221,14 @@
             "required": ["a", "b"],
             "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }] },
             "properties": { "params": { "$ref": "#/$defs/springParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "bar" } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }] },
+            "properties": { "params": { "$ref": "#/$defs/barParams" } }
           }
         },
         {
@@ -180,6 +262,13 @@
         }
       }
     },
+    "barParams": {
+      "type": "object",
+      "required": ["section"],
+      "additionalProperties": false,
+      "description": "Elastic Stab (v0.4): a pin-ended two-force member with axial stiffness E A / L, unstressed as installed. Unlike the rigid rod (a constraint) it makes statically indeterminate trusses solvable.",
+      "properties": { "section": { "$ref": "#/$defs/section" } }
+    },
     "damperParams": {
       "type": "object",
       "required": ["c"],
@@ -207,9 +296,19 @@
           "description": "Couple, N m (constant) or N m s (impulse), counter-clockwise positive."
         },
         "mode": {
-          "enum": ["constant", "impulse"],
+          "enum": ["constant", "impulse", "harmonic"],
           "default": "constant",
-          "description": "constant acts for the whole simulation; impulse is a velocity jump at t = 0 (and after every reset)."
+          "description": "constant acts for the whole simulation; impulse is a velocity jump at t = 0 (and after every reset); harmonic is force and moment times sin(2 pi f t + phase), the excitation of a forced vibration."
+        },
+        "frequency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "harmonic only (required there): exciting frequency f in Hz (angular frequency Omega = 2 pi f)."
+        },
+        "phase": {
+          "type": "number",
+          "default": 0,
+          "description": "harmonic only: phase angle in rad."
         }
       }
     },

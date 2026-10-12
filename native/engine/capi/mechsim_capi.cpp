@@ -85,25 +85,21 @@ double ms_world_time(const ms_world* world) {
 
 int ms_world_body_count(const ms_world* world) {
     if (nullWorld(world)) return MS_ERR;
-    return static_cast<int>(world->world->bodies.size());
+    return static_cast<int>(world->world->sceneBodies().size());  // a beam counts once
 }
 
 int ms_world_get_state(const ms_world* world, double* out, int capacity) {
     if (nullWorld(world)) return MS_ERR;
     return guarded<int>(MS_ERR, [&] {
-        const int needed = MS_STATE_STRIDE * static_cast<int>(world->world->bodies.size());
+        const auto bodies = world->world->sceneBodies();  // scene order; a beam is its midpoint
+        const int needed = MS_STATE_STRIDE * static_cast<int>(bodies.size());
         if (!out || capacity < needed) {
             g_last_error = "output buffer is NULL or too small";
             return MS_ERR;
         }
         int i = 0;
-        for (const ms::Body& b : world->world->bodies) {
-            out[i++] = b.pos.x;
-            out[i++] = b.pos.y;
-            out[i++] = b.phi;
-            out[i++] = b.vel.x;
-            out[i++] = b.vel.y;
-            out[i++] = b.omega;
+        for (const auto& b : bodies) {
+            for (double v : b.q) out[i++] = v;
         }
         return needed;
     });

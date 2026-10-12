@@ -12,6 +12,10 @@ public:
     std::string id;
     std::string type;  // "block" in v0.1
 
+    // v0.4: >= 0 for a hidden node of a bendable beam (index into World::beams); such nodes are
+    // reported through their beam, not as bodies of their own.
+    int beam = -1;
+
     double mass = 1.0;     // kg
     double inertia = 1.0;  // kg m^2 about the centre of mass
 

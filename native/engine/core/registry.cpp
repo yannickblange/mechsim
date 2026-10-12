@@ -5,11 +5,13 @@
 
 #include "../bodies/block.hpp"
 #include "../bodies/disc.hpp"
+#include "../bodies/node.hpp"
 #include "../constraints/fixed_support.hpp"
 #include "../constraints/joint.hpp"
 #include "../constraints/link.hpp"
 #include "../constraints/pin_support.hpp"
 #include "../constraints/roller_support.hpp"
+#include "../elements/bar.hpp"
 #include "../elements/damper.hpp"
 #include "../elements/load.hpp"
 #include "../elements/spring.hpp"
@@ -20,6 +22,7 @@ BodyInitFn findBodyType(const std::string& type) {
     static const std::map<std::string, BodyInitFn> table = {
         {"block", &initBlock},
         {"disc", &initDisc},
+        {"node", &initNode},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;
@@ -30,6 +33,7 @@ ElementFactoryFn findElementType(const std::string& type) {
         {"spring", &makeSpring},
         {"load", &makeLoad},
         {"damper", &makeDamper},
+        {"bar", &makeBar},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;

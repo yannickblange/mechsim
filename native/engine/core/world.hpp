@@ -21,6 +21,15 @@ struct SolverSettings {
     double baumgarte_beta = 5.0;
 };
 
+// A bendable beam (v0.4): hidden node bodies, ordered along the beam, and the element that holds
+// them together. Reported in frames as one body with the id of the beam.
+struct BeamGroup {
+    std::string id;
+    std::vector<int> nodes;      // body indices, from the start to the end of the beam
+    int centre = 0;              // body index of the node at the middle of the beam (local x = 0)
+    const Element* fe = nullptr; // its BeamElement (owned by World::elements)
+};
+
 class World {
 public:
     Vec2 gravity{0.0, -9.81};
@@ -30,9 +39,12 @@ public:
     std::vector<Body> bodies;
     std::vector<std::unique_ptr<Element>> elements;
     std::vector<std::unique_ptr<Constraint>> constraints;
+    std::vector<BeamGroup> beams;
 
     // Index of the body with this id, or GROUND (-1) if not found.
     BodyIndex findBody(const std::string& id) const;
+    // Index into `beams` of the beam with this id, or -1.
+    int findBeam(const std::string& id) const;
 
     // World position / velocity of an anchor (handles GROUND).
     Vec2 anchorWorld(const Anchor& a) const;
@@ -44,7 +56,9 @@ public:
     // Call once after loading: saves every body's initial state, calls Constraint::initialize().
     void initialize();
 
-    // Advance by one step of size dt using solver.integrator. Advances `time`.
+    // Advance by one step of size dt using solver.integrator. Advances `time`. A step is split into
+    // substeps when dt * maxOmega() is large (stiff bars and beams): the semi-implicit Euler scheme is
+    // stable for omega * dt < 2, the substeps keep it below 0.5.
     void step(double dt);
 
     // Restore initial body states, time = 0, re-run Constraint::initialize().
@@ -56,6 +70,23 @@ public:
 
     // Build the frame JSON (contracts/state.schema.json).
     nlohmann::json frame() const;
+
+    // The bodies as the outside world sees them, in scene order: a beam is one body (its midpoint).
+    // Each entry: x, y, phi, vx, vy, omega.
+    struct BodyState {
+        std::string id;
+        double q[6];
+    };
+    std::vector<BodyState> sceneBodies() const;
+
+    // Highest natural frequency (rad/s) the force elements can produce, estimated at initialize().
+    // step() splits a step into substeps so that the explicit scheme stays stable (see step()).
+    double maxOmega() const { return maxOmega_; }
+    // Number of substeps step(dt) uses.
+    int substepsFor(double dt) const;
+
+private:
+    double maxOmega_ = 0.0;
 };
 
 }  // namespace ms

@@ -54,3 +54,50 @@ def base03() -> dict:
              "params": {"length": 3.0}},
         ],
     }
+
+
+def base04() -> dict:
+    """A scene using every v0.4 type: node, bendable beam, elastic bar, harmonic load, all sections.
+
+    A clamped steel strip (the beam) carries a node at its tip; two nodes hang on elastic bars from
+    the ceiling and on a rigid Stab; a harmonic force shakes one of them.
+    """
+    return {
+        "version": "0.4",
+        "name": "fachwerk and beams",
+        "bodies": [
+            {"id": "beam", "type": "beam", "position": [0.0, 0.0],
+             "params": {"length": 1.0, "section": {"type": "square", "a": 0.01}, "segments": 8}},
+            {"id": "N1", "type": "node", "position": [0.5, 0.0], "params": {"mass": 0.5}},
+            {"id": "N2", "type": "node", "position": [2.0, 0.0], "params": {"mass": 1.0}},
+            {"id": "N3", "type": "node", "position": [3.0, 0.0], "params": {"mass": 1.0}},
+        ],
+        "elements": [
+            {"id": "B1", "type": "bar", "a": {"body": None, "point": [2.0, 1.0]}, "b": {"body": "N2", "point": [0, 0]},
+             "params": {"section": {"type": "L", "b": 0.05, "h": 0.05, "t": 0.005}}},
+            {"id": "B2", "type": "bar", "a": {"body": "N2", "point": [0, 0]}, "b": {"body": "N3", "point": [0, 0]},
+             "params": {"section": {"type": "T", "b": 0.05, "h": 0.05, "tf": 0.006, "tw": 0.005}}},
+            {"id": "F1", "type": "load", "body": "N3", "point": [0, 0],
+             "params": {"force": [0, 5], "mode": "harmonic", "frequency": 2.0, "phase": 0.5}},
+            {"id": "F2", "type": "load", "body": "beam", "point": [0.5, 0.0], "params": {"force": [0, -1]}},
+            {"id": "k1", "type": "spring", "a": {"body": None, "point": [0.2, 1.0]}, "b": {"body": "beam", "point": [0.2, 0.005]},
+             "params": {"k": 50}},
+        ],
+        "constraints": [
+            {"id": "E1", "type": "fixed_support", "body": "beam", "point": [-0.5, 0.0], "surface": None, "params": {"angle": 0}},
+            {"id": "J1", "type": "pin_joint", "a": {"body": "beam", "point": [0.5, 0.0]}, "b": {"body": "N1", "point": [0, 0]}},
+            {"id": "S1", "type": "rod", "a": {"body": None, "point": [3.0, 1.0]}, "b": {"body": "N3", "point": [0, 0]}},
+            {"id": "A1", "type": "pin_support", "body": "N2", "point": [0, 0], "surface": None, "params": {"angle": 0}},
+        ],
+    }
+
+
+def sections() -> list[dict]:
+    """One valid section of every type."""
+    return [
+        {"type": "square", "a": 0.04},
+        {"type": "L", "b": 0.08, "h": 0.12, "t": 0.01},
+        {"type": "T", "b": 0.1, "h": 0.1, "tf": 0.01, "tw": 0.01},
+        {"type": "H", "b": 0.1, "h": 0.2, "tf": 0.01, "tw": 0.006},
+        {"type": "I", "b": 0.1, "h": 0.2, "tf": 0.01, "tw": 0.006},
+    ]

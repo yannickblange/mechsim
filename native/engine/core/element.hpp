@@ -24,6 +24,10 @@ public:
     // Stored potential energy (0 for non-conservative elements).
     virtual double potentialEnergy(const World& world) const { (void)world; return 0.0; }
 
+    // v0.4: an element that is part of something else (the finite elements of a beam) and has no
+    // entry of its own in frames.
+    virtual bool hidden() const { return false; }
+
     // Fill the frame entry for this element. World::frame() has already set "id" and "type";
     // the element must add every other field required by contracts/state.schema.json.
     virtual void writeFrame(const World& world, nlohmann::json& out) const = 0;

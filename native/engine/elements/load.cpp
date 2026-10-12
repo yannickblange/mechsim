@@ -1,6 +1,7 @@
 // load.cpp - external force + moment ("Kraft und Moment") at a body point.
 #include "load.hpp"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -10,13 +11,19 @@ namespace ms {
 
 Vec2 Load::worldPoint(const World& world) const { return world.bodies[body].toWorld(localPoint); }
 
+double Load::factor(double t) const {
+    return mode == Mode::Harmonic ? std::sin(2.0 * 3.14159265358979323846 * frequency * t + phase) : 1.0;
+}
+
 // A force F at local point p adds F to the force and cross(R p, F) to the torque
 // (Body::applyForceAt); the moment is a pure couple, so it adds the same torque at any point.
-void Load::applyForces(World& world, double /*t*/) {
-    if (mode != Mode::Constant) return;
+// A harmonic load is the same with F sin(2 pi f t + phase): the excitation of a forced vibration.
+void Load::applyForces(World& world, double t) {
+    if (mode == Mode::Impulse) return;
+    const double s = factor(t);
     Body& b = world.bodies[body];
-    b.applyForceAt(force, localPoint);
-    b.torque += moment;
+    b.applyForceAt(s * force, localPoint);
+    b.torque += s * moment;
 }
 
 // Impulse J = integral of F dt: velocity jump J / m, angular jump (cross(r, J) + L) / I.
@@ -29,7 +36,8 @@ void Load::addImpulse(const World& world, std::vector<double>& J) const {
 }
 
 // A constant world-frame force and couple are conservative: V = -F . p - M phi
-// (the generalised forces -dV/dq are F, cross(r, F) and M).
+// (the generalised forces -dV/dq are F, cross(r, F) and M). A harmonic load depends on time: it
+// does work on the system and has no potential.
 double Load::potentialEnergy(const World& world) const {
     if (mode != Mode::Constant) return 0.0;
     const Body& b = world.bodies[body];
@@ -40,11 +48,12 @@ void Load::writeFrame(const World& world, nlohmann::json& out) const {
     const Vec2 p = worldPoint(world);
     out["p1"] = {p.x, p.y};
     out["p2"] = {p.x, p.y};
+    const double s = factor(world.time);
     out["force"] = length(force);
-    out["vector"] = {force.x, force.y};
-    out["moment"] = moment;
-    out["mode"] = mode == Mode::Constant ? "constant" : "impulse";
-    out["active"] = mode == Mode::Constant || world.time <= 0.0;
+    out["vector"] = {s * force.x, s * force.y};
+    out["moment"] = s * moment;
+    out["mode"] = mode == Mode::Constant ? "constant" : mode == Mode::Impulse ? "impulse" : "harmonic";
+    out["active"] = mode != Mode::Impulse || world.time <= 0.0;
 }
 
 std::unique_ptr<Element> makeLoad(const nlohmann::json& spec, const World& world) {
@@ -86,8 +95,19 @@ std::unique_ptr<Element> makeLoad(const nlohmann::json& spec, const World& world
             l->mode = Load::Mode::Constant;
         } else if (mode == "impulse") {
             l->mode = Load::Mode::Impulse;
+        } else if (mode == "harmonic") {
+            l->mode = Load::Mode::Harmonic;
+            if (!params.contains("frequency") || !params["frequency"].is_number() ||
+                !(params["frequency"].get<double>() > 0.0)) {
+                throw std::runtime_error("load '" + id + "': a harmonic load needs a 'frequency' (Hz) > 0");
+            }
+            l->frequency = params["frequency"].get<double>();
+            if (params.contains("phase")) {
+                if (!params["phase"].is_number()) throw std::runtime_error("load '" + id + "': 'phase' must be a number");
+                l->phase = params["phase"].get<double>();
+            }
         } else {
-            throw std::runtime_error("load '" + id + "': 'mode' must be \"constant\" or \"impulse\"");
+            throw std::runtime_error("load '" + id + "': 'mode' must be \"constant\", \"impulse\" or \"harmonic\"");
         }
         return l;
     } catch (const nlohmann::json::exception& e) {
