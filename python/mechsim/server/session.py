@@ -79,6 +79,17 @@ class SimSession:
         """Engine steps per display frame: speed / 60 s of simulated time."""
         return max(1, round(self.speed / 60 / self.sim.dt))
 
+    def advance(self) -> dict[str, Any]:
+        """Run one display frame of engine steps; returns the frame message. The message carries a
+        `trace` (the pose after every engine step, see Simulation.step_traced) when the simulation
+        can produce one, so graphs are not limited by the 60 Hz display rate."""
+        n = self.frame_steps()
+        trace = self.sim.step_traced(n) if hasattr(self.sim, "step_traced") else self.sim.step(n=n)
+        msg: dict[str, Any] = {"type": "frame", "data": self.sim.frame()}
+        if trace:
+            msg["trace"] = trace
+        return msg
+
     async def command(self, msg: dict[str, Any], ws) -> None:
         cmd = msg.get("cmd") if isinstance(msg, dict) else None
         if cmd == "play":
@@ -92,11 +103,11 @@ class SimSession:
         elif cmd == "step":
             if self.sim is not None and not self.running:
                 try:
-                    self.sim.step(n=self.frame_steps())
+                    msg = self.advance()
                 except Exception as exc:
                     await ws.send_json({"type": "error", "message": str(exc)})
                 else:
-                    await self.broadcast({"type": "frame", "data": self.sim.frame()})
+                    await self.broadcast(msg)
         elif cmd == "speed":
             try:
                 value = float(msg["value"])
@@ -114,8 +125,7 @@ class SimSession:
             t0 = time.perf_counter()
             if self.running and self.sim is not None:
                 try:
-                    self.sim.step(n=self.frame_steps())
-                    await self.broadcast({"type": "frame", "data": self.sim.frame()})
+                    await self.broadcast(self.advance())
                 except Exception as exc:
                     self.running = False
                     await self.broadcast({"type": "error", "message": str(exc)})

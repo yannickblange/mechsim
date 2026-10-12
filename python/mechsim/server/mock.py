@@ -48,6 +48,21 @@ class MockSimulation:
         self._check_open()
         self._time += n * (dt if dt is not None else self._dt)
 
+    def step_traced(self, n: int, max_samples: int = 120) -> dict[str, Any]:
+        """Same contract as Simulation.step_traced (poses of the mock motion)."""
+        self._check_open()
+        every = max(1, -(-n // max_samples))
+        times: list[float] = []
+        poses: list[list[float]] = []
+        done = 0
+        while done < n:
+            k = min(every, n - done)
+            self.step(n=k)
+            done += k
+            times.append(self._time)
+            poses.append([v for body in self._scene["bodies"] for v in self._pose(body, self._time)[:3]])
+        return {"ids": [body["id"] for body in self._scene["bodies"]], "t": times, "q": poses}
+
     def close(self) -> None:
         self._closed = True
 

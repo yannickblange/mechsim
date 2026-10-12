@@ -17,8 +17,10 @@ const isTyping = (target) => target instanceof HTMLElement && /^(INPUT|SELECT|TE
 
 export class Editor {
   // stage: the element that contains the canvas (the toolbox and popups are placed in it).
-  constructor({ renderer, model, stage }) {
+  // onGraph(id): optional, shows the displacement graph of a mass (offered in its popup).
+  constructor({ renderer, model, stage, onGraph = null }) {
     this.renderer = renderer;
+    this.onGraph = onGraph;
     this.model = model;
     this.stage = stage;
     this.canvas = renderer.canvas;
@@ -287,6 +289,16 @@ export class Editor {
       const apply = el('button', 'primary', { type: 'submit' });
       apply.textContent = 'Apply';
       buttons.append(apply);
+    }
+    const found = this.model.find(id);
+    if (this.onGraph && found && found.kind === 'body') {
+      const graph = el('button', '', { type: 'button', title: 'Plot the displacement of this mass over time' });
+      graph.textContent = 'Graph';
+      graph.addEventListener('click', () => {
+        this.onGraph(id);
+        this.closePopup();
+      });
+      buttons.append(graph);
     }
     const del = el('button', 'danger', { type: 'button' });
     del.textContent = 'Delete';

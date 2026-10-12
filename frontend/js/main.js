@@ -20,6 +20,9 @@ import { Editor } from './editor/editor.js';
 import { SceneModel } from './editor/model.js';
 import { slugify } from './editor/names.js';
 import { applyTheme, currentTheme, otherTheme } from './theme.js';
+import { Recorder } from './graphs/recorder.js';
+import { GraphManager } from './graphs/panel.js';
+import { hitTest } from './editor/hit.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,7 +30,10 @@ const api = new Api();
 const state = new AppState();
 const renderer = new Renderer($('view'));
 const model = new SceneModel();
-const editor = new Editor({ renderer, model, stage: document.querySelector('.stage') });
+const stage = document.querySelector('.stage');
+const recorder = new Recorder();
+const graphs = new GraphManager({ stage, recorder, getTheme: () => renderer.theme });
+const editor = new Editor({ renderer, model, stage, onGraph: (id) => graphs.open(id) });
 
 const ui = {
   sceneSelect: $('scene-select'),
@@ -92,6 +98,68 @@ function updateUi() {
   ui.redo.disabled = !model.canRedo;
   showError(state.lastError);
 }
+
+// --- graphs and the run-mode context menu -------------------------------------------------------------------
+
+// Every frame message (with its trace) feeds the recorder; a new scene starts a new recording.
+state.onFrame((msg) => {
+  recorder.bindScene(state.sceneVersion);
+  recorder.ingest(msg);
+});
+state.subscribe(() => {
+  recorder.bindScene(state.sceneVersion);
+  if (state.scene && !state.editing) graphs.sync(state.scene.bodies.map((b) => b.id));
+});
+model.subscribe(() => {
+  if (state.editing) graphs.sync(model.scene.bodies.map((b) => b.id));
+});
+
+let contextMenu = null;
+
+function closeContextMenu() {
+  if (contextMenu) contextMenu.remove();
+  contextMenu = null;
+}
+
+// Right-click on a mass while the simulation is shown (the editor has its own popup): a small menu.
+function openContextMenu(event) {
+  event.preventDefault();
+  closeContextMenu();
+  if (state.editing || !state.scene) return;
+  const rect = renderer.canvas.getBoundingClientRect();
+  const world = renderer.cam.toWorld([event.clientX - rect.left, event.clientY - rect.top]);
+  const hit = hitTest(state.scene, world, renderer.cam.scale);
+  if (!hit || hit.kind !== 'body') return;
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.setAttribute('role', 'menu');
+  const title = document.createElement('div');
+  title.className = 'ctx-title';
+  title.textContent = hit.id;
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.setAttribute('role', 'menuitem');
+  item.textContent = graphs.has(hit.id) ? 'Show displacement graph' : 'Displacement graph';
+  item.addEventListener('click', () => {
+    graphs.open(hit.id);
+    closeContextMenu();
+  });
+  menu.append(title, item);
+  contextMenu = menu;
+  const stageBox = stage.getBoundingClientRect();
+  stage.append(menu);
+  menu.style.left = `${Math.min(event.clientX - stageBox.left, stage.clientWidth - menu.offsetWidth - 8)}px`;
+  menu.style.top = `${Math.min(event.clientY - stageBox.top, stage.clientHeight - menu.offsetHeight - 8)}px`;
+  item.focus();
+}
+
+renderer.canvas.addEventListener('contextmenu', openContextMenu);
+window.addEventListener('pointerdown', (e) => {
+  if (contextMenu && !contextMenu.contains(e.target)) closeContextMenu();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeContextMenu();
+});
 
 // --- scene list -------------------------------------------------------------------------------------
 
@@ -280,6 +348,7 @@ ui.edit.addEventListener('click', () => {
 ui.theme.addEventListener('click', () => {
   applyTheme(otherTheme(currentTheme()));
   renderer.refreshTheme();
+  graphs.refreshTheme();
   updateUi();
 });
 ui.newScene.addEventListener('click', newLayout);
@@ -298,11 +367,12 @@ function loop() {
   // While editing, show the layout at t = 0 (no frame); ghosts are shown whenever nothing moves.
   renderer.showGhosts = state.editing || !state.running;
   renderer.render(state.editing ? null : state.frame);
+  graphs.render();
   requestAnimationFrame(loop);
 }
 
 // Handle for debugging in the browser console (and for UI tests).
-window.__mechsim = { api, state, renderer, model, editor };
+window.__mechsim = { api, state, renderer, model, editor, recorder, graphs };
 
 renderer.resize();
 init();

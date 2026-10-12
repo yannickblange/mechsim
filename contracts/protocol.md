@@ -1,4 +1,4 @@
-# Server <-> browser protocol (v0.1; v0.2 adds scene source, `apply`, `save`)
+# Server <-> browser protocol (v0.1; v0.2 adds scene source, `apply`, `save`; v0.4 adds the frame `trace`)
 
 ## REST (JSON)
 
@@ -38,7 +38,7 @@ Client -> server (JSON text messages):
 Server -> client:
 
 ```json
-{"type": "frame",  "data": <frame matching state.schema.json>}
+{"type": "frame",  "data": <frame matching state.schema.json>, "trace"?: <trace>}
 {"type": "status", "running": true, "scene": "single_mass_spring", "speed": 1.0, "mode": "native"}
 {"type": "error",  "message": "human readable text"}
 ```
@@ -47,3 +47,17 @@ Server -> client:
 - After every command the server sends a `status`.
 - While running, the server sends `frame` messages at **60 Hz**. Each display frame advances
   simulated time by `speed / 60` s, using `n = max(1, round(speed / 60 / solver.dt))` engine steps.
+
+### Trace (v0.4, optional)
+
+A running or stepping frame message may carry a `trace`: the pose of every body after (at most 120 of) the engine
+steps that produced the frame, so the browser can plot motion that is faster than the 60 Hz display rate (the
+displacement graphs use it).
+
+```json
+{"ids": ["m1", "m2"], "t": [0.001, 0.002], "q": [[x1, y1, phi1, x2, y2, phi2], [x1, y1, phi1, x2, y2, phi2]]}
+```
+
+`ids` are the bodies in scene order, `t` the simulated times, `q[i]` the poses at `t[i]` (3 numbers per body; a bendable
+beam reports its midpoint). The last sample is the pose of the frame itself. Frames without a trace (the `t = 0` frame after a
+load or reset, or a simulation that cannot trace) are plotted as a single sample.

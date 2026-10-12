@@ -28,8 +28,10 @@ class Simulation:
             parsed = json.loads(text)
             solver = parsed.get("solver", {}) if isinstance(parsed, dict) else {}
             self._dt = float(solver.get("dt", _DEFAULT_DT))
-        except (ValueError, TypeError, AttributeError):
+            self._body_ids = [b["id"] for b in parsed.get("bodies", [])]
+        except (ValueError, TypeError, AttributeError, KeyError):
             self._dt = _DEFAULT_DT  # the engine will report the real parse error
+            self._body_ids = []
         handle = lib.ms_world_create(text.encode("utf-8"))
         if not handle:
             raise _native.NativeError(_native.last_error())
@@ -60,6 +62,25 @@ class Simulation:
         if n < 1:
             raise ValueError("n must be >= 1")
         _native.check(lib.ms_world_step(handle, dt or 0.0, n))
+
+    def step_traced(self, n: int, max_samples: int = 120) -> dict[str, Any]:
+        """Like step(n=n), but also returns the pose of every body after (at most `max_samples` of)
+        the steps, so a client can plot motion that is faster than the display frame rate:
+        {"ids": [...], "t": [t_1, ...], "q": [[x, y, phi of body 0, x, y, phi of body 1, ...], ...]}.
+        Bodies are in scene order (a bendable beam reports its midpoint)."""
+        if n < 1:
+            raise ValueError("n must be >= 1")
+        every = max(1, -(-n // max_samples))
+        times: list[float] = []
+        poses: list[list[float]] = []
+        done = 0
+        while done < n:
+            k = min(every, n - done)
+            self.step(n=k)
+            done += k
+            times.append(self.time)
+            poses.append(self.state()[:, :3].ravel().tolist())
+        return {"ids": list(self._body_ids), "t": times, "q": poses}
 
     def reset(self) -> None:
         lib, handle = self._live()

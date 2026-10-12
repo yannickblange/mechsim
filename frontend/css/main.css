@@ -418,3 +418,91 @@ input[type='text']:focus-visible {
     transition: none;
   }
 }
+
+/* --- v0.4: displacement graphs and the run-mode context menu ----------------------------------- */
+.graph {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: 400px;
+  height: 260px;
+  min-width: 280px;
+  min-height: 170px;
+  resize: both;
+  overflow: hidden;
+  background: var(--c-bg);
+  border: 1px solid var(--c-axis);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px var(--c-shadow);
+}
+
+.graph-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 10px;
+  background: var(--c-panel);
+  border-bottom: 1px solid var(--c-grid-major);
+  cursor: grab;
+  user-select: none;
+}
+
+.graph-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.graph-head select,
+.graph-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.graph-close {
+  font-size: 16px;
+  line-height: 1;
+  padding: 1px 7px;
+}
+
+.graph-canvas {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.ctx-menu {
+  position: absolute;
+  z-index: 7;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--c-panel);
+  border: 1px solid var(--c-axis);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--c-shadow);
+}
+
+.ctx-title {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.ctx-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+}
+
+.ctx-menu button:hover,
+.ctx-menu button:focus-visible {
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+}

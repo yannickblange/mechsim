@@ -12,6 +12,14 @@ export class AppState {
     this.connected = false;
     this.lastError = null;
     this.subscribers = new Set();
+    this.frameListeners = new Set(); // fn(message): every frame message, with its optional trace
+    this.sceneVersion = 0; // bumped by setScene: a new scene starts new recordings
+  }
+
+  // Returns a function that removes the listener.
+  onFrame(fn) {
+    this.frameListeners.add(fn);
+    return () => this.frameListeners.delete(fn);
   }
 
   // Returns a function that removes the subscription.
@@ -36,6 +44,7 @@ export class AppState {
     this.scene = scene;
     this.frame = null;
     this.lastError = null;
+    this.sceneVersion++;
     this.notify();
   }
 
@@ -49,6 +58,13 @@ export class AppState {
     switch (msg && msg.type) {
       case 'frame':
         this.frame = msg.data;
+        for (const fn of [...this.frameListeners]) {
+          try {
+            fn(msg);
+          } catch (err) {
+            console.error('Frame listener failed', err);
+          }
+        }
         break;
       case 'status':
         this.running = msg.running;
