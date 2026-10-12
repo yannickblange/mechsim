@@ -8,7 +8,7 @@
 //   a surface       alone
 // Ground ends of springs / ropes / rods that are not on a pin stay where they are.
 import {
-  add, bodyToWorld, closestOnSegment, dist, sub, supportAngle, tidy, tidyPoint,
+  add, bodyToWorld, closestOnSegment, dist, sub, supportAngleAt, tidy, tidyPoint,
 } from './geometry.js';
 import { anchorWorld, isJoint, isLink } from './hit.js';
 
@@ -44,16 +44,18 @@ export function nearestSurface(scene, p, tol) {
   return best && best.s;
 }
 
-// After masses or surfaces moved: every support (on the given masses, or all) sits on the surface
-// it now touches, or on none. The angle follows the surface; without one it is kept.
+// After masses or surfaces moved: a support keeps the surface it sits on, however far away it now is
+// (the symbol spans the gap); one without a surface adopts a surface that it now touches. The angle
+// follows the side of the surface the supported point is on.
 export function refreshSupports(scene, tol, bodyIds = null) {
   for (const c of scene.constraints) {
     if (!isSupport(c) || c.body === null) continue;
     if (bodyIds && !bodyIds.includes(c.body)) continue;
     const body = scene.bodies.find((b) => b.id === c.body);
-    const surface = nearestSurface(scene, bodyToWorld(body, c.point), tol);
+    const p = bodyToWorld(body, c.point);
+    const surface = scene.surfaces.find((x) => x.id === c.surface) || nearestSurface(scene, p, tol);
     c.surface = surface ? surface.id : null;
-    if (surface) c.params.angle = tidy(supportAngle(surface, body.position));
+    if (surface) c.params.angle = tidy(supportAngleAt(surface, p, body.position));
   }
 }
 
@@ -97,7 +99,7 @@ export function movePin(scene, id, delta, tol) {
   pin.point = tidyPoint(add(old, delta));
   const surface = nearestSurface(scene, pin.point, tol);
   pin.surface = surface ? surface.id : null;
-  if (surface) pin.params.angle = tidy(supportAngle(surface, pin.point));
+  if (surface) pin.params.angle = tidy(supportAngleAt(surface, pin.point, pin.point));
   normalizeRopes(scene);
 }
 
@@ -156,7 +158,7 @@ export function reattachEnd(scene, id, end, anchor) {
   normalizeRopes(scene);
 }
 
-// Applies a placeSupport() result to a support.
+// Applies a describeSupport() result to a support.
 export function replaceSupport(scene, id, placement) {
   const c = scene.constraints.find((x) => x.id === id);
   c.body = placement.body;

@@ -29,7 +29,7 @@ Click **Edit** (or **New**), then the floating **+** at the bottom left: its ico
 | Surface | drag; the angle snaps to 0, 30, 45, 60, 90 degrees (Shift = free) |
 | Spring | click end A, click end B, then move the dashed **ghost** to the relaxed length and click (Enter = unloaded) |
 | Force / moment | press on a mass (centre, corner, edge snap) and drag for the force; a plain click adds a moment |
-| Festlager, fixed Lager, Loslager | click a point of a mass; it adopts the surface it touches (the Loslager needs one). A Festlager can also be placed in free space |
+| Festlager, fixed Lager, Loslager | two clicks: a point of a mass, then the surface it sits on. The symbol adapts to the surface angle and grows to span the distance between them. The Loslager needs a surface. A Festlager can also be placed in free space with one click |
 | Rope, Stab | click end A, click end B (a mass, a Festlager in free space, or the ground). The rope never stretches but can go slack (set a longer length in its properties); the Stab takes push and pull |
 | Joint, rigid joint | click where two masses touch or overlap: a hinge (Gelenk) or a rigid connection. On a free-space Festlager it pins the mass that lies on it |
 | Move | drag a mass (with what is attached and the masses joined to it), a surface or a free-space Festlager; drag a support or load to re-place it, or the end of a spring / rope / Stab to attach it elsewhere. Shift: no grid snap |

@@ -6,6 +6,12 @@ import { setup, click, drag } from './helpers.mjs';
 
 const SCALE = 400; // px per metre -> 0.05 m grid
 
+// Supports take two clicks: a point of a mass, then the surface it sits on (or any free spot for none).
+const support = (tool, point, surfacePoint = point) => {
+  click(tool, point);
+  click(tool, surfacePoint);
+};
+
 function incline() {
   const { model, tools } = setup(undefined, SCALE);
   drag(tools.get('surface'), [0, 0], [1.6, 0.9]); // snaps to 30 degrees
@@ -20,8 +26,8 @@ function incline() {
   // Two Loslager at the lower corners (one would let the block tip over), force at the centre,
   // spring to the slope above.
   const { width, height } = body.params;
-  click(tools.get('roller'), bodyToWorld(body, [-width / 2, -height / 2]));
-  click(tools.get('roller'), bodyToWorld(body, [width / 2, -height / 2]));
+  support(tools.get('roller'), bodyToWorld(body, [-width / 2, -height / 2]));
+  support(tools.get('roller'), bodyToWorld(body, [width / 2, -height / 2]));
   drag(tools.get('load'), body.position, [body.position[0] + 0.2, body.position[1]]);
   const top = bodyToWorld(body, [body.params.width / 2, 0]);
   const anchor = [top[0] + 0.6 * t[0], top[1] + 0.6 * t[1]];
@@ -36,7 +42,7 @@ function pendulum() {
   const { model, tools } = setup(undefined, SCALE);
   drag(tools.get('surface'), [0.5, 0], [-0.5, 0]); // a ceiling, drawn right to left
   drag(tools.get('rect'), [-0.05, 0], [0.05, -1.0]); // the rod, hanging from the ceiling
-  click(tools.get('pin'), [0, 0]);
+  support(tools.get('pin'), [0, 0]);
   drag(tools.get('load'), [0, -1.0], [0.05, -1.0]); // 1 N horizontal at the lower end ...
   model.updateElement('F1', { mode: 'impulse' }); // ... as an impulse, like the property form does
   return model.toJSON();
@@ -45,7 +51,7 @@ function pendulum() {
 function disc() {
   const { model, tools } = setup(undefined, SCALE);
   drag(tools.get('circle'), [0, 0.6], [0.25, 0.6]);
-  click(tools.get('pin'), [0, 0.6]); // at the centre of mass
+  support(tools.get('pin'), [0, 0.6], [1, 1]); // at the centre of mass, no surface
   const sp = tools.get('spring');
   click(sp, [0.25, 1.4]);
   click(sp, [0.25, 0.6]); // rim point (r, 0)
@@ -62,7 +68,7 @@ function clamp() {
   const { model, tools } = setup(undefined, SCALE);
   drag(tools.get('surface'), [0, 1], [0, -0.5]); // a wall, drawn downwards: the mass is on its left
   drag(tools.get('rect'), [0, 0.5], [1.0, 0.4]); // a beam attached to the wall
-  click(tools.get('fixed'), [0, 0.45]); // left edge midpoint
+  support(tools.get('fixed'), [0, 0.45]); // left edge midpoint, on the wall
   drag(tools.get('load'), [1.0, 0.45], [1.0, 0.25]); // -4 N at the tip
   return model.toJSON();
 }
@@ -96,6 +102,16 @@ function chain() {
   return model.toJSON();
 }
 
+// A block 0.5 m above a floor held by two Loslager that were placed with a gap (the symbols span it).
+function gap() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('surface'), [-1, 0], [1, 0]);
+  drag(tools.get('rect'), [-0.2, 0.5], [0.2, 0.7]);
+  support(tools.get('roller'), [-0.2, 0.5], [-0.6, 0]); // lower left corner, then the floor far away
+  support(tools.get('roller'), [0.2, 0.5], [0.6, 0]);
+  return model.toJSON();
+}
+
 process.stdout.write(JSON.stringify({
-  incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(),
+  incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(), gap: gap(),
 }));

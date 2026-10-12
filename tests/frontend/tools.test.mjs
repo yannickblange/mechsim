@@ -332,36 +332,83 @@ test('load: the force arrow preview reports newtons', () => {
 
 // --- supports ------------------------------------------------------------------------------------
 
-test('Festlager on a corner that touches a surface adopts the surface', () => {
+// Supports take two clicks: a point of a mass, then the surface it sits on.
+const clickSupport = (tool, point, surfacePoint) => { click(tool, point); click(tool, surfacePoint ?? point); };
+
+test('Festlager: first a point of the mass, then the surface', () => {
   const { model, tools, log } = setup(floorScene());
-  click(tools.get('pin'), [0.3, 0.0]);
-  const c = model.scene.constraints[0];
-  assert.deepEqual(c, { id: 'A1', type: 'pin_support', body: 'm1', point: [-0.2, -0.1], surface: 's1', params: { angle: 0 } });
+  const t = tools.get('pin');
+  click(t, [0.3, 0.0]);
+  assert.equal(model.scene.constraints.length, 0, 'nothing yet');
+  assert.match(t.hint, /click the surface/i);
+  assert.ok(t.marker, 'the picked point stays marked');
+  click(t, [0.8, 0.0]); // anywhere on the surface: it only picks the surface
+  assert.deepEqual(model.scene.constraints[0], {
+    id: 'A1', type: 'pin_support', body: 'm1', point: [-0.2, -0.1], surface: 's1', params: { angle: 0 },
+  });
   assert.deepEqual(log.created, [['constraint', 'A1']]);
+  assert.match(t.hint, /Click a point of a mass/, 'ready for the next one');
 });
 
-test('Loslager and fixed Lager use the same placement; the Loslager needs a surface', () => {
+test('supports: the surface may be further away than the mass; the preview spans the gap', () => {
+  const { model, tools } = setup(sceneWith({
+    surfaces: [{ id: 's1', p1: [0, 0], p2: [2, 0] }],
+    bodies: [block('m1', 0.5, 0.6, 0.4, 0.2)], // its lower edge is 0.5 m above the surface
+  }));
+  const t = tools.get('roller');
+  click(t, [0.5, 0.5]); // middle of the lower edge
+  t.move({ world: [1.2, 0.01] }); // hovering the surface (a little off it)
+  assert.equal(t.preview.surface, 's1');
+  assert.equal(t.preview.valid, true);
+  close(t.preview.height, 0.5, 1e-9);
+  click(t, [1.2, 0.01]);
+  assert.deepEqual(model.scene.constraints[0], {
+    id: 'B1', type: 'roller_support', body: 'm1', point: [0, -0.1], surface: 's1', params: { angle: 0 },
+  });
+});
+
+test('supports: the surface can be picked from 15 px away, not from further', () => {
   const { model, tools } = setup(floorScene());
-  click(tools.get('roller'), [0.7, 0.0]);
-  click(tools.get('fixed'), [0.5, 0.1]);
-  assert.deepEqual(model.scene.constraints.map((c) => [c.type, c.surface]), [['roller_support', 's1'], ['fixed_support', null]]);
-
-  const bare = setup(sceneWith({ bodies: [block('m1', 0.5, 0.1, 0.4, 0.2)] }));
-  const t = bare.tools.get('roller');
-  click(t, [0.5, 0.1]);
-  assert.match(t.error, /needs a surface/);
-  assert.equal(bare.model.scene.constraints.length, 0);
-  click(bare.tools.get('pin'), [0.5, 0.1]);
-  assert.equal(bare.model.scene.constraints[0].surface, null, 'a Festlager works without a surface');
+  const t = tools.get('fixed');
+  click(t, [0.3, 0.0]);
+  click(t, [1.0, 0.045]); // 18 px at 400 px/m: too far
+  assert.equal(model.scene.constraints[0].surface, null, 'created without a surface');
+  click(t, [0.7, 0.0]);
+  click(t, [1.0, 0.03]); // 12 px: picks it
+  assert.equal(model.scene.constraints[1].surface, 's1');
 });
 
-test('supports: the angle follows the surface and the side the mass is on', () => {
+test('Loslager: the second click must be a surface; Escape cancels the first', () => {
+  const { model, tools } = setup(floorScene());
+  const t = tools.get('roller');
+  click(t, [0.7, 0.0]);
+  t.move({ world: [1.5, 1.5] });
+  assert.equal(t.preview.valid, false);
+  click(t, [1.5, 1.5]);
+  assert.match(t.error, /needs a surface/);
+  assert.equal(model.scene.constraints.length, 0);
+  assert.ok(t.first, 'still waiting for the surface');
+  assert.equal(t.key('Escape'), true);
+  assert.equal(t.first, null);
+  assert.equal(t.key('Escape'), false);
+  click(t, [1.5, 1.5]);
+  assert.match(t.error, /point of a mass/);
+});
+
+test('Festlager and fixed Lager without a surface: second click elsewhere', () => {
+  const { model, tools } = setup(sceneWith({ bodies: [block('m1', 0.5, 0.1, 0.4, 0.2)] }));
+  clickSupport(tools.get('pin'), [0.5, 0.1], [3, 3]);
+  clickSupport(tools.get('fixed'), [0.3, 0.1], [3, 3]);
+  assert.deepEqual(model.scene.constraints.map((c) => [c.type, c.surface, c.params.angle]), [['pin_support', null, 0], ['fixed_support', null, 0]]);
+});
+
+test('supports: the angle follows the surface and the side the point is on', () => {
   // ceiling drawn right to left, rod hanging below it
   const ceiling = setup(sceneWith({
     surfaces: [{ id: 'c', p1: [0.5, 0], p2: [-0.5, 0] }],
     bodies: [block('rod', 0, -0.5, 0.06, 1)],
   }));
-  click(ceiling.tools.get('pin'), [0, 0]);
+  clickSupport(ceiling.tools.get('pin'), [0, 0]);
   const pin = ceiling.model.scene.constraints[0];
   assert.deepEqual(pin.point, [0, 0.5]);
   assert.equal(pin.surface, 'c');
@@ -375,10 +422,20 @@ test('supports: the angle follows the surface and the side the mass is on', () =
   }));
   const body = incline.model.scene.bodies[0];
   const bottom = bodyToWorld(body, [0, -0.1]);
-  click(incline.tools.get('roller'), bottom);
+  clickSupport(incline.tools.get('roller'), bottom);
   const r = incline.model.scene.constraints[0];
   assert.equal(r.surface, 's');
   close(r.params.angle, a, 1e-6);
+
+  // the same incline, the point at the top of the block: still above (left of) the surface
+  const top = bodyToWorld(body, [0, 0.1]);
+  const far = setup(incline.model.scene);
+  clickSupport(far.tools.get('pin'), top, bottom);
+  close(far.model.scene.constraints[0].params.angle, a, 1e-6);
+  const h = far.tools.get('pin');
+  click(h, top);
+  h.move({ world: bottom });
+  close(h.preview.height, 0.2, 1e-3, 'the gap is measured along the surface normal');
 });
 
 test('supports: not on a mass is an error, with an invalid marker (except the Festlager)', () => {
@@ -388,17 +445,20 @@ test('supports: not on a mass is an error, with an invalid marker (except the Fe
   assert.equal(t.marker.kind, 'invalid');
   assert.equal(t.preview.valid, false);
   click(t, [1.5, 0.5]);
-  assert.match(t.error, /on a mass/);
+  assert.match(t.error, /point of a mass/);
   assert.equal(model.scene.constraints.length, 0);
 });
 
-test('supports: the preview carries the orientation', () => {
+test('supports: the preview carries the orientation and the surface', () => {
   const { tools } = setup(floorScene());
   const t = tools.get('roller');
-  t.move({ world: [0.3, 0.0] });
+  click(t, [0.3, 0.0]);
+  t.move({ world: [1.0, 0.0] });
   assert.equal(t.preview.supportType, 'roller_support');
   assert.equal(t.preview.valid, true);
   assert.equal(t.preview.angle, 0);
+  assert.equal(t.preview.surface, 's1');
+  assert.equal(t.preview.height, 0);
 });
 
 // --- select --------------------------------------------------------------------------------------

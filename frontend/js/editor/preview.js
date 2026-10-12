@@ -22,6 +22,7 @@ const SUPPORT_DRAW = {
 
 // tool: the active tool (preview, marker); selection: { kind, id } | null.
 export function drawOverlay(ctx, cam, theme, scene, tool, selection) {
+  // (scene is also needed by the previews to highlight the surface a support would sit on)
   drawConnections(ctx, cam, theme, scene);
   if (selection) {
     drawNeighbors(ctx, cam, theme, scene, selection);
@@ -30,7 +31,7 @@ export function drawOverlay(ctx, cam, theme, scene, tool, selection) {
   if (!tool) return;
   if (tool.hover && !(selection && tool.hover.id === selection.id)) drawHover(ctx, cam, theme, scene, tool.hover);
   const preview = tool.preview;
-  if (preview) drawToolPreview(ctx, cam, theme, preview);
+  if (preview) drawToolPreview(ctx, cam, theme, preview, scene);
   if (tool.marker) drawMarker(ctx, cam, theme, tool.marker);
 }
 
@@ -141,7 +142,7 @@ function label(ctx, cam, theme, worldPoint, text) {
   ctx.restore();
 }
 
-function drawToolPreview(ctx, cam, theme, pv) {
+function drawToolPreview(ctx, cam, theme, pv, scene) {
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.setLineDash([]);
@@ -191,8 +192,21 @@ function drawToolPreview(ctx, cam, theme, pv) {
     case 'support':
       if (pv.valid) {
         ctx.globalAlpha = 0.6;
-        SUPPORT_DRAW[pv.supportType](ctx, cam, { params: { angle: pv.angle } }, { position: pv.point }, theme);
+        SUPPORT_DRAW[pv.supportType](ctx, cam, { params: { angle: pv.angle } }, { position: pv.point, height: pv.height }, theme);
         label(ctx, cam, theme, pv.point, pv.label);
+        const surface = pv.surface && scene.surfaces.find((x) => x.id === pv.surface);
+        if (surface) {
+          // the surface the support would sit on
+          ctx.globalAlpha = 0.5;
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = theme.support;
+          const [ax, ay] = cam.toScreen(surface.p1);
+          const [bx, by] = cam.toScreen(surface.p2);
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx, by);
+          ctx.stroke();
+        }
       }
       break;
     default:

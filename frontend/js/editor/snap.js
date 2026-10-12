@@ -125,8 +125,8 @@ function snapToSurface(world, surfaces, tol) {
 }
 
 // The surface (if any) closest to `world` within the snap tolerance. Used by supports.
-export function surfaceNear(world, surfaces, scale) {
-  const tol = SNAP_TOLERANCE_PX / scale;
+export function surfaceNear(world, surfaces, scale, tolPx = SNAP_TOLERANCE_PX) {
+  const tol = tolPx / scale;
   let best = null;
   for (const s of surfaces || []) {
     const hit = closestOnSegment(world, s.p1, s.p2);

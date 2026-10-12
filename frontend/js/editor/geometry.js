@@ -163,6 +163,16 @@ export function supportAngle(surface, bodyCenter) {
   return normalizeAngle(sideOfSurface(surface, bodyCenter) >= 0 ? a : a + Math.PI);
 }
 
+// Like supportAngle, but decided by the side the supported POINT is on: the point may be some
+// distance from the surface. A point within 1 cm of the surface line (touching, up to snapping
+// noise) takes the side of the body's centre.
+export function supportAngleAt(surface, point, bodyCenter) {
+  const len = dist(surface.p1, surface.p2) || 1;
+  const side = sideOfSurface(surface, point);
+  if (Math.abs(side) / len < 0.01) return supportAngle(surface, bodyCenter);
+  return normalizeAngle(side > 0 ? surfaceAngle(surface) : surfaceAngle(surface) + Math.PI);
+}
+
 // --- ids ------------------------------------------------------------------------------------
 
 // prefix + smallest positive integer not yet used in `taken`.

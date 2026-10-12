@@ -44,7 +44,7 @@ test('Festlager in free space: not twice at the same place; other supports still
   assert.equal(model.scene.constraints.length, 1);
   const fixed = tools.get('fixed');
   click(fixed, [2, 2]);
-  assert.match(fixed.error, /on a mass/);
+  assert.match(fixed.error, /point of a mass/);
 });
 
 test('snapping: ends snap to a Festlager in free space only when asked', () => {

@@ -46,14 +46,14 @@ def to_world(body, point):
     return [body["x"] + c * point[0] - s * point[1], body["y"] + s * point[0] + c * point[1]]
 
 
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap"])
 def test_exported_scene_is_valid(scenes, name):
     assert scene_module.validate_scene(scenes[name]) == []
     assert scenes[name]["version"] == "0.2"
 
 
 @pytest.mark.native
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap"])
 def test_exported_scene_runs_and_frames_are_valid(scenes, state_schema, name):
     for frame in run(scenes[name], 500, sample=100):
         jsonschema.validate(frame, state_schema)
@@ -183,3 +183,19 @@ def test_chain_pinned_to_a_free_space_festlager_and_hinged(scenes):
         assert math.dist(to_world(next(b for b in f["bodies"] if b["id"] == pin["body"]), pin["point"]), [0.0, 1.5]) < 6e-3
     angles = [f["bodies"][1]["phi"] - f["bodies"][0]["phi"] for f in frames]
     assert max(angles) - min(angles) > 0.1, "the bars swing against each other"
+
+
+@pytest.mark.native
+def test_loslager_placed_with_a_gap_holds_the_mass_like_a_touching_one(scenes):
+    s = scenes["gap"]
+    rollers = s["constraints"]
+    assert [c["type"] for c in rollers] == ["roller_support"] * 2
+    assert all(c["surface"] == "s1" and c["params"]["angle"] == 0 for c in rollers)
+    block = s["bodies"][0]
+    y0 = block["position"][1]
+    frames = run(s, 1000, sample=100)
+    for f in frames:
+        assert f["bodies"][0]["y"] == pytest.approx(y0, abs=1e-6), "held 0.5 m above the floor"
+    m = block["params"]["mass"]
+    total = sum(c["reaction"][1] for c in frames[-1]["constraints"])
+    assert total == pytest.approx(m * G, rel=1e-6)

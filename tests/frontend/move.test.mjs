@@ -23,7 +23,7 @@ test('jointGroup follows pin and fixed joints transitively, not ropes or support
   assert.deepEqual(jointGroup(m.scene, 'd'), ['d']);
 });
 
-test('moveBodies: attached things follow, ground ends stay, supports re-evaluate their surface', () => {
+test('moveBodies: attached things follow, ground ends stay; a support keeps its surface at any distance', () => {
   const m = new SceneModel(sceneWith({ surfaces: [floor], bodies: [block('a', 1, 0.1, 0.4, 0.2)] }));
   m.addSupport('roller_support', { body: 'a', point: [0, -0.1], surface: 's1', angle: 0 });
   m.addSpring({ a: { body: null, point: [0, 0.1] }, b: { body: 'a', point: [-0.2, 0] } });
@@ -31,10 +31,19 @@ test('moveBodies: attached things follow, ground ends stay, supports re-evaluate
   moveBodies(s, ['a'], [0, 1.0], TOL);
   assert.deepEqual(s.bodies[0].position, [1, 1.1]);
   assert.deepEqual(s.elements[0].a, { body: null, point: [0, 0.1] }, 'the ground end stays');
-  assert.equal(s.constraints[0].surface, null, 'no longer on the floor');
-  assert.equal(s.constraints[0].params.angle, 0, 'the angle is kept');
-  moveBodies(s, ['a'], [0, -1.0], TOL);
-  assert.equal(s.constraints[0].surface, 's1', 'back on the floor');
+  assert.equal(s.constraints[0].surface, 's1', 'still on the floor, one metre below: the symbol spans the gap');
+  assert.equal(s.constraints[0].params.angle, 0);
+  moveBodies(s, ['a'], [0, -1.5], TOL); // through the floor: the point is on the other side now
+  assert.equal(s.constraints[0].surface, 's1');
+  close(Math.abs(s.constraints[0].params.angle), Math.PI, 1e-9, 'the angle follows the side of the surface');
+});
+
+test('moveBodies: a support without a surface adopts one that it now touches', () => {
+  const m = new SceneModel(sceneWith({ surfaces: [floor], bodies: [block('a', 1, 1, 0.4, 0.2)] }));
+  m.addSupport('pin_support', { body: 'a', point: [0, -0.1], surface: null });
+  const s = m.toJSON();
+  moveBodies(s, ['a'], [0, -0.9], TOL);
+  assert.equal(s.constraints[0].surface, 's1');
 });
 
 test('moveBodies drops the explicit length of a rope that would be too short', () => {
@@ -72,15 +81,15 @@ test('movePin adopts a surface it lands on', () => {
   assert.equal(s.constraints[0].surface, 's1');
 });
 
-test('moveSurface: supports no longer on it let go', () => {
+test('moveSurface: supports stay attached to their surface', () => {
   const m = new SceneModel(sceneWith({ surfaces: [floor], bodies: [block('a', 1, 0.1, 0.4, 0.2)] }));
   m.addSupport('pin_support', { body: 'a', point: [0, -0.1], surface: 's1' });
   const s = m.toJSON();
   moveSurface(s, 's1', [0, -1], TOL);
   assert.deepEqual(s.surfaces[0], { id: 's1', p1: [0, -1], p2: [3, -1] });
-  assert.equal(s.constraints[0].surface, null);
+  assert.equal(s.constraints[0].surface, 's1', 'the gap is now 1 m');
   refreshSupports(s, TOL);
-  assert.equal(s.constraints[0].surface, null);
+  assert.equal(s.constraints[0].surface, 's1');
 });
 
 test('contactOffset: a block corner or a disc rim lands exactly on a nearby surface', () => {
@@ -251,7 +260,7 @@ test('move: an end that would make the link invalid goes back (and says why)', (
   assert.equal(model.undoStack.length, 0, 'nothing was changed, nothing to undo');
 });
 
-test('move: drag a support to another point of the mass; a Loslager needs a surface there', () => {
+test('move: drag a support to another point of the mass; it keeps its surface', () => {
   const m0 = new SceneModel(sceneWith({ surfaces: [floor], bodies: [block('m', 1, 0.1, 0.4, 0.2)] }));
   m0.addSupport('pin_support', { body: 'm', point: [-0.2, -0.1], surface: 's1' });
   m0.addSupport('roller_support', { body: 'm', point: [0.2, -0.1], surface: 's1' });
@@ -259,9 +268,12 @@ test('move: drag a support to another point of the mass; a Loslager needs a surf
   const t = tools.get('move');
   drag(t, [0.8, 0.0], [1.0, 0.1]); // the Festlager to the centre
   assert.deepEqual(model.scene.constraints[0].point, [0, 0]);
-  assert.equal(model.scene.constraints[0].surface, null);
-  drag(t, [1.2, 0.0], [1.0, 0.2]); // the Loslager to the top edge: no surface there
-  assert.deepEqual(model.scene.constraints[1].point, [0.2, -0.1], 'unchanged');
+  assert.equal(model.scene.constraints[0].surface, 's1');
+  drag(t, [1.2, 0.0], [1.0, 0.2]); // the Loslager to the top edge: 0.2 m above the floor
+  assert.deepEqual(model.scene.constraints[1].point, [0, 0.1]);
+  assert.equal(model.scene.constraints[1].surface, 's1');
+  drag(t, [1.0, 0.2], [3, 3]); // off the mass: refused
+  assert.deepEqual(model.scene.constraints[1].point, [0, 0.1]);
 });
 
 test('move: drag a load to another mass', () => {
@@ -296,4 +308,44 @@ test('move: a tiny drag below the threshold does not move anything', () => {
   drag(tools.get('move'), [1, 0.5], [1.005, 0.505]);
   assert.deepEqual(model.body('m').position, [1, 0.5]);
   assert.equal(model.undoStack.length, 0);
+});
+
+// --- support size ---------------------------------------------------------------------------------
+
+import { supportHeight } from '../../frontend/js/canvas/symbols/supports.js';
+import { Renderer } from '../../frontend/js/canvas/renderer.js';
+
+test('supportHeight: distance to the surface along the normal on the body side', () => {
+  const floor0 = { p1: [0, 0], p2: [3, 0] };
+  close(supportHeight(floor0, 0, [1, 0.5]), 0.5);
+  assert.equal(supportHeight(floor0, 0, [1, -0.2]), 0, 'through the surface: no negative height');
+  // ceiling: body below it, angle pi
+  close(supportHeight({ p1: [1, 2], p2: [-1, 2] }, Math.PI, [0, 1.25]), 0.75);
+  // 30 degree incline: the point is 0.4 m from the line, measured perpendicular to it
+  const a = Math.PI / 6;
+  const slope = { p1: [0, 0], p2: [2 * Math.cos(a), 2 * Math.sin(a)] };
+  const n = [-Math.sin(a), Math.cos(a)];
+  close(supportHeight(slope, a, [Math.cos(a) + n[0] * 0.4, Math.sin(a) + n[1] * 0.4]), 0.4, 1e-12);
+  // a wall at x = 0 that the body is to the right of (angle -pi/2)
+  close(supportHeight({ p1: [0, 1], p2: [0, -1] }, -Math.PI / 2, [0.6, 0]), 0.6);
+});
+
+test('the renderer gives supports on a surface their distance from it', () => {
+  const scene = sceneWith({
+    surfaces: [{ id: 's1', p1: [0, 0], p2: [3, 0] }],
+    constraints: [
+      { id: 'A', type: 'pin_support', body: 'm', point: [0, 0], surface: 's1', params: { angle: 0 } },
+      { id: 'B', type: 'pin_support', body: 'm', point: [0, 0], surface: null, params: { angle: 0 } },
+      { id: 'R', type: 'rope', a: { body: null, point: [0, 1] }, b: { body: 'm', point: [0, 0] }, params: {} },
+    ],
+  });
+  const fake = { scene, constraints: new Map(scene.constraints.map((c) => [c.id, c])) };
+  const entries = [
+    { id: 'A', position: [1, 0.7] }, { id: 'B', position: [1, 0.7] }, { id: 'R', position: [0, 1], p1: [0, 1], p2: [1, 0.7] },
+  ];
+  const out = Renderer.prototype.withSupportHeights.call(fake, entries);
+  close(out[0].height, 0.7);
+  assert.equal(out[1].height, undefined, 'no surface, no height');
+  assert.equal(out[2].height, undefined, 'only supports');
+  assert.equal(entries[0].height, undefined, 'the frame entries are not modified');
 });

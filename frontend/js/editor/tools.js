@@ -12,8 +12,8 @@ import {
   contactOffset, jointGroup, linkProblem, moveBodies, movePin, moveSurface, reattachEnd,
   replaceLoad, replaceSupport,
 } from './moves.js';
-import { SUPPORT_LABELS, placeSupport } from './placement.js';
-import { SNAP_TOLERANCE_PX, bodiesAt, gridStepFor, snapPoint } from './snap.js';
+import { SUPPORT_LABELS, describeSupport, pickSupportPoint, surfaceUnder } from './placement.js';
+import { SNAP_TOLERANCE_PX, bodiesAt, gridStepFor, snapPoint, surfaceNear } from './snap.js';
 
 export const MIN_DRAG_PX = 6; // below this a press-release counts as a click
 export const MIN_SIZE_M = 0.05;
@@ -483,28 +483,48 @@ export class LoadTool extends Tool {
 
 // --- supports -------------------------------------------------------------------------------------
 
+// Two clicks: a point of a mass (centre, corner, edge snapping), then the surface the support sits
+// on. The symbol adapts to the surface angle and spans the distance between the point and the
+// surface (the renderer scales it). A Festlager clicked in free space needs only one click.
 export class SupportTool extends Tool {
   constructor(env, type) {
     super(env);
     this.type = type;
-    this.last = null;
+    this.first = null; // the picked point of a mass, after the first click
+    this.last = null; // what the pointer would place, for the preview
   }
 
   get hint() {
-    if (this.type === 'roller_support') {
-      return 'Click a point of a mass that touches a surface. The Loslager slides along that surface.';
+    const name = SUPPORT_LABELS[this.type];
+    if (this.first) {
+      return this.type === 'roller_support'
+        ? 'Now click the surface the Loslager rolls on. It slides along it and adapts to its angle.'
+        : `Now click the surface the ${name} sits on: it adapts to its angle and spans the distance. `
+          + 'Click elsewhere for a support without a surface.';
     }
+    if (this.type === 'roller_support') return 'Click a point of a mass, then the surface it rolls on.';
     const free = this.type === 'pin_support' ? ' Click free space to place a Festlager that ropes, Stabs and springs can attach to.' : '';
-    return `Click a point of a mass to place the ${SUPPORT_LABELS[this.type]}. It sits on the surface it touches.${free}`;
+    return `Click a point of a mass for the ${name}, then the surface it sits on.${free}`;
   }
 
+  // What a click at `world` would do right now.
   place(world) {
-    return placeSupport(this.scene, this.type, world, this.scale);
+    if (!this.first) return pickSupportPoint(this.scene, this.type, world, this.scale);
+    const surface = surfaceUnder(this.scene, world, this.scale);
+    if (!surface && this.type === 'roller_support') {
+      return { error: 'A Loslager needs a surface: click on one.', point: this.first.point };
+    }
+    return { ...describeSupport(this.scene, this.first, surface), point: this.first.point, kind: this.first.kind, surfaceId: surface && surface.id };
   }
 
   move(e) {
-    this.last = this.place(e.world);
-    this.marker = { point: this.last.point, kind: this.last.error ? 'invalid' : this.last.kind };
+    const p = this.place(e.world);
+    this.last = p;
+    if (this.first) {
+      this.marker = { point: this.first.point, kind: this.first.kind };
+    } else {
+      this.marker = { point: p.point, kind: p.error ? 'invalid' : p.kind };
+    }
   }
 
   down(e) {
@@ -514,24 +534,55 @@ export class SupportTool extends Tool {
       this.error = p.error;
       return true;
     }
-    const id = p.free
-      ? this.env.model.addGroundPin({ point: p.point, surface: p.surface, angle: p.angle })
-      : this.env.model.addSupport(this.type, { body: p.body, point: p.local, surface: p.surface, angle: p.angle });
+    if (!this.first) {
+      if (p.free) {
+        const id = this.env.model.addGroundPin({ point: p.point, surface: p.surface, angle: p.angle });
+        this.env.created('constraint', id);
+      } else {
+        this.first = p;
+        this.last = null;
+      }
+      return true;
+    }
+    const id = this.env.model.addSupport(this.type, {
+      body: p.body, point: p.local, surface: p.surface, angle: p.angle,
+    });
     this.env.created('constraint', id);
+    this.first = null;
+    this.last = null;
     return true;
+  }
+
+  key(name) {
+    if (name === 'Escape' && this.first) {
+      this.cancel();
+      return true;
+    }
+    return false;
   }
 
   get preview() {
     const p = this.last;
     if (!p) return null;
+    const height = p.surfaceId ? this.heightFor(p) : 0;
     return {
-      type: 'support', supportType: this.type, point: p.point, angle: p.angle || 0,
-      valid: !p.error, label: p.error ? '' : `${SUPPORT_LABELS[this.type]}${p.free ? ' (free space)' : ''}`,
+      type: 'support', supportType: this.type, point: p.point, angle: p.angle || 0, height,
+      surface: p.surfaceId || null, valid: !p.error,
+      label: p.error ? '' : `${SUPPORT_LABELS[this.type]}${p.free ? ' (free space)' : ''}`,
     };
+  }
+
+  // Distance (m) from the picked point to the surface the pointer is over.
+  heightFor(p) {
+    const s = this.scene.surfaces.find((x) => x.id === p.surfaceId);
+    const nx = -Math.sin(p.angle);
+    const ny = Math.cos(p.angle);
+    return s ? Math.max(0, (p.point[0] - s.p1[0]) * nx + (p.point[1] - s.p1[1]) * ny) : 0;
   }
 
   cancel() {
     super.cancel();
+    this.first = null;
     this.last = null;
   }
 }
@@ -820,15 +871,20 @@ export class MoveTool extends Tool {
   dragAttachment(e, d) {
     const { target: t, base, tx } = d;
     if (t.type === 'support') {
-      const type = base.constraints.find((c) => c.id === t.id).type;
-      const p = placeSupport(base, type, e.world, this.scale);
-      this.marker = { point: p.point, kind: p.error || p.free ? 'invalid' : p.kind };
-      if (p.error || p.free) {
-        this.error = p.error || 'A support must sit on a mass.';
+      const old = base.constraints.find((c) => c.id === t.id);
+      const pt = pickSupportPoint(base, old.type, e.world, this.scale);
+      this.marker = { point: pt.point, kind: pt.error || pt.free ? 'invalid' : pt.kind };
+      if (pt.error || pt.free) {
+        this.error = pt.error || 'A support must sit on a mass.';
         tx.update(() => {});
         return;
       }
-      tx.update((scene) => replaceSupport(scene, t.id, p));
+      // The support keeps the surface it sits on (it may be some distance away); one without a
+      // surface adopts one that it now touches.
+      const surface = base.surfaces.find((x) => x.id === old.surface) || surfaceNear(pt.point, base.surfaces, this.scale);
+      const placement = describeSupport(base, pt, surface);
+      if (!surface) placement.angle = old.params.angle || 0;
+      tx.update((scene) => replaceSupport(scene, t.id, placement));
     } else {
       const s = snapPoint(e.world, base, { scale: this.scale, interior: true });
       this.marker = { point: s.point, kind: s.body ? s.kind : 'invalid' };

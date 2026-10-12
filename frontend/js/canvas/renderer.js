@@ -2,7 +2,7 @@
 import { Camera } from './camera.js';
 import { drawGrid } from './grid.js';
 import {
-  bodySymbols, constraintSymbols, drawSpringGhost, drawSurface, elementSymbols,
+  bodySymbols, constraintSymbols, drawSpringGhost, drawSurface, elementSymbols, supportHeight,
 } from './symbols/index.js';
 
 const THEME_VARS = {
@@ -15,6 +15,8 @@ const THEME_VARS = {
   force: ['--c-force', '#e8868a'],
   rope: ['--c-rope', '#dcae78'],
 };
+
+const SUPPORT_TYPES = ['pin_support', 'fixed_support', 'roller_support'];
 
 const rotate = ([x, y], phi) => {
   const c = Math.cos(phi);
@@ -124,8 +126,20 @@ export class Renderer {
     if (this.showGhosts) this.drawGhosts(f.elements);
     this.drawAll(f.elements, this.elements, elementSymbols);
     this.drawAll(f.bodies, this.bodies, bodySymbols);
-    this.drawAll(f.constraints, this.constraints, constraintSymbols);
+    this.drawAll(this.withSupportHeights(f.constraints), this.constraints, constraintSymbols);
     if (this.overlay) this.overlay(ctx, cam, theme);
+  }
+
+  // Supports that sit on a surface get `height`: their distance from it, so the symbol spans the gap.
+  withSupportHeights(entries) {
+    const surfaces = (this.scene && this.scene.surfaces) || [];
+    return (entries || []).map((entry) => {
+      const spec = this.constraints.get(entry.id);
+      if (!spec || !spec.surface || !SUPPORT_TYPES.includes(spec.type)) return entry;
+      const surface = surfaces.find((s) => s.id === spec.surface);
+      if (!surface) return entry;
+      return { ...entry, height: supportHeight(surface, (spec.params && spec.params.angle) || 0, entry.position) };
+    });
   }
 
   // The relaxed state of every spring that has a rest_length: it hangs from the end stored first

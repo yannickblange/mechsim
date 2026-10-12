@@ -16,10 +16,11 @@ import { drawLoad } from './load.js';
 import { drawRod } from './rod.js';
 import { drawRope } from './rope.js';
 import { drawSpring } from './spring.js';
-import { drawFixedSupport, drawPinSupport, drawRollerSupport } from './supports.js';
+import { drawFixedSupport, drawPinSupport, drawRollerSupport, supportHeight } from './supports.js';
 
 export { drawSurface } from './surface.js';
 export { drawSpringGhost } from './spring.js';
+export { supportHeight };
 
 export const bodySymbols = { block: drawBlock, disc: drawDisc };
 export const elementSymbols = { spring: drawSpring, load: drawLoad };

@@ -122,3 +122,14 @@ test('slugify produces names the server accepts', () => {
   assert.equal(slugify('a'.repeat(100)).length, 64);
   assert.match(slugify('ok-name_1'), /^[A-Za-z0-9_-]+$/);
 });
+
+import { supportAngleAt } from '../../frontend/js/editor/geometry.js';
+
+test('supportAngleAt: a point that is clearly off the surface decides the side; a touching one does not', () => {
+  const floor0 = { p1: [0, 0], p2: [2, 0] };
+  close(supportAngleAt(floor0, [1, 0.5], [1, 0.6]), 0);
+  close(supportAngleAt(floor0, [1, -0.5], [1, 0.6]), Math.PI, 1e-12, 'the point is below: the body side is below');
+  // touching up to 0.1 mm of noise: the body centre decides
+  close(supportAngleAt(floor0, [1, -1e-4], [1, 0.6]), 0);
+  close(supportAngleAt(floor0, [1, 0.004], [1, -0.6]), Math.PI, 1e-12);
+});

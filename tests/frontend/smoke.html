@@ -15,6 +15,8 @@
   <canvas id="c2" width="900" height="360"></canvas>
   <h1>v0.3 symbols</h1>
   <canvas id="c3" width="900" height="300"></canvas>
+  <h1>v0.3b supports spanning a gap to their surface</h1>
+  <canvas id="c4" width="900" height="300"></canvas>
   <script type="module">
     import { Camera } from '/js/canvas/camera.js';
     import { drawSpring } from '/js/canvas/symbols/spring.js';
@@ -138,6 +140,45 @@
     drawPinSupport(ctx, cam, { params: { angle: 0 } }, { position: [-0.6, 1.3] }, theme); // a free-space Festlager
     drawPinJoint(ctx, cam, {}, { position: [2.4, 0.5] }, theme);
     drawFixedJoint(ctx, cam, {}, { position: [3.4, 0.5] }, theme);
+  </script>
+  <script type="module">
+    // v0.3b: Festlager, fixed Lager and Loslager scale to the distance to their surface (entry.height).
+    import { Camera } from '/js/canvas/camera.js';
+    import { drawSurface } from '/js/canvas/symbols/surface.js';
+    import {
+      drawFixedSupport, drawPinSupport, drawRollerSupport, supportHeight,
+    } from '/js/canvas/symbols/supports.js';
+
+    const theme = { background: '#22332b', ink: '#e9eee4', muted: '#9fb0a4', support: '#9cc3e6' };
+    const ctx = document.getElementById('c4').getContext('2d');
+    ctx.fillStyle = theme.background;
+    ctx.fillRect(0, 0, 900, 300);
+    const cam = new Camera();
+    cam.width = 900;
+    cam.height = 300;
+    cam.center = [0, 0];
+    cam.scale = 100;
+
+    const draw = (fn, surface, angle, position) => {
+      drawSurface(ctx, cam, surface, theme);
+      fn(ctx, cam, { params: { angle } }, { position, height: supportHeight(surface, angle, position) }, theme);
+    };
+    // floor: gaps of 0 (default size), 0.3 m, 0.8 m, 1.3 m
+    const floor = { p1: [-4.4, -1.4], p2: [-0.4, -1.4] };
+    drawSurface(ctx, cam, floor, theme);
+    [[-4.0, 0], [-3.2, 0.3], [-2.2, 0.8], [-1.0, 1.3]].forEach(([x, gap]) => {
+      const position = [x, -1.4 + gap];
+      drawPinSupport(ctx, cam, { params: { angle: 0 } }, { position, height: supportHeight(floor, 0, position) }, theme);
+    });
+    // roller and fixed on a second floor
+    const floor2 = { p1: [0.2, -1.4], p2: [4.4, -1.4] };
+    drawSurface(ctx, cam, floor2, theme);
+    drawRollerSupport(ctx, cam, { params: { angle: 0 } }, { position: [1.0, -0.4], height: 1.0 }, theme);
+    drawFixedSupport(ctx, cam, { params: { angle: 0 } }, { position: [2.4, -0.6], height: 0.8 }, theme);
+    // incline: the support leg is perpendicular to the surface
+    const a = Math.PI / 6;
+    const slope = { p1: [2.8, -1.2], p2: [4.4, -0.28] };
+    draw(drawPinSupport, slope, a, [3.5 - Math.sin(a) * -0.9, -0.8 + Math.cos(a) * 0.9 + 0.1]);
   </script>
 </body>
 </html>
