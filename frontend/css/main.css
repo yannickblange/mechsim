@@ -99,6 +99,10 @@ body {
   color: var(--c-muted);
 }
 
+.field[hidden] {
+  display: none;
+}
+
 .transport {
   display: flex;
   gap: 6px;
@@ -227,7 +231,7 @@ input[type='text']:focus-visible {
   left: 16px;
   bottom: 44px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   z-index: 5;
 }
@@ -261,8 +265,10 @@ input[type='text']:focus-visible {
 
 .tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  max-width: calc(100vw - 110px);
 }
 
 .tool {
@@ -382,6 +388,13 @@ input[type='text']:focus-visible {
 
 .props-row .unit {
   font-size: 12px;
+}
+
+.props-section {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 8px;
+  color: var(--c-ink);
 }
 
 .props-errors {

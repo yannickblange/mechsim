@@ -1,5 +1,6 @@
 // load.js - external force and moment at a point: arrow (force) and circular arrow (moment).
-// Constant loads are drawn solid, impulses dashed; an impulse fades once it has been applied.
+// Constant loads are drawn solid, impulses dashed; an impulse fades once it has been applied. A harmonic
+// load (v0.4) is drawn solid with its frequency in the label; its arrow follows the instantaneous force.
 export const FORCE_M_PER_N = 0.05; // arrow length per newton (also used by the editor)
 const MIN_ARROW_PX = 18;
 const MAX_ARROW_PX = 320;
@@ -64,6 +65,7 @@ export function drawLoad(ctx, cam, spec, entry, theme) {
   const vector = entry.vector || params.force || [0, 0];
   const moment = entry.moment ?? params.moment ?? 0;
   const impulse = (entry.mode || params.mode) === 'impulse';
+  const harmonic = (entry.mode || params.mode) === 'harmonic';
   const p = cam.toScreen(entry.p1);
 
   ctx.save();
@@ -84,6 +86,12 @@ export function drawLoad(ctx, cam, spec, entry, theme) {
   const mag = Math.hypot(vector[0], vector[1]);
   if (mag > 0) parts.push(`${trimNumber(mag)} ${impulse ? 'N·s' : 'N'}`);
   if (moment !== 0) parts.push(`${trimNumber(moment)} ${impulse ? 'N·m·s' : 'N·m'}`);
+  if (harmonic) {
+    // the label names the excitation (amplitude and frequency), the arrow shows the value now
+    const amp = trimNumber(entry.force ?? Math.hypot(...(params.force || [0, 0])));
+    parts.length = 0;
+    parts.push(`${amp} N sin(2π·${trimNumber(params.frequency ?? 0)} Hz·t)`);
+  }
   if (parts.length) {
     ctx.font = '11px system-ui, sans-serif';
     ctx.textBaseline = 'bottom';

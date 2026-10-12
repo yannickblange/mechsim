@@ -9,6 +9,8 @@ export const ICONS = {
   rod: wrap('<path d="M5 18L19 6" stroke-width="3.2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/>'),
   joint: wrap('<rect x="3" y="14" width="10" height="5" rx="1"/><rect x="11" y="5" width="10" height="5" rx="1"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
   weld: wrap('<rect x="3" y="14" width="10" height="5" rx="1"/><rect x="11" y="5" width="10" height="5" rx="1"/><rect x="9.4" y="9.4" width="5.2" height="5.2" fill="currentColor"/>'),
+  node: wrap('<path d="M3.5 19L12 7l8.5 12"/><circle cx="12" cy="7" r="2.6" fill="currentColor"/><circle cx="3.5" cy="19" r="1.5"/><circle cx="20.5" cy="19" r="1.5"/>'),
+  beam: wrap('<path d="M3 8c6 0 9 5.5 18 5.5v4c-9 0-12-5.5-18-5.5z"/>'),
   select: wrap('<path d="M6 3l12 8-5.5 1.3L9.5 18z"/>'),
   rect: wrap('<rect x="3.5" y="7" width="17" height="10" rx="1"/><circle cx="12" cy="12" r="1.8"/>'),
   circle: wrap('<circle cx="12" cy="12" r="8.5"/><path d="M12 12h8.5"/><circle cx="12" cy="12" r="1.2"/>'),

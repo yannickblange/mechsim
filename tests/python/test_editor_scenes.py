@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import jsonschema
+import numpy as np
 import pytest
 
 from mechsim import scene as scene_module
@@ -46,14 +47,17 @@ def to_world(body, point):
     return [body["x"] + c * point[0] - s * point[1], body["y"] + s * point[0] + c * point[1]]
 
 
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped"])
+V04 = ["fachwerk", "fachwerkElastic", "cantileverBeam", "forced"]
+
+
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped", *V04])
 def test_exported_scene_is_valid(scenes, name):
     assert scene_module.validate_scene(scenes[name]) == []
-    assert scenes[name]["version"] == "0.2"
+    assert scenes[name]["version"] == "0.4"
 
 
 @pytest.mark.native
-@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped"])
+@pytest.mark.parametrize("name", ["incline", "pendulum", "disc", "clamp", "hung", "chain", "gap", "damped", *V04])
 def test_exported_scene_runs_and_frames_are_valid(scenes, state_schema, name):
     for frame in run(scenes[name], 500, sample=100):
         jsonschema.validate(frame, state_schema)
@@ -210,3 +214,171 @@ def test_damper_made_with_the_tool_gives_terminal_velocity(scenes):
     frames = run(s, 2000, sample=100)
     assert frames[-1]["bodies"][0]["vy"] == pytest.approx(-m * G / 10, rel=2e-3)
     assert frames[-1]["elements"][0]["force"] == pytest.approx(m * G, rel=2e-3)
+
+
+# --- v0.4: Fachwerk, beam, forced vibration ---------------------------------------------------------
+
+
+def joint_equilibrium(scene):
+    """Member forces (tension positive) and reactions of the Fachwerk by the method of joints, solved
+    independently of the engine: for every node sum of member forces + reactions + loads + weight = 0."""
+    nodes = {b["id"]: b for b in scene["bodies"]}
+    index = {nid: i for i, nid in enumerate(nodes)}
+    members = [c for c in scene["constraints"] if c["type"] == "rod"]
+    members += [e for e in scene["elements"] if e["type"] == "bar"]
+    supports = [c for c in scene["constraints"] if c["type"] in ("pin_support", "roller_support")]
+    unknowns = len(members) + sum(2 if c["type"] == "pin_support" else 1 for c in supports)
+    A = np.zeros((2 * len(nodes), unknowns))
+    b = np.zeros(2 * len(nodes))
+    for k, m in enumerate(members):
+        pa = np.array(nodes[m["a"]["body"]]["position"], float)
+        pb = np.array(nodes[m["b"]["body"]]["position"], float)
+        u = (pb - pa) / np.linalg.norm(pb - pa)
+        # tension pulls a towards b and b towards a
+        A[2 * index[m["a"]["body"]]: 2 * index[m["a"]["body"]] + 2, k] += u
+        A[2 * index[m["b"]["body"]]: 2 * index[m["b"]["body"]] + 2, k] -= u
+    col = len(members)
+    for c in supports:
+        i = index[c["body"]]
+        if c["type"] == "pin_support":
+            A[2 * i, col] = 1
+            A[2 * i + 1, col + 1] = 1
+            col += 2
+        else:  # a Loslager on a horizontal floor reacts vertically
+            A[2 * i + 1, col] = 1
+            col += 1
+    for nid, body in nodes.items():
+        b[2 * index[nid] + 1] += body["params"]["mass"] * G  # A x = -(external forces): the weight (0, -m g) enters as +m g
+    for e in scene["elements"]:
+        if e["type"] == "load":
+            b[2 * index[e["body"]]: 2 * index[e["body"]] + 2] -= e["params"]["force"]
+    x, residual, rank, _ = np.linalg.lstsq(A, b, rcond=None)
+    return members, x, rank, unknowns, A, b
+
+
+@pytest.mark.native
+def test_fachwerk_member_forces_equal_the_method_of_joints(scenes):
+    scene = scenes["fachwerk"]
+    members, x, rank, unknowns, A, b = joint_equilibrium(scene)
+    assert rank == unknowns == A.shape[0], "statically determinate: 2 j = m + r"
+    assert np.allclose(A @ x, b)
+    with Simulation(scene) as sim:
+        sim.step(n=3)
+        frame = sim.frame()
+    forces = {c["id"]: c["force"] for c in frame["constraints"] if c["type"] == "rod"}
+    for k, m in enumerate(members):
+        assert forces[m["id"]] == pytest.approx(x[k], rel=1e-4, abs=1e-3), m["id"]
+    # the load is carried: the vertical reactions add up to the load and the node weights
+    reactions = sum(c["reaction"][1] for c in frame["constraints"] if c["type"] in ("pin_support", "roller_support"))
+    assert reactions == pytest.approx(1000 + 5 * 1.0 * G, rel=1e-5)
+    assert [b["id"] for b in frame["bodies"]] == ["N1", "N2", "N3", "N4", "N5"]
+    # a determinate truss at rest stays at rest: the nodes do not move
+    with Simulation(scene) as sim:
+        sim.step(n=2000)
+        later = sim.frame()
+    for before, after in zip(frame["bodies"], later["bodies"]):
+        assert (after["x"], after["y"]) == pytest.approx((before["x"], before["y"]), abs=1e-6)
+
+
+@pytest.mark.native
+def test_elastic_fachwerk_with_a_redundant_bar_matches_the_stiffness_method(scenes):
+    scene = scenes["fachwerkElastic"]
+    nodes = {b["id"]: np.array(b["position"], float) for b in scene["bodies"]}
+    index = {nid: i for i, nid in enumerate(nodes)}
+    bars = [e for e in scene["elements"] if e["type"] == "bar"]
+    assert len(bars) == 8  # one more than a determinate truss needs
+    EA = 210e9 * 0.02**2
+    ndof = 2 * len(nodes)
+    K = np.zeros((ndof, ndof))
+    for bar in bars:
+        a, b = bar["a"]["body"], bar["b"]["body"]
+        d = nodes[b] - nodes[a]
+        L = np.linalg.norm(d)
+        u = d / L
+        k = EA / L * np.outer(u, u)
+        ia, ib = 2 * index[a], 2 * index[b]
+        K[ia:ia + 2, ia:ia + 2] += k
+        K[ib:ib + 2, ib:ib + 2] += k
+        K[ia:ia + 2, ib:ib + 2] -= k
+        K[ib:ib + 2, ia:ia + 2] -= k
+    f = np.zeros(ndof)
+    for nid, pos in nodes.items():
+        f[2 * index[nid] + 1] -= next(b for b in scene["bodies"] if b["id"] == nid)["params"]["mass"] * G
+    f[2 * index["N2"] + 1] -= 1000
+    # supports: pin on N1 (x, y), roller on N3 (y)
+    fixed = [2 * index["N1"], 2 * index["N1"] + 1, 2 * index["N3"] + 1]
+    free = [i for i in range(ndof) if i not in fixed]
+    u = np.zeros(ndof)
+    u[free] = np.linalg.solve(K[np.ix_(free, free)], f[free])
+    expected = {}
+    for bar in bars:
+        a, b = bar["a"]["body"], bar["b"]["body"]
+        d = nodes[b] - nodes[a]
+        L = np.linalg.norm(d)
+        elong = (d / L) @ (u[2 * index[b]:2 * index[b] + 2] - u[2 * index[a]:2 * index[a] + 2])
+        expected[bar["id"]] = EA / L * elong
+    # the bars start unstressed and oscillate about the static solution (a few MHz-ish: tens of kHz):
+    # the mean force over a few thousand steps is the static force
+    sums = {k: 0.0 for k in expected}
+    n = 3000
+    with Simulation(scene) as sim:
+        for _ in range(n):
+            sim.step()
+            for e in sim.frame()["elements"]:
+                if e["type"] == "bar":
+                    sums[e["id"]] += e["force"]
+    for k, v in expected.items():
+        assert sums[k] / n == pytest.approx(v, rel=0.03, abs=2.0), k
+    # at least one member is in compression and one in tension
+    assert min(expected.values()) < 0 < max(expected.values())
+
+
+@pytest.mark.native
+def test_beam_drawn_with_the_tool_bends_like_euler_bernoulli(scenes):
+    scene = scenes["cantileverBeam"]
+    beam = scene["bodies"][0]
+    assert beam["params"]["length"] == 2 and beam["params"]["section"] == {"type": "square", "a": 0.01}
+    EI = 210e9 * 0.01**4 / 12
+    L, P = 2.0, 2.0
+    m_beam = 7850 * 0.01**2 * L
+    q = m_beam * G / L  # the beam's own weight per metre
+    # tip load + self weight of a cantilever: P L^3 / 3 EI + q L^4 / 8 EI
+    static = P * L**3 / (3 * EI) + q * L**4 / (8 * EI)
+    omega = math.sqrt(3 * EI / (L**3 * (33 / 140 * m_beam)))  # first mode (Rayleigh: 33/140 of the mass at the tip)
+    period = 2 * math.pi / omega
+    tips = []
+    with Simulation(scene) as sim:
+        steps = int(8 * period / 1e-3)
+        for _ in range(steps):
+            sim.step()
+            tips.append(sim.frame()["bodies"][0]["nodes"][-1][1])
+        final = sim.frame()["bodies"][0]
+    # starting from rest, the tip swings between 0 and twice the static deflection
+    assert -min(tips) == pytest.approx(2 * static, rel=0.06)
+    assert max(tips) == pytest.approx(0.0, abs=0.01 * static)
+    # and its mean is the static deflection (whole periods)
+    assert -np.mean(tips) == pytest.approx(static, rel=0.05)
+    # the engine frame carries what the editor needs to draw it
+    assert len(final["nodes"]) == 9 and final["stress"] > 0
+
+
+@pytest.mark.native
+def test_forced_vibration_reaches_the_steady_state_amplitude(scenes):
+    scene = scenes["forced"]
+    m, k, c, F0, f = 2.0, 200.0, 8.0, 5.0, 1.5
+    Omega = 2 * math.pi * f
+    expected = F0 / math.hypot(k - m * Omega**2, c * Omega)  # |X| of m x'' + c x' + k x = F0 sin(Omega t)
+    ys = []
+    with Simulation(scene) as sim:
+        for _ in range(16000):  # 16 s: the transient decays like exp(-zeta omega0 t) = exp(-2 t)
+            sim.step()
+            ys.append(sim.frame()["bodies"][0]["y"])
+    tail = np.array(ys[-int(4 / f / 1e-3 * 2):])  # the last two periods... of the excitation (4/f is plenty)
+    amplitude = (tail.max() - tail.min()) / 2
+    assert amplitude == pytest.approx(expected, rel=0.03)
+    # the load is shown with its instantaneous value
+    with Simulation(scene) as sim:
+        sim.step(n=100)  # t = 0.1 s
+        load = next(e for e in sim.frame()["elements"] if e["type"] == "load")
+    assert load["mode"] == "harmonic" and load["force"] == pytest.approx(F0)
+    assert load["vector"][1] == pytest.approx(F0 * math.sin(Omega * 0.1), abs=0.05)

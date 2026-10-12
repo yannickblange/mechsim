@@ -122,6 +122,76 @@ function damped() {
   return model.toJSON();
 }
 
+// A Fachwerk drawn with the Stab tool alone: its free ends make the nodes. Nodes A(0,0) B(2,0) C(4,0)
+// D(1,1) E(3,1); seven Stabs; a Festlager on A, a Loslager on C (both on the floor), 1000 N down on B.
+// 2 j = 10 = 7 members + 3 reactions: statically determinate.
+function fachwerk() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('surface'), [-0.5, 0], [4.5, 0]); // the floor
+  const rod = tools.get('rod');
+  for (const [a, b] of [[[0, 0], [2, 0]], [[2, 0], [4, 0]], [[0, 0], [1, 1]], [[1, 1], [2, 0]], [[1, 1], [3, 1]], [[2, 0], [3, 1]], [[3, 1], [4, 0]]]) {
+    click(rod, a);
+    click(rod, b);
+  }
+  support(tools.get('pin'), [0, 0]); // node A, then the floor
+  support(tools.get('roller'), [4, 0]); // node C
+  drag(tools.get('load'), [2, 0], [2, -2]);
+  model.updateElement('F1', { force: [0, -1000] });
+  return model.toJSON();
+}
+
+// The same Fachwerk with an extra Stab (A - E) and every Stab elastic (cross sections set the way the
+// property form does): statically indeterminate, solvable only because the bars have a stiffness.
+function fachwerkElastic() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('surface'), [-0.5, 0], [4.5, 0]);
+  const rod = tools.get('rod');
+  for (const [a, b] of [[[0, 0], [2, 0]], [[2, 0], [4, 0]], [[0, 0], [1, 1]], [[1, 1], [2, 0]], [[1, 1], [3, 1]], [[2, 0], [3, 1]], [[3, 1], [4, 0]], [[1, 1], [4, 0]]]) {
+    click(rod, a);
+    click(rod, b);
+  }
+  support(tools.get('pin'), [0, 0]);
+  support(tools.get('roller'), [4, 0]);
+  drag(tools.get('load'), [2, 0], [2, -2]);
+  model.updateElement('F1', { force: [0, -1000] });
+  for (const c of [...model.scene.constraints]) {
+    if (c.type === 'rod') model.setStabSection(c.id, { type: 'square', a: 0.02 });
+  }
+  return model.toJSON();
+}
+
+// A cantilever drawn with the beam tool: 2 m long, thin (10 mm square, set like the property form does),
+// clamped at the left end, a 2 N force down at the tip.
+function cantileverBeam() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('beam'), [0, 0], [2, 0]);
+  model.updateBody('b1', { section: { type: 'square', a: 0.01 } });
+  support(tools.get('fixed'), [0, 0]); // the start of the axis (a snap point of the beam)
+  drag(tools.get('load'), [2, 0], [2, -0.4]);
+  model.updateElement('F1', { force: [0, -2] });
+  return model.toJSON();
+}
+
+// Forced vibration: a 2 kg mass on a spring (200 N/m) with a damper (8 N s/m), shaken by a harmonic force.
+function forced() {
+  const { model, tools } = setup(undefined, SCALE);
+  drag(tools.get('rect'), [-0.2, 0.4], [0.2, 0.6]);
+  model.updateBody('m1', { mass: 2 });
+  const sp = tools.get('spring');
+  click(sp, [0, 1.5]);
+  click(sp, [0, 0.6]);
+  sp.key('Enter'); // the installed length is the relaxed length
+  model.updateElement('k1', { k: 200 });
+  const damper = tools.get('damper');
+  click(damper, [0, -0.5]);
+  click(damper, [0, 0.4]);
+  model.updateElement('c1', { c: 8 });
+  drag(tools.get('load'), [0, 0.5], [0, 0.7]);
+  model.updateElement('F1', { force: [0, 5], mode: 'harmonic', frequency: 1.5 });
+  return model.toJSON();
+}
+
 process.stdout.write(JSON.stringify({
   incline: incline(), pendulum: pendulum(), disc: disc(), clamp: clamp(), hung: hung(), chain: chain(), gap: gap(), damped: damped(),
+  fachwerk: fachwerk(), fachwerkElastic: fachwerkElastic(), cantileverBeam: cantileverBeam(), forced: forced(),
 }));

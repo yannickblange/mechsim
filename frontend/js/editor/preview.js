@@ -1,5 +1,6 @@
 // preview.js - draws the editor overlay on top of the scene: snap marker, the tool's preview
 // (rubber band, ghost spring, force arrow ...) and the selection highlight.
+import { drawBeam } from '../canvas/symbols/beam.js';
 import { drawBlock } from '../canvas/symbols/block.js';
 import { drawFixedJoint, drawPinJoint } from '../canvas/symbols/joint.js';
 import { drawLoad } from '../canvas/symbols/load.js';
@@ -11,7 +12,8 @@ import { drawSurface } from '../canvas/symbols/surface.js';
 import {
   drawFixedSupport, drawPinSupport, drawRollerSupport,
 } from '../canvas/symbols/supports.js';
-import { bodyToWorld, blockCorners } from './geometry.js';
+import { NODE_RADIUS, bodyToWorld, blockCorners } from './geometry.js';
+import { defaultSection } from './section.js';
 import { connectionPoints, neighbors } from './connections.js';
 import { anchorWorld, attachedPoint, isLink, linkPath } from './hit.js';
 
@@ -69,6 +71,12 @@ function drawConnections(ctx, cam, theme, scene) {
 }
 
 function bodyPath(ctx, cam, body, pad) {
+  if (body.type === 'node') {
+    const [x, y] = cam.toScreen(body.position);
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(8, NODE_RADIUS * cam.scale) + pad, 0, 2 * Math.PI);
+    return;
+  }
   if (body.type === 'disc') {
     const [x, y] = cam.toScreen(body.position);
     ctx.beginPath();
@@ -181,10 +189,36 @@ function drawToolPreview(ctx, cam, theme, pv, scene) {
       drawLoad(ctx, cam, { params: {} }, { p1: pv.point, vector: pv.force, moment: 0, mode: 'constant' }, theme);
       label(ctx, cam, theme, pv.point, pv.label);
       break;
+    case 'beam': {
+      const d = [pv.end[0] - pv.start[0], pv.end[1] - pv.start[1]];
+      const L = Math.hypot(d[0], d[1]);
+      if (L > 1e-6) {
+        const side = Math.min(0.1, Math.max(0.01, Math.round(L / 40 / 0.005) * 0.005));
+        const spec = { id: '', params: { length: L, section: defaultSection('square', side) } };
+        const entry = { x: (pv.start[0] + pv.end[0]) / 2, y: (pv.start[1] + pv.end[1]) / 2, phi: Math.atan2(d[1], d[0]) };
+        ctx.globalAlpha = 0.6;
+        const bend = cam.bendScale;
+        cam.bendScale = 1; // the preview is a straight beam
+        drawBeam(ctx, cam, spec, entry, theme);
+        cam.bendScale = bend;
+      }
+      label(ctx, cam, theme, pv.end, pv.label);
+      break;
+    }
     case 'link':
       if (pv.kind === 'rope') drawRope(ctx, cam, {}, { p1: pv.a, p2: pv.b, taut: true }, theme);
       else if (pv.kind === 'damper') drawDamper(ctx, cam, {}, { p1: pv.a, p2: pv.b }, theme);
       else drawRod(ctx, cam, {}, { p1: pv.a, p2: pv.b }, theme);
+      for (const p of pv.newNodes || []) { // a free Stab end: a node is made there
+        const [nx, ny] = cam.toScreen(p);
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(nx, ny, 9, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       label(ctx, cam, theme, pv.b, pv.label);
       break;
     case 'joint':

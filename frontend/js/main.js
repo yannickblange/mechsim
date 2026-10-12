@@ -56,6 +56,8 @@ const ui = {
   undo: $('btn-undo'),
   redo: $('btn-redo'),
   theme: $('btn-theme'),
+  bendField: $('bend-field'),
+  bend: $('bend-scale'),
 };
 
 let userScenes = [];
@@ -91,6 +93,9 @@ function updateUi() {
   ui.edit.textContent = editing ? 'Done' : 'Edit';
   ui.edit.setAttribute('aria-pressed', String(editing));
   ui.editControls.hidden = !editing;
+  // the bending selector only matters when there is a beam (in the scene being edited or shown)
+  const shown = editing ? model.scene : state.scene;
+  ui.bendField.hidden = !(shown && (shown.bodies || []).some((b) => b.type === 'beam'));
   const dark = currentTheme() === 'dark';
   ui.theme.textContent = dark ? 'Light' : 'Dark';
   ui.theme.setAttribute('aria-pressed', String(dark));
@@ -344,6 +349,9 @@ ui.edit.addEventListener('click', () => {
   if (state.editing) leaveEdit();
   else if (state.scene) enterEdit(state.scene, state.scene.name ?? state.sceneName, { source: state.sceneSource, name: state.sceneName });
   else enterEdit(SceneModel.emptyScene(), '');
+});
+ui.bend.addEventListener('change', () => {
+  renderer.bendScale = Number(ui.bend.value);
 });
 ui.theme.addEventListener('click', () => {
   applyTheme(otherTheme(currentTheme()));

@@ -2,6 +2,10 @@
 // calls applyProperties() with what the user typed.
 import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
 import { dist } from './geometry.js';
+import {
+  E_MODULUS, SECTION_FIELDS, SECTION_LABELS, SECTION_TYPES, beamMass, defaultSection, describeSection,
+  sectionError, sectionProps,
+} from './section.js';
 
 const RAD = Math.PI / 180;
 const SUPPORT_NAMES = {
@@ -11,15 +15,18 @@ const SUPPORT_NAMES = {
 };
 
 const num = (key, label, unit, value, extra = {}) => ({ key, label, unit, type: 'number', value, ...extra });
+const select = (key, label, value, options, extra = {}) => ({ key, label, type: 'select', value, options, ...extra });
 
-// { title, info: [string], fields: [...] , deletable: true } or null for an unknown id.
-// Field: { key, label, unit, type: "number" | "select", value, min?, minExclusive?, options? }
-export function propertyFields(model, id) {
+// { title, info: [string], fields: [...], section?: { ...section } } or null for an unknown id.
+// Field: { key, label, unit, type: "number" | "select", value, min?, minExclusive?, options?, reshape? }
+// `draft` holds what the user has typed so far ({ key: string }): a select with `reshape` changes which
+// fields exist (the cross-section type, the load type), so the form is built again with the draft.
+export function propertyFields(model, id, draft = {}) {
   const found = model.find(id);
   if (!found) return null;
   const { kind, obj } = found;
 
-  if (kind === 'body') return bodyForm(obj);
+  if (kind === 'body') return bodyForm(obj, draft);
   if (kind === 'surface') {
     const len = dist(obj.p1, obj.p2);
     const deg = (Math.atan2(obj.p2[1] - obj.p1[1], obj.p2[0] - obj.p1[0]) / RAD);
@@ -29,7 +36,7 @@ export function propertyFields(model, id) {
       fields: [],
     };
   }
-  if (kind === 'constraint' && isLink(obj)) return linkForm(model, obj);
+  if (kind === 'constraint' && isLink(obj)) return linkForm(model, obj, draft);
   if (kind === 'constraint' && isJoint(obj)) return jointForm(obj);
   if (kind === 'constraint' && obj.type === 'pin_support' && obj.body === null) {
     const where = obj.surface ? `on surface ${obj.surface}` : 'not on a surface';
@@ -49,8 +56,53 @@ export function propertyFields(model, id) {
     };
   }
   if (obj.type === 'damper') return damperForm(model, obj);
-  return obj.type === 'spring' ? springForm(model, obj) : loadForm(obj);
+  if (obj.type === 'bar') return stabForm(model, obj, draft);
+  return obj.type === 'spring' ? springForm(model, obj) : loadForm(obj, draft);
 }
+
+// --- cross sections -----------------------------------------------------------------------------
+
+const MM = 1000;
+const sectionKey = (k) => `sec_${k}`;
+
+// The section a form shows: the object's own, or - after the type select changed - a default one of the
+// new type with the same depth.
+function formSection(current, draft, fallbackType = 'square') {
+  const chosen = draft.sectionType;
+  if (chosen && chosen !== 'rigid' && (!current || chosen !== current.type)) {
+    const depth = current && !sectionError(current) ? sectionProps(current).depth : undefined;
+    return defaultSection(chosen, depth);
+  }
+  return current || defaultSection(fallbackType);
+}
+
+// Fields of a cross section: type select plus the dimensions of the type, in mm.
+function sectionFields(section, { allowRigid = false, rigid = false } = {}) {
+  const options = SECTION_TYPES.map((t) => [t, SECTION_LABELS[t]]);
+  if (allowRigid) options.unshift(['rigid', 'Rigid (no cross section)']);
+  const fields = [select('sectionType', 'Cross section', rigid ? 'rigid' : section.type, options, { reshape: true })];
+  if (!rigid) {
+    for (const [key, label] of SECTION_FIELDS[section.type]) {
+      fields.push(num(sectionKey(key), label, 'mm', round(section[key] * MM, 4), { minExclusive: 0 }));
+    }
+  }
+  return fields;
+}
+
+// The section typed into a submitted form (values in m), or null for "rigid".
+export function sectionFromValues(values) {
+  const type = values.sectionType;
+  if (!type || type === 'rigid') return null;
+  const section = { type };
+  for (const [key] of SECTION_FIELDS[type] || []) section[key] = values[sectionKey(key)] / MM;
+  return section;
+}
+
+const sectionInfo = (section) => {
+  const p = sectionProps(section);
+  return `${describeSection(section)}: A = ${fixed(p.area * 1e4, 2)} cm², I = ${fixed(p.inertia * 1e8, 2)} cm⁴, `
+    + `EI = ${fixed(E_MODULUS * p.inertia, 1)} N·m² (E = 210 GPa, steel).`;
+};
 
 const SUPPORT_NOTES = {
   pin_support: 'Locks x and y, rotation is free.',
@@ -65,20 +117,35 @@ function installedLength(model, link) {
   return ends ? dist(ends[0], ends[1]) : 0;
 }
 
-function linkForm(model, link) {
+function linkForm(model, link, draft) {
   const d = installedLength(model, link);
-  if (link.type === 'rod') {
-    return {
-      title: `Stab ${link.id}`,
-      info: [`Length ${fixed(d)} m (the distance between its ends). A massless two-force member: it takes push and pull and has no other properties.`],
-      fields: [],
-    };
-  }
+  if (link.type === 'rod') return stabForm(model, link, draft);
   const length = link.params.length ?? d;
   return {
     title: `Rope ${link.id}`,
     info: [`Distance between the ends ${fixed(d)} m. The rope never stretches, only pulls, and hangs slack when the ends are closer than its length.`],
     fields: [num('length', 'Length', 'm', round(length, 6), { min: round(d - 1e-9, 9) })],
+  };
+}
+
+// A Stab: rigid (a constraint) or, with a cross section, an elastic bar of axial stiffness E A / L.
+function stabForm(model, stab, draft) {
+  const d = installedLength(model, stab);
+  const rigid = stab.type === 'rod' ? !draft.sectionType || draft.sectionType === 'rigid' : draft.sectionType === 'rigid';
+  const section = rigid ? null : formSection(stab.type === 'bar' ? stab.params.section : null, draft);
+  const info = [`Length ${fixed(d)} m (the distance between its ends). A massless two-force member that takes push and pull.`];
+  if (section) {
+    const p = sectionProps(section);
+    info.push(`Elastic: axial stiffness E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m. ${sectionInfo(section)}`);
+    info.push('Bending and buckling are not modelled. An elastic Stab also makes statically indeterminate trusses solvable.');
+  } else {
+    info.push('Rigid: infinitely stiff. Give it a cross section to make it elastic.');
+  }
+  return {
+    title: `${section ? 'Stab (elastic)' : 'Stab'} ${stab.id}`,
+    info,
+    fields: sectionFields(section || defaultSection('square'), { allowRigid: true, rigid: !section }),
+    section,
   };
 }
 
@@ -94,13 +161,23 @@ function jointForm(joint) {
   };
 }
 
-function bodyForm(body) {
+function bodyForm(body, draft) {
+  if (body.type === 'beam') return beamForm(body, draft);
   const p = body.params;
+  const v = body.velocity || [0, 0];
+  const fields = [num('mass', 'Mass', 'kg', p.mass, { minExclusive: 0 })];
+  if (body.type === 'node') {
+    fields.push(num('vx', 'Initial vx', 'm/s', v[0]), num('vy', 'Initial vy', 'm/s', v[1]));
+    return {
+      title: `Node ${body.id}`,
+      info: ['A node (Knoten) is a point mass where Stabs meet. Supports and forces can sit on it. '
+        + 'Its weight loads the Fachwerk; keep the mass small next to the loads.'],
+      fields,
+    };
+  }
   const inertia = body.type === 'disc'
     ? 0.5 * p.mass * p.radius ** 2
     : (p.mass * (p.width ** 2 + p.height ** 2)) / 12;
-  const v = body.velocity || [0, 0];
-  const fields = [num('mass', 'Mass', 'kg', p.mass, { minExclusive: 0 })];
   if (body.type === 'disc') {
     fields.push(num('radius', 'Radius', 'm', p.radius, { minExclusive: 0 }));
   } else {
@@ -119,6 +196,40 @@ function bodyForm(body) {
     title: `${body.type === 'disc' ? 'Circular' : 'Rectangular'} mass ${body.id}`,
     info: [`Moment of inertia J = ${fixed(inertia, 4)} kg·m² about the centre of mass.`],
     fields,
+  };
+}
+
+// A bendable beam: length, cross section, mass from the steel or given, and the usual start values.
+function beamForm(body, draft) {
+  const p = body.params;
+  const v = body.velocity || [0, 0];
+  const section = formSection(p.section, draft);
+  const length = p.length;
+  const massMode = draft.massMode || (p.mass === undefined ? 'steel' : 'given');
+  const steelMass = beamMass(section, length);
+  const fields = [
+    num('length', 'Length', 'm', length, { minExclusive: 0 }),
+    ...sectionFields(section),
+    select('massMode', 'Mass', massMode, [['steel', 'Steel: 7850 kg/m³ x A x L'], ['given', 'Given']], { reshape: true }),
+  ];
+  if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(p.mass ?? steelMass, 6), { minExclusive: 0 }));
+  fields.push(
+    num('segments', 'Finite elements', '', p.segments ?? 8, { min: 2, integer: true, max: 64 }),
+    num('angle', 'Angle', '°', round((body.angle || 0) / RAD, 4)),
+    num('vx', 'Initial vx', 'm/s', v[0]),
+    num('vy', 'Initial vy', 'm/s', v[1]),
+    num('omega', 'Initial ω', 'rad/s', body.omega || 0),
+  );
+  const m = massMode === 'given' ? (p.mass ?? steelMass) : steelMass;
+  return {
+    title: `Beam ${body.id}`,
+    info: [
+      `${sectionInfo(section)} Mass ${fixed(m, 3)} kg.`,
+      'Bends in the plane (Euler-Bernoulli, large rotations allowed). Supports, springs and loads may attach anywhere along it. '
+        + 'The nodes are placed by the engine, evenly and at every attachment.',
+    ],
+    fields,
+    section,
   };
 }
 
@@ -150,29 +261,39 @@ function springForm(model, spring) {
   };
 }
 
-function loadForm(load) {
-  const mode = load.params.mode || 'constant';
+function loadForm(load, draft) {
+  const mode = draft.mode || load.params.mode || 'constant';
   const f = load.params.force || [0, 0];
   const impulse = mode === 'impulse';
+  const harmonic = mode === 'harmonic';
+  const fields = [
+    select('mode', 'Type', mode, [['constant', 'Constant'], ['impulse', 'Impulse at t = 0'], ['harmonic', 'Harmonic: F sin(2π f t + φ)']], { reshape: true }),
+    num('fx', harmonic ? 'Amplitude x' : 'Force x', impulse ? 'N·s' : 'N', f[0]),
+    num('fy', harmonic ? 'Amplitude y' : 'Force y', impulse ? 'N·s' : 'N', f[1]),
+    num('moment', harmonic ? 'Moment amplitude' : 'Moment', impulse ? 'N·m·s' : 'N·m', load.params.moment || 0),
+  ];
+  let info = 'A constant load acts for the whole simulation; the force direction stays fixed in the world.';
+  if (impulse) info = 'An impulse is a velocity jump at t = 0 (also after Reset).';
+  if (harmonic) {
+    const freq = load.params.frequency ?? 1;
+    fields.push(
+      num('frequency', 'Frequency f', 'Hz', freq, { minExclusive: 0 }),
+      num('phase', 'Phase φ', '°', round((load.params.phase || 0) / RAD, 4)),
+    );
+    info = `The force is F₀ sin(2π f t + φ) (Ω = 2π f = ${fixed(2 * Math.PI * freq, 3)} rad/s); its direction stays fixed in the world. `
+      + 'It does work on the system: the energy is not conserved.';
+  }
   return {
-    title: `${impulse ? 'Impulse' : 'Force / moment'} ${load.id}`,
-    info: [impulse
-      ? 'An impulse is a velocity jump at t = 0 (also after Reset).'
-      : 'A constant load acts for the whole simulation; the force direction stays fixed in the world.'],
-    fields: [
-      { key: 'mode', label: 'Type', type: 'select', value: mode,
-        options: [['constant', 'Constant'], ['impulse', 'Impulse at t = 0']] },
-      num('fx', 'Force x', impulse ? 'N·s' : 'N', f[0]),
-      num('fy', 'Force y', impulse ? 'N·s' : 'N', f[1]),
-      num('moment', 'Moment', impulse ? 'N·m·s' : 'N·m', load.params.moment || 0),
-    ],
+    title: `${impulse ? 'Impulse' : harmonic ? 'Harmonic load' : 'Force / moment'} ${load.id}`,
+    info: [info],
+    fields,
   };
 }
 
 // values: { key: string | number } as typed in the form. Returns { ok, errors }. Nothing is changed
 // unless every value is valid.
 export function applyProperties(model, id, values) {
-  const form = propertyFields(model, id);
+  const form = propertyFields(model, id, values);
   if (!form) return { ok: false, errors: [`unknown object "${id}"`] };
 
   const parsed = {};
@@ -191,9 +312,19 @@ export function applyProperties(model, id, values) {
       errors.push(`${f.label}: must be greater than ${f.minExclusive}`);
     } else if (f.min !== undefined && n < f.min) {
       errors.push(`${f.label}: must be at least ${fixed(f.min, 3)}`);
+    } else if (f.max !== undefined && n > f.max) {
+      errors.push(`${f.label}: must be at most ${fixed(f.max, 3)}`);
+    } else if (f.integer && !Number.isInteger(n)) {
+      errors.push(`${f.label}: must be a whole number`);
     } else {
       parsed[f.key] = n;
     }
+  }
+  // dimensions that are valid one by one but do not fit together (flanges thicker than the section ...)
+  if (!errors.length && form.fields.some((f) => f.key === 'sectionType')) {
+    const section = sectionFromValues(parsed);
+    const problem = section && sectionError(section);
+    if (problem) errors.push(`Cross section: ${problem}.`);
   }
   if (errors.length) return { ok: false, errors };
 
@@ -202,18 +333,36 @@ export function applyProperties(model, id, values) {
   if (kind === 'constraint' && found.obj.type === 'rope') {
     const d = installedLength(model, found.obj);
     model.updateRope(id, { length: Math.abs(parsed.length - d) < 1e-6 ? null : parsed.length });
+  } else if (kind === 'constraint' && found.obj.type === 'rod') {
+    const section = sectionFromValues(parsed);
+    if (section) model.setStabSection(id, section);
   } else if (kind === 'constraint' && isJoint(found.obj)) {
     if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
   } else if (kind === 'body') {
     const patch = { mass: parsed.mass, angle: parsed.angle * RAD, velocity: [parsed.vx, parsed.vy], omega: parsed.omega };
-    for (const key of ['width', 'height', 'radius']) if (key in parsed) patch[key] = parsed[key];
+    if (found.obj.type === 'node') {
+      delete patch.angle;
+      delete patch.omega;
+    }
+    for (const key of ['width', 'height', 'radius', 'length']) if (key in parsed) patch[key] = parsed[key];
+    if (found.obj.type === 'beam') {
+      patch.section = sectionFromValues(parsed);
+      patch.mass = parsed.massMode === 'given' ? parsed.mass : null;
+      patch.segments = parsed.segments === 8 && found.obj.params.segments === undefined ? undefined : parsed.segments;
+    }
     model.updateBody(id, patch);
+  } else if (kind === 'element' && found.obj.type === 'bar') {
+    const section = sectionFromValues(parsed);
+    if (section) model.updateBar(id, { section });
+    else model.setStabSection(id, null);
   } else if (kind === 'element' && 'c' in parsed) {
     model.updateElement(id, { c: parsed.c });
   } else if (kind === 'element' && 'k' in parsed) {
     model.updateElement(id, { k: parsed.k, restLength: parsed.restLength });
   } else if (kind === 'element') {
-    model.updateElement(id, { mode: parsed.mode, force: [parsed.fx, parsed.fy], moment: parsed.moment });
+    const patch = { mode: parsed.mode, force: [parsed.fx, parsed.fy], moment: parsed.moment };
+    if (parsed.mode === 'harmonic') Object.assign(patch, { frequency: parsed.frequency, phase: parsed.phase * RAD });
+    model.updateElement(id, patch);
   }
   return { ok: true, errors: [] };
 }

@@ -9,12 +9,14 @@
 //     entry the matching object from the current frame (same id)
 //     theme colours, see Renderer.readTheme()
 // Surfaces are not part of frames; the renderer draws them with drawSurface(ctx, cam, surface, theme).
+import { drawBeam } from './beam.js';
 import { drawBlock } from './block.js';
 import { drawDamper } from './damper.js';
 import { drawDisc } from './disc.js';
 import { drawFixedJoint, drawPinJoint } from './joint.js';
 import { drawLoad } from './load.js';
-import { drawRod } from './rod.js';
+import { drawNode } from './node.js';
+import { drawBar, drawRod } from './rod.js';
 import { drawRope } from './rope.js';
 import { drawSpring } from './spring.js';
 import { drawFixedSupport, drawPinSupport, drawRollerSupport, supportHeight } from './supports.js';
@@ -23,8 +25,8 @@ export { drawSurface } from './surface.js';
 export { drawSpringGhost } from './spring.js';
 export { supportHeight };
 
-export const bodySymbols = { block: drawBlock, disc: drawDisc };
-export const elementSymbols = { spring: drawSpring, load: drawLoad, damper: drawDamper };
+export const bodySymbols = { block: drawBlock, disc: drawDisc, node: drawNode, beam: drawBeam };
+export const elementSymbols = { spring: drawSpring, load: drawLoad, damper: drawDamper, bar: drawBar };
 export const constraintSymbols = {
   pin_support: drawPinSupport,
   fixed_support: drawFixedSupport,

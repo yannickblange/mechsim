@@ -8,7 +8,7 @@
 //   a surface       alone
 // Ground ends of springs / ropes / rods that are not on a pin stay where they are.
 import {
-  add, bodyToWorld, closestOnSegment, dist, sub, supportAngleAt, tidy, tidyPoint,
+  add, blockCorners, bodyToWorld, closestOnSegment, dist, sub, supportAngleAt, tidy, tidyPoint,
 } from './geometry.js';
 import { anchorWorld, isJoint, isLink } from './hit.js';
 
@@ -133,17 +133,19 @@ export function contactOffset(scene, bodyId, delta, tol) {
 const signedDistance = (p, origin, n) => (p[0] - origin[0]) * n[0] + (p[1] - origin[1]) * n[1];
 
 function cornerPoints(body) {
-  const { width: w, height: h } = body.params;
-  return [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]].map((c) => bodyToWorld(body, c));
+  if (body.type === 'node') return [body.position]; // a point: it lands on the surface itself
+  return blockCorners(body).map((c) => bodyToWorld(body, c));
 }
 
 // --- re-attaching -------------------------------------------------------------------------------
 
-// Problem with a spring, rope or rod in its current state, or null.
+// Problem with a spring, rope or rod in its current state, or null. An end given as { node: true }
+// is a node that will be made there (it counts as a mass).
 export function linkProblem(scene, link) {
   const a = link.a;
   const b = link.b;
-  if (a.body === null && b.body === null) return 'Needs at least one end on a mass.';
+  const massEnd = (e) => e.body !== null || e.node;
+  if (!massEnd(a) && !massEnd(b)) return 'Needs at least one end on a mass.';
   if (a.body !== null && a.body === b.body) return 'Both ends are on the same mass.';
   const pa = anchorWorld(scene, a);
   const pb = anchorWorld(scene, b);

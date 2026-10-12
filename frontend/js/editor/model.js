@@ -1,11 +1,14 @@
 // model.js - the scene being edited: creation, editing, deletion (with cascades), undo / redo.
-// Holds a plain scene object (contracts/scene.schema.json, version 0.2) and never touches the DOM.
-import { nextId, tidy, tidyPoint } from './geometry.js';
+// Holds a plain scene object (contracts/scene.schema.json, version 0.4) and never touches the DOM.
+import { dist, nextId, roundTo, sub, tidy, tidyPoint } from './geometry.js';
 import { normalizeRopes } from './moves.js';
+import { defaultSection } from './section.js';
 
 export const DEFAULT_MASS = 1.0;
 export const DEFAULT_SPRING_K = 100.0;
 export const DEFAULT_DAMPING = 10.0; // N s / m
+export const DEFAULT_NODE_MASS = 1.0; // kg of a Knoten (the weight is small next to typical truss loads)
+export const DEFAULT_FREQUENCY = 1.0; // Hz of a new harmonic load
 const HISTORY_LIMIT = 100;
 
 const SUPPORT_TYPES = {
@@ -30,7 +33,7 @@ export class SceneModel {
 
   static emptyScene() {
     return {
-      version: '0.2',
+      version: '0.4',
       name: '',
       gravity: [0, -9.81],
       solver: { dt: 0.001 },
@@ -45,7 +48,7 @@ export class SceneModel {
   // Replace the whole scene (also resets undo history and the dirty flag).
   load(scene) {
     const s = clone(scene);
-    s.version = '0.2';
+    s.version = '0.4';
     for (const key of ['surfaces', 'bodies', 'elements', 'constraints']) s[key] ||= [];
     this.scene = s;
     this.undoStack = [];
@@ -185,6 +188,29 @@ export class SceneModel {
     });
   }
 
+  // Knoten: the point where Stabs meet (a point mass; supports and loads can sit on it).
+  addNode({ point, mass = DEFAULT_NODE_MASS }) {
+    return this.#edit((s) => addNodeTo(s, point, mass));
+  }
+
+  // Bendable beam from the start to the end of its axis; the default cross section is a square whose
+  // side follows the length (L / 40, between 10 and 100 mm).
+  addBeam({ start, end, section, mass }) {
+    return this.#edit((s) => {
+      const id = nextId('b', this.allIds());
+      const L = dist(start, end);
+      const side = Math.min(0.1, Math.max(0.01, roundTo(L / 40, 0.005)));
+      const d = sub(end, start);
+      const params = { length: tidy(L), section: section || defaultSection('square', side) };
+      if (mass !== undefined) params.mass = mass;
+      s.bodies.push({
+        id, type: 'beam', position: tidyPoint([(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]),
+        angle: tidy(Math.atan2(d[1], d[0])), params,
+      });
+      return id;
+    });
+  }
+
   addSurface(p1, p2) {
     return this.#edit((s) => {
       const id = nextId('s', this.allIds());
@@ -243,12 +269,47 @@ export class SceneModel {
     });
   }
 
-  // Stab: massless two-force member; its length is the distance between its ends.
+  // Stab: massless two-force member; its length is the distance between its ends. An end given as
+  // { node: true, point } is a free end: a Knoten (point mass) is made there, or the one that is
+  // already there is used, so Stabs can be joined to a Fachwerk. Nothing is pinned to empty space: a
+  // fixed point is a Festlager in free space (or a support on a Knoten) that the user places.
   addRod({ a, b }) {
     return this.#edit((s) => {
+      const end = (e) => (e.node ? nodeAt(s, e.point) : anchor(e));
+      const ends = [end(a), end(b)];
       const id = nextId('S', this.allIds());
-      s.constraints.push({ id, type: 'rod', a: anchor(a), b: anchor(b), params: {} });
+      s.constraints.push({ id, type: 'rod', a: ends[0], b: ends[1], params: {} });
       return id;
+    });
+  }
+
+  // The Stab becomes elastic with a cross section ({ type, ...dimensions }, a bar: axial stiffness
+  // E A / L), or rigid again for null. Same id, same ends.
+  setStabSection(id, section) {
+    const found = this.find(id);
+    if (!found || !['rod', 'bar'].includes(found.obj.type)) throw new Error(`no Stab "${id}"`);
+    return this.#edit((s) => {
+      const stab = { ...found.obj };
+      s.constraints = s.constraints.filter((c) => c.id !== id);
+      s.elements = s.elements.filter((e) => e.id !== id);
+      if (section) {
+        stab.type = 'bar';
+        stab.params = { section: clone(section) };
+        s.elements.push(stab);
+      } else {
+        stab.type = 'rod';
+        stab.params = {};
+        s.constraints.push(stab);
+      }
+    });
+  }
+
+  // patch for a bar: { section }.
+  updateBar(id, patch) {
+    const found = this.find(id);
+    if (!found || found.obj.type !== 'bar') throw new Error(`no bar "${id}"`);
+    return this.#edit((s) => {
+      if (patch.section) s.elements.find((e) => e.id === id).params.section = clone(patch.section);
     });
   }
 
@@ -328,22 +389,36 @@ export class SceneModel {
     this.scene.view = { center: tidyPoint(view.center), width: tidy(view.width) };
   }
 
-  // patch: { mass, width, height, radius, angle, velocity: [vx, vy], omega }. Points attached to
-  // the body (spring ends, loads, supports) are scaled with it so a corner stays a corner.
+  // patch: { mass, width, height, radius, length, section, segments, angle, velocity: [vx, vy], omega }.
+  // `mass: null` of a beam means "from the section" (density x area x length). Points attached to
+  // the body (spring ends, loads, supports) are scaled with it so a corner stays a corner; on a beam
+  // only along its length.
   updateBody(id, patch) {
     const found = this.find(id);
     if (!found || found.kind !== 'body') throw new Error(`no body "${id}"`);
     return this.#edit((s) => {
       const body = s.bodies.find((b) => b.id === id);
       const old = { ...body.params };
-      for (const key of ['mass', 'width', 'height', 'radius']) {
-        if (patch[key] !== undefined && key in body.params) body.params[key] = tidy(patch[key]);
+      for (const key of ['mass', 'width', 'height', 'radius', 'length']) {
+        if (patch[key] !== undefined && patch[key] !== null && key in body.params) body.params[key] = tidy(patch[key]);
+      }
+      if (body.type === 'beam') {
+        if (patch.mass === null) delete body.params.mass;
+        else if (patch.mass !== undefined) body.params.mass = tidy(patch.mass);
+        if (patch.section) body.params.section = clone(patch.section);
+        if (patch.segments !== undefined) {
+          if (patch.segments === null) delete body.params.segments;
+          else body.params.segments = patch.segments;
+        }
       }
       if (patch.angle !== undefined) body.angle = tidy(patch.angle);
       if (patch.velocity !== undefined) body.velocity = tidyPoint(patch.velocity);
       if (patch.omega !== undefined) body.omega = tidy(patch.omega);
-      const sx = body.type === 'disc' ? body.params.radius / old.radius : body.params.width / old.width;
-      const sy = body.type === 'disc' ? sx : body.params.height / old.height;
+      let sx = 1;
+      let sy = 1;
+      if (body.type === 'disc') sx = sy = body.params.radius / old.radius;
+      else if (body.type === 'block') [sx, sy] = [body.params.width / old.width, body.params.height / old.height];
+      else if (body.type === 'beam') sx = body.params.length / old.length;
       if (sx !== 1 || sy !== 1) {
         rescaleAttachments(s, id, sx, sy);
         normalizeRopes(s);
@@ -363,7 +438,16 @@ export class SceneModel {
       else if (patch.restLength !== undefined) el.params.rest_length = tidy(patch.restLength);
       if (patch.force !== undefined) el.params.force = tidyPoint(patch.force);
       if (patch.moment !== undefined) el.params.moment = tidy(patch.moment);
-      if (patch.mode !== undefined) el.params.mode = patch.mode;
+      if (patch.mode !== undefined) {
+        el.params.mode = patch.mode;
+        if (patch.mode === 'harmonic') el.params.frequency ??= DEFAULT_FREQUENCY;
+        else {
+          delete el.params.frequency;
+          delete el.params.phase;
+        }
+      }
+      if (patch.frequency !== undefined && el.params.mode === 'harmonic') el.params.frequency = tidy(patch.frequency);
+      if (patch.phase !== undefined && el.params.mode === 'harmonic') el.params.phase = tidy(patch.phase);
     });
   }
 
@@ -395,6 +479,19 @@ export class SceneModel {
       return removed;
     });
   }
+}
+
+// A node at a world point: the one that is there, or a new one (inside a model edit).
+function addNodeTo(scene, point, mass) {
+  const allIds = [...scene.surfaces, ...scene.bodies, ...scene.elements, ...scene.constraints].map((o) => o.id);
+  const id = nextId('N', allIds);
+  scene.bodies.push({ id, type: 'node', position: tidyPoint(point), angle: 0, params: { mass } });
+  return id;
+}
+
+function nodeAt(scene, point) {
+  const there = scene.bodies.find((b) => b.type === 'node' && dist(b.position, point) < 1e-6);
+  return { body: there ? there.id : addNodeTo(scene, point, DEFAULT_NODE_MASS), point: [0, 0] };
 }
 
 function rescaleAttachments(scene, bodyId, sx, sy) {

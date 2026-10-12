@@ -608,15 +608,23 @@ export class LinkTool extends Tool {
   }
 
   get hint() {
+    if (this.kind === 'rod') {
+      return this.a
+        ? 'Click the second end: a mass, a node, a Festlager - or free space, which makes a node there.'
+        : 'Click the first end of the Stab: a mass, a node, a Festlager in free space - or free space, which makes a new node (Knoten). '
+          + 'Join Stabs in nodes to build a Fachwerk; a fixed point needs a Festlager.';
+    }
     if (this.a) return 'Click the second end (or release after dragging from the first).';
     const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.'
       : this.kind === 'damper' ? ' Set its damping c in its properties.' : '';
     return `Click the first end of the ${LINK_NAMES[this.kind]}: a point of a mass, a Festlager in free space, or the ground.${extra}`;
   }
 
+  // A Stab never pins itself to empty space: its free ends become nodes (made when the Stab is created).
   anchorFrom(world) {
-    const s = this.snap(world, { interior: true, surfaces: true, pins: true });
-    return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind };
+    const s = this.snap(world, { interior: true, surfaces: this.kind !== 'rod', pins: true });
+    const node = this.kind === 'rod' && !s.body && s.kind !== 'pin';
+    return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind, node };
   }
 
   down(e) {
@@ -646,7 +654,7 @@ export class LinkTool extends Tool {
 
   finish(world) {
     const b = this.anchorFrom(world);
-    const strip = ({ body, point }) => ({ body, point });
+    const strip = ({ body, point, node }) => (node ? { body: null, point, node: true } : { body, point });
     const link = { a: strip(this.a), b: strip(b) };
     const problem = linkProblem(this.scene, link);
     if (problem) {
@@ -676,10 +684,84 @@ export class LinkTool extends Tool {
 
   get preview() {
     if (!this.a) return null;
+    const newNodes = []; // free Stab ends: a node is made there
+    if (this.kind === 'rod') {
+      if (this.a.node) newNodes.push(this.a.world);
+      if (this.cursor && this.anchorFrom(this.cursor).node) newNodes.push(this.cursor);
+    }
     return {
-      type: 'link', kind: this.kind, a: this.a.world, b: this.cursor,
+      type: 'link', kind: this.kind, a: this.a.world, b: this.cursor, newNodes,
       label: `${LINK_NAMES[this.kind]} ${dist(this.a.world, this.cursor).toFixed(2)} m`,
     };
+  }
+}
+
+// --- node (Knoten) ----------------------------------------------------------------------------------
+
+// The joint of a Fachwerk: a point mass that Stabs, supports and forces attach to. Stabs also make
+// their own nodes at free ends; this tool places one first (to put a support on it, say).
+export class NodeTool extends Tool {
+  get hint() {
+    return 'Click to place a node (Knoten), where Stabs meet. Supports and forces can sit on it; '
+      + 'a Stab that ends in free space makes one by itself.';
+  }
+
+  pick(world) {
+    const s = this.snap(world, { surfaces: true });
+    const existing = (this.scene.bodies || []).find((b) => b.type === 'node' && dist(b.position, s.point) < 1e-6);
+    return { ...s, existing: existing ? existing.id : null };
+  }
+
+  move(e) {
+    const s = this.pick(e.world);
+    this.marker = { point: s.point, kind: s.existing ? 'invalid' : s.kind };
+  }
+
+  down(e) {
+    this.error = null;
+    const s = this.pick(e.world);
+    if (s.existing) {
+      this.error = `There is already a node here (${s.existing}).`;
+      return true;
+    }
+    this.env.created('body', this.env.model.addNode({ point: s.point }));
+    return true;
+  }
+
+  get preview() {
+    return null;
+  }
+}
+
+// --- beam (bendable mass object) -------------------------------------------------------------------
+
+export const MIN_BEAM_M = 0.1;
+
+// Press at one end of the beam, drag (or click) to the other: the axis, at an angle snapped to
+// 0, 30, 45, 60, 90 degrees (Shift for free angles). The cross section is chosen in its properties.
+export class BeamTool extends TwoPointTool {
+  get hint() {
+    return this.p1
+      ? 'Release / click the other end of the beam. Hold Shift for free angles.'
+      : 'Drag along the beam axis to create a bendable beam (steel); choose its cross section with a right-click.';
+  }
+
+  snapStart(world) { return this.snap(world, { surfaces: true, pins: true }); }
+
+  constrainEnd(p1, world, e) {
+    if (e && e.shift) return this.snap(world, { surfaces: true, bodies: false }).point;
+    return snapSegmentEnd(p1, world, { step: this.step });
+  }
+
+  commit(p1, p2) {
+    if (dist(p1, p2) < MIN_BEAM_M) return false;
+    this.env.created('body', this.env.model.addBeam({ start: p1, end: p2 }));
+    return true;
+  }
+
+  get preview() {
+    if (!this.p1) return null;
+    return { type: 'beam', start: this.p1, end: this.end, label: `${fmt(dist(this.p1, this.end))} m beam` };
   }
 }
 
@@ -863,7 +945,11 @@ export class MoveTool extends Tool {
     const test = JSON.parse(JSON.stringify(base));
     reattachEnd(test, t.id, t.end, anchor);
     const link = [...test.elements, ...test.constraints].find((o) => o.id === t.id);
-    const problem = linkProblem(test, link);
+    // A Stab is never pinned to empty space: it ends on a mass, a node or a Festlager.
+    const stab = link.type === 'rod' || link.type === 'bar';
+    const problem = stab && anchor.body === null && s.kind !== 'pin'
+      ? 'A Stab ends on a mass, a node or a Festlager. Draw it from a free point to make a node there.'
+      : linkProblem(test, link);
     this.marker = { point: s.point, kind: problem ? 'invalid' : s.kind };
     if (problem) {
       this.error = problem;
@@ -911,11 +997,13 @@ export const TOOL_DEFS = [
   { id: 'move', label: 'Move', icon: 'move', make: (env) => new MoveTool(env) },
   { id: 'rect', label: 'Rectangular mass', icon: 'rect', make: (env) => new RectTool(env) },
   { id: 'circle', label: 'Circular mass', icon: 'circle', make: (env) => new CircleTool(env) },
+  { id: 'beam', label: 'Beam (bendable)', icon: 'beam', make: (env) => new BeamTool(env) },
   { id: 'surface', label: 'Surface', icon: 'surface', make: (env) => new SurfaceTool(env) },
   { id: 'spring', label: 'Spring', icon: 'spring', make: (env) => new SpringTool(env) },
   { id: 'damper', label: 'Damper', icon: 'damper', make: (env) => new LinkTool(env, 'damper') },
   { id: 'rope', label: 'Rope', icon: 'rope', make: (env) => new LinkTool(env, 'rope') },
   { id: 'rod', label: 'Stab (rod)', icon: 'rod', make: (env) => new LinkTool(env, 'rod') },
+  { id: 'node', label: 'Node (Knoten)', icon: 'node', make: (env) => new NodeTool(env) },
   { id: 'load', label: 'Force / moment', icon: 'load', make: (env) => new LoadTool(env) },
   { id: 'pin', label: 'Festlager', icon: 'pin', make: (env) => new SupportTool(env, 'pin_support') },
   { id: 'fixed', label: 'Lager (fixed)', icon: 'fixed', make: (env) => new SupportTool(env, 'fixed_support') },

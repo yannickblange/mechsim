@@ -12,8 +12,8 @@ export const HIT_PX = { support: 14, load: 12, spring: 7, surface: 7, end: 11 };
 const LINK_TYPES = ['rope', 'rod'];
 const JOINT_TYPES = ['pin_joint', 'fixed_joint'];
 export const isLink = (c) => LINK_TYPES.includes(c.type);
-// Spring and damper: elements with two anchors.
-export const isAxialElement = (e) => e.type === 'spring' || e.type === 'damper';
+// Spring, damper and (elastic) bar: elements with two anchors.
+export const isAxialElement = (e) => e.type === 'spring' || e.type === 'damper' || e.type === 'bar';
 export const isJoint = (c) => JOINT_TYPES.includes(c.type);
 
 export function anchorWorld(scene, anchor) {
@@ -52,8 +52,13 @@ function lineDistance(p, ends, obj, scene) {
   return best;
 }
 
+// A Knoten (node) under the pointer: it sits where Stabs end, so it must win over them.
+function nodeAtPoint(scene, world, radius) {
+  return [...scene.bodies].reverse().find((b) => b.type === 'node' && dist(b.position, world) <= radius) || null;
+}
+
 // Returns { kind: "surface" | "body" | "element" | "constraint", id } or null.
-// Small things win over big things: supports, joints and pins, loads, springs / ropes / rods,
+// Small things win over big things: supports, joints and pins, loads, nodes, springs / ropes / rods,
 // then bodies, then surfaces.
 export function hitTest(scene, world, scale) {
   const px = (n) => n / scale;
@@ -73,6 +78,8 @@ export function hitTest(scene, world, scale) {
     const nearMoment = (e.params.moment || 0) !== 0 && dist(p, world) <= px(HIT_PX.load + 12);
     if (nearArrow || nearMoment || dist(p, world) <= px(HIT_PX.load)) return { kind: 'element', id: e.id };
   }
+  const node = nodeAtPoint(scene, world, px(HIT_PX.end));
+  if (node) return { kind: 'body', id: node.id };
   const lines = [
     ...scene.elements.filter(isAxialElement).map((e) => ({ kind: 'element', obj: e })),
     ...scene.constraints.filter(isLink).map((c) => ({ kind: 'constraint', obj: c })),
@@ -107,9 +114,12 @@ export function moveTarget(scene, world, scale) {
   // it), not a handle of its own.
   const pins = scene.constraints.filter((c) => c.type === 'pin_support' && c.body === null);
   const onPin = (anchor) => anchor.body === null && pins.some((c) => dist(c.point, anchor.point) < 1e-6);
+  // ... and so is an end on a Knoten: dragging there moves the node (with the Stabs that meet in it).
+  const nodes = new Set(scene.bodies.filter((b) => b.type === 'node').map((b) => b.id));
+  const onNode = (anchor) => anchor.body !== null && nodes.has(anchor.body);
   for (const { kind, obj } of ends) {
     for (const end of ['a', 'b']) {
-      if (onPin(obj[end])) continue;
+      if (onPin(obj[end]) || onNode(obj[end])) continue;
       const p = anchorWorld(scene, obj[end]);
       if (p && dist(p, world) <= px(HIT_PX.end)) return { type: 'end', id: obj.id, end, kind };
     }

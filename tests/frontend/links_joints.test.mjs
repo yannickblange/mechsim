@@ -86,7 +86,7 @@ test('rope: taut by default (no length), ids R1, R2', () => {
 
 test('links: both ends on the ground, the same mass, or too close together are refused', () => {
   const { model, tools } = setup(hung());
-  const t = tools.get('rod');
+  const t = tools.get('rope'); // (a Stab makes a node of a free end: see truss.test.mjs)
   click(t, [0, 1.5]);
   click(t, [1, 1.5]);
   assert.match(t.error, /at least one end on a mass/);
@@ -260,7 +260,7 @@ test('rope form: length at least the distance between the ends; equal means taut
 test('Stab, joint and free pin forms', () => {
   const { m } = wired();
   const rod = propertyFields(m, 'S1');
-  assert.deepEqual(rod.fields, []);
+  assert.deepEqual(rod.fields.map((f) => [f.key, f.value]), [['sectionType', 'rigid']]); // v0.4: a cross section is optional
   assert.match(rod.info[0], /two-force/);
   const joint = propertyFields(m, 'G1');
   assert.match(joint.title, /Hinge/);

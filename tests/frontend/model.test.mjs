@@ -15,9 +15,9 @@ function filled() {
   return { m, a, d, s, k, f, p, r };
 }
 
-test('a new model is an empty v0.2 scene', () => {
+test('a new model is an empty v0.4 scene', () => {
   const s = new SceneModel().toJSON();
-  assert.equal(s.version, '0.2');
+  assert.equal(s.version, '0.4');
   for (const key of ['surfaces', 'bodies', 'elements', 'constraints']) assert.deepEqual(s[key], []);
 });
 
@@ -190,7 +190,7 @@ test('toJSON returns a copy; load copies its input', () => {
 
 test('loading a v0.1 scene upgrades the version and fills missing lists', () => {
   const m = new SceneModel({ version: '0.1', bodies: [] });
-  assert.equal(m.scene.version, '0.2');
+  assert.equal(m.scene.version, '0.4');
   assert.deepEqual(m.scene.surfaces, []);
   assert.deepEqual(m.scene.constraints, []);
 });

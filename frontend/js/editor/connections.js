@@ -19,7 +19,7 @@ export function connectionPoints(scene) {
     g.kinds.add(item.role);
   };
   for (const e of scene.elements) {
-    if (e.type === 'spring' || e.type === 'damper') {
+    if (e.a && e.b) { // spring, damper, bar
       add(anchorWorld(scene, e.a), { kind: 'element', id: e.id, role: 'end' });
       add(anchorWorld(scene, e.b), { kind: 'element', id: e.id, role: 'end' });
     } else if (e.type === 'load') {

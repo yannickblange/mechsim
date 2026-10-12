@@ -4,6 +4,7 @@ import { ICONS } from './icons.js';
 import { hitTest } from './hit.js';
 import { applyProperties, propertyFields } from './properties.js';
 import { drawOverlay } from './preview.js';
+import { sectionSvg } from './sectionview.js';
 import { TOOL_DEFS, createTools } from './tools.js';
 
 const el = (tag, className, attrs = {}) => {
@@ -253,8 +254,9 @@ export class Editor {
     this.updateHint();
   }
 
-  openPopup(id, x, y) {
-    const form = propertyFields(this.model, id);
+  // draft: what the user has typed (a select that changes the form builds it again with the draft).
+  openPopup(id, x, y, draft = {}, focus = null) {
+    const form = propertyFields(this.model, id, draft);
     if (!form) return;
     this.popupId = id;
     const p = this.popup;
@@ -266,6 +268,11 @@ export class Editor {
       info.textContent = line;
       p.append(info);
     }
+    if (form.section) {
+      const view = el('div', 'props-section');
+      view.innerHTML = sectionSvg(form.section);
+      p.append(view);
+    }
     for (const f of form.fields) {
       const row = el('label', 'props-row');
       const name = el('span');
@@ -274,6 +281,7 @@ export class Editor {
       if (f.type === 'select') {
         input = el('select', '', { name: f.key });
         for (const [value, text] of f.options) input.append(new Option(text, value, false, value === f.value));
+        if (f.reshape) input.addEventListener('change', () => this.reshapePopup(f.key));
       } else {
         input = el('input', '', { name: f.key, type: 'text', inputmode: 'decimal', autocomplete: 'off', value: String(f.value) });
       }
@@ -315,8 +323,16 @@ export class Editor {
     const maxY = this.stage.clientHeight - p.offsetHeight - 8;
     p.style.left = `${Math.max(8, Math.min(x, maxX))}px`;
     p.style.top = `${Math.max(8, Math.min(y, maxY))}px`;
-    const first = p.querySelector('input, select');
+    const first = (focus && p.querySelector(`[name="${focus}"]`)) || p.querySelector('input, select');
     if (first) first.focus();
+  }
+
+  // A select changed which fields exist: build the form again, keeping what was typed.
+  reshapePopup(focusKey) {
+    const draft = Object.fromEntries(new FormData(this.popup).entries());
+    const left = parseFloat(this.popup.style.left) || 8;
+    const top = parseFloat(this.popup.style.top) || 8;
+    this.openPopup(this.popupId, left, top, draft, focusKey);
   }
 
   submitPopup() {

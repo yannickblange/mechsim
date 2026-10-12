@@ -47,6 +47,8 @@ export class Renderer {
     // Faded dashed springs at their relaxed length (the "ghost"). The app turns this on while the
     // simulation is not running.
     this.showGhosts = false;
+    // Bending of beams is drawn this many times as large (1 = true to scale). See symbols/beam.js.
+    this.bendScale = 1;
     // Editor hooks: interceptor gets first refusal on pointer events (return true = handled),
     // overlay(ctx, cam, theme) draws on top of the scene.
     this.interceptor = null;
@@ -128,6 +130,7 @@ export class Renderer {
     const box = this.canvas.getBoundingClientRect();
     if (box.width !== this.cam.width || box.height !== this.cam.height) this.resize();
     const { ctx, cam, theme } = this;
+    cam.bendScale = this.bendScale;
     ctx.save();
     ctx.fillStyle = theme.background;
     ctx.fillRect(0, 0, cam.width, cam.height);

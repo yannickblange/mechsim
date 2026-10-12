@@ -1,5 +1,6 @@
 // geometry.js - pure 2D helpers for the layout editor (metres, y up, angles in rad CCW).
 // No DOM access, so everything here is unit-tested with Node (tests/frontend).
+import { sectionProps } from './section.js';
 
 export const SNAP_ANGLES_DEG = [0, 30, 45, 60, 90];
 const TAU = 2 * Math.PI;
@@ -90,30 +91,48 @@ export const bodyAngle = (body) => body.angle || 0;
 export const bodyToWorld = (body, local) => add(body.position, rotate(local, bodyAngle(body)));
 export const worldToLocal = (body, world) => rotate(sub(world, body.position), -bodyAngle(body));
 
-// Corners of a block in world coordinates, counter-clockwise from the lower left.
-export function blockCorners(body) {
+// A node (Knoten, v0.4) has no extent: this is the radius within which it is hit and snapped to.
+export const NODE_RADIUS = 0.05;
+
+// Rectangle { x0, x1, y0, y1 } of a block or beam in its local frame. A block is centred on its
+// centre of mass; a beam lies along x with its centroid axis at y = 0, so the box of an L or T
+// section reaches further to one side.
+export function bodyBox(body) {
+  if (body.type === 'beam') {
+    const { yBottom, yTop } = sectionProps(body.params.section);
+    return { x0: -body.params.length / 2, x1: body.params.length / 2, y0: -yBottom, y1: yTop };
+  }
   const { width: w, height: h } = body.params;
-  return [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
+  return { x0: -w / 2, x1: w / 2, y0: -h / 2, y1: h / 2 };
+}
+
+// Corners of a block or beam in its local frame, counter-clockwise from the lower left.
+export function blockCorners(body) {
+  const { x0, x1, y0, y1 } = bodyBox(body);
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 }
 
 export function pointInBody(body, world) {
   const l = worldToLocal(body, world);
   if (body.type === 'disc') return length(l) <= body.params.radius;
-  return Math.abs(l[0]) <= body.params.width / 2 && Math.abs(l[1]) <= body.params.height / 2;
+  if (body.type === 'node') return length(l) <= NODE_RADIUS;
+  const { x0, x1, y0, y1 } = bodyBox(body);
+  return l[0] >= x0 && l[0] <= x1 && l[1] >= y0 && l[1] <= y1;
 }
 
 export function bodyArea(body) {
-  return body.type === 'disc'
-    ? Math.PI * body.params.radius ** 2
-    : body.params.width * body.params.height;
+  if (body.type === 'node') return Math.PI * NODE_RADIUS ** 2 * 0.25; // smaller than any real mass: on top
+  if (body.type === 'disc') return Math.PI * body.params.radius ** 2;
+  const { x0, x1, y0, y1 } = bodyBox(body);
+  return (x1 - x0) * (y1 - y0);
 }
 
 // Nearest point on the outline of a body to `world`: { local, world, dist }.
 export function nearestOnOutline(body, world) {
   const l = worldToLocal(body, world);
   let best;
-  if (body.type === 'disc') {
-    const r = body.params.radius;
+  if (body.type === 'disc' || body.type === 'node') {
+    const r = body.type === 'node' ? NODE_RADIUS : body.params.radius;
     const len = length(l);
     const local = len < 1e-12 ? [r, 0] : scale(l, r / len);
     best = { local, dist: Math.abs(len - r) };
@@ -127,9 +146,11 @@ export function nearestOnOutline(body, world) {
   return { local: best.local, world: bodyToWorld(body, best.local), dist: best.dist };
 }
 
-// Features a load or support can snap to: centre of mass, corners, edge midpoints.
-// Discs have the centre and the four points on the axes of the body.
+// Features a load or support can snap to: centre of mass, corners, edge midpoints (a beam also its
+// two axis ends). Discs have the centre and the four points on the axes of the body; a node only its
+// centre.
 export function bodyFeaturePoints(body) {
+  if (body.type === 'node') return [{ kind: 'center', local: [0, 0] }];
   if (body.type === 'disc') {
     const r = body.params.radius;
     return [
@@ -137,12 +158,15 @@ export function bodyFeaturePoints(body) {
       ...[[r, 0], [0, r], [-r, 0], [0, -r]].map((local) => ({ kind: 'corner', local })),
     ];
   }
-  const { width: w, height: h } = body.params;
-  return [
+  const { x0, x1, y0, y1 } = bodyBox(body);
+  const ym = (y0 + y1) / 2;
+  const features = [
     { kind: 'center', local: [0, 0] },
     ...blockCorners(body).map((local) => ({ kind: 'corner', local })),
-    ...[[0, -h / 2], [w / 2, 0], [0, h / 2], [-w / 2, 0]].map((local) => ({ kind: 'edge-mid', local })),
+    ...[[0, y0], [x1, ym], [0, y1], [x0, ym]].map((local) => ({ kind: 'edge-mid', local })),
   ];
+  if (body.type === 'beam') features.push(...[[x0, 0], [x1, 0]].map((local) => ({ kind: 'corner', local })));
+  return features;
 }
 
 // Rectangle spanned by two opposite corners: { center, width, height }.

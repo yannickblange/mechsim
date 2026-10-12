@@ -252,8 +252,8 @@ test('move: an end that would make the link invalid goes back (and says why)', (
   const { model, tools } = setup(m0.scene);
   const t = tools.get('move');
   t.down({ world: [1, 0.6] });
-  t.move({ world: [3, 3] }); // free space: both ends would be on the ground
-  assert.match(t.error, /at least one end on a mass/);
+  t.move({ world: [3, 3] }); // free space: a Stab is not pinned to empty space
+  assert.match(t.error, /ends on a mass, a node or a Festlager/);
   assert.deepEqual(model.scene.constraints[0].b, { body: 'a', point: [0, 0.1] }, 'shown unchanged while dragging');
   t.up({ world: [3, 3] });
   assert.deepEqual(model.scene.constraints[0].b, { body: 'a', point: [0, 0.1] });
