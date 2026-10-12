@@ -1,0 +1,80 @@
+{
+  "version": "0.2",
+  "name": "Pendulum hit by an impulse",
+  "description": "Rod hanging from a Festlager on a ceiling surface. A horizontal impulse of 1.5 N s at its lower end sets it swinging at t = 0; the velocity jump respects the pin.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      -0.5
+    ],
+    "width": 2.6
+  },
+  "surfaces": [
+    {
+      "id": "ceiling",
+      "p1": [
+        0.5,
+        0
+      ],
+      "p2": [
+        -0.5,
+        0
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "rod",
+      "type": "block",
+      "position": [
+        0.0,
+        -0.5
+      ],
+      "params": {
+        "mass": 2.0,
+        "width": 0.06,
+        "height": 1.0
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "J1",
+      "type": "load",
+      "body": "rod",
+      "point": [
+        0.0,
+        -0.5
+      ],
+      "params": {
+        "force": [
+          1.5,
+          0.0
+        ],
+        "mode": "impulse"
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "A",
+      "type": "pin_support",
+      "body": "rod",
+      "point": [
+        0.0,
+        0.5
+      ],
+      "surface": "ceiling",
+      "params": {
+        "angle": 3.141592654
+      }
+    }
+  ]
+}

@@ -1,17 +1,38 @@
-"""REST endpoints (contracts/protocol.md). TICKET B1 implements this file."""
+"""REST endpoints (contracts/protocol.md)."""
 from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 import mechsim
-from mechsim.scene import SceneInvalid, SceneNotFound, list_scenes
+from mechsim.scene import (
+    SceneInvalid,
+    SceneNameInvalid,
+    SceneNotFound,
+    check_name,
+    list_scenes,
+    list_user_scenes,
+    save_user_scene,
+)
 
 router = APIRouter(prefix="/api")
 
 
 class LoadRequest(BaseModel):
     name: str
+    source: str = "example"  # "example" | "user"
+
+
+class ApplyRequest(BaseModel):
+    scene: dict[str, Any]
+    name: str | None = None
+
+
+class SaveRequest(BaseModel):
+    name: str
+    scene: dict[str, Any]
 
 
 @router.get("/health")
@@ -21,24 +42,46 @@ async def health(request: Request):
 
 @router.get("/scenes")
 async def scenes():
-    return {"scenes": list_scenes()}
+    return {"scenes": list_scenes(), "user_scenes": list_user_scenes()}
 
 
 @router.get("/scene")
 async def current_scene(request: Request):
     session = request.app.state.session
-    return {"name": session.scene_name, "scene": session.scene}
+    return {"name": session.scene_name, "source": session.scene_source, "scene": session.scene}
 
 
 @router.post("/scene/load")
 async def load_scene_route(body: LoadRequest, request: Request):
     session = request.app.state.session
     try:
-        await session.load(body.name)
+        await session.load(body.name, body.source)
     except SceneNotFound:
         raise HTTPException(status_code=404, detail=f"unknown scene '{body.name}'")
     except SceneInvalid as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:  # the engine rejected a schema-valid scene
         raise HTTPException(status_code=422, detail=str(exc))
-    return {"name": session.scene_name, "scene": session.scene}
+    return {"name": session.scene_name, "source": session.scene_source, "scene": session.scene}
+
+
+@router.post("/scene/apply")
+async def apply_scene(body: ApplyRequest, request: Request):
+    """Make a scene from the editor the active simulation without saving it."""
+    session = request.app.state.session
+    name = body.name or body.scene.get("name") or "untitled"
+    try:
+        await session.load_scene_dict(body.scene, str(name), "draft")
+    except Exception as exc:  # SceneInvalid, or the engine rejected the scene
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"name": session.scene_name, "source": session.scene_source, "scene": session.scene}
+
+
+@router.post("/scene/save")
+async def save_scene(body: SaveRequest):
+    """Validate the scene and store it as a user scene (overwrites an existing one)."""
+    try:
+        name = save_user_scene(check_name(body.name), body.scene)
+    except (SceneInvalid, SceneNameInvalid) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"name": name, "source": "user"}

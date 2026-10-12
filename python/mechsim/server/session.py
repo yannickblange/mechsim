@@ -11,7 +11,7 @@ import asyncio
 import time
 from typing import Any
 
-from mechsim.scene import load_scene
+from mechsim.scene import SceneInvalid, load_scene, validate_scene
 
 FRAME_PERIOD = 1.0 / 60.0
 SPEED_MIN, SPEED_MAX = 0.05, 4.0
@@ -22,6 +22,7 @@ class SimSession:
         self.sim_factory = sim_factory
         self.mode = mode
         self.scene_name: str | None = None
+        self.scene_source: str = "example"  # "example" | "user" | "draft" (applied, not saved)
         self.scene: dict[str, Any] | None = None
         self.sim = None
         self.running = False
@@ -44,14 +45,32 @@ class SimSession:
             except Exception:
                 self.clients.discard(ws)
 
-    async def load(self, name: str) -> None:
-        """Load a scene by name. Raises SceneNotFound / SceneInvalid, or whatever the engine raises;
-        in every error case the previous scene stays active."""
-        scene = load_scene(name)
+    async def load(self, name: str, source: str = "example") -> None:
+        """Load a saved scene by name. Raises SceneNotFound / SceneInvalid, or whatever the engine
+        raises; in every error case the previous scene stays active."""
+        await self.load_scene_dict(load_scene(name, source), name, source)
+
+    async def load_scene_dict(self, scene: dict[str, Any], name: str, source: str = "draft") -> None:
+        """Make `scene` the active scene (used for scenes coming straight from the editor).
+
+        The scene is validated, built, and probed with one step followed by a reset, so engine
+        problems that only show up when stepping (for example a singular constraint set) are
+        reported now instead of when the user presses Play. In every error case the previous
+        scene stays active.
+        """
+        errors = validate_scene(scene)
+        if errors:
+            raise SceneInvalid("scene is invalid: " + "; ".join(errors))
         new_sim = self.sim_factory(scene)
+        try:
+            new_sim.step(n=1)
+            new_sim.reset()
+        except Exception:
+            new_sim.close()
+            raise
         if self.sim is not None:
             self.sim.close()
-        self.scene_name, self.scene, self.sim = name, scene, new_sim
+        self.scene_name, self.scene_source, self.scene, self.sim = name, source, scene, new_sim
         self.running = False
         await self.broadcast({"type": "frame", "data": new_sim.frame()})
         await self.broadcast(self.status())

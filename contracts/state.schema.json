@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/state.schema.json",
-  "title": "MechSim frame v0.1",
+  "title": "MechSim frame v0.2",
   "description": "One simulation frame, produced by ms_world_frame_json() and sent to the browser.",
   "type": "object",
   "required": ["t", "bodies", "elements", "constraints", "energy"],
@@ -34,9 +34,13 @@
         "properties": {
           "id": { "type": "string" },
           "type": { "type": "string" },
-          "p1": { "$ref": "#/$defs/vec2", "description": "World position of anchor a." },
-          "p2": { "$ref": "#/$defs/vec2", "description": "World position of anchor b." },
-          "force": { "type": "number", "description": "Axial force, positive = tension." }
+          "p1": { "$ref": "#/$defs/vec2", "description": "World position of anchor a (load: application point)." },
+          "p2": { "$ref": "#/$defs/vec2", "description": "World position of anchor b (load: the same point as p1)." },
+          "force": { "type": "number", "description": "Axial force, positive = tension (spring); magnitude of the force or impulse (load)." },
+          "vector": { "$ref": "#/$defs/vec2", "description": "load only: force or impulse vector, world frame." },
+          "moment": { "type": "number", "description": "load only: moment or angular impulse." },
+          "mode": { "enum": ["constant", "impulse"], "description": "load only." },
+          "active": { "type": "boolean", "description": "load only: false once an impulse has been applied (t > 0)." }
         }
       }
     },

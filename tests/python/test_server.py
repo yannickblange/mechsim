@@ -11,7 +11,16 @@ from mechsim import paths
 from mechsim.server.app import create_app
 from mechsim.server.mock import MockSimulation
 
-SCENES = ["physical_pendulum", "pinned_block_spring", "single_mass_spring", "two_mass_chain"]
+SCENES = [
+    "cantilever_clamp",
+    "disc_force_spring",
+    "impulse_pendulum",
+    "incline_roller",
+    "physical_pendulum",
+    "pinned_block_spring",
+    "single_mass_spring",
+    "two_mass_chain",
+]
 
 
 @pytest.fixture

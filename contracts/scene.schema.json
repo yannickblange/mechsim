@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.1",
+  "title": "MechSim scene v0.2",
+  "description": "v0.2 adds surfaces, discs, loads (force and moment), fixed and roller supports. Version 0.1 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": "0.1" },
+    "version": { "enum": ["0.1", "0.2"] },
     "name": { "type": "string" },
     "description": { "type": "string" },
     "gravity": { "$ref": "#/$defs/vec2", "default": [0, -9.81] },
@@ -28,6 +29,12 @@
         "center": { "$ref": "#/$defs/vec2" },
         "width": { "type": "number", "exclusiveMinimum": 0 }
       }
+    },
+    "surfaces": {
+      "type": "array",
+      "default": [],
+      "description": "Fixed line segments (v0.2). Pure geometry: supports sit on them, bodies do not collide with them. Ignored by the engine.",
+      "items": { "$ref": "#/$defs/surface" }
     },
     "bodies": {
       "type": "array",
@@ -67,19 +74,39 @@
         }
       }
     },
+    "surface": {
+      "type": "object",
+      "required": ["id", "p1", "p2"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "p1": { "$ref": "#/$defs/vec2", "description": "World start point. The hatching is drawn on the right-hand side of p1 -> p2." },
+        "p2": { "$ref": "#/$defs/vec2", "description": "World end point." }
+      }
+    },
     "body": {
       "type": "object",
       "required": ["id", "type", "position", "params"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["block"] },
+        "type": { "enum": ["block", "disc"] },
         "position": { "$ref": "#/$defs/vec2" },
         "angle": { "type": "number", "default": 0 },
         "velocity": { "$ref": "#/$defs/vec2", "default": [0, 0] },
         "omega": { "type": "number", "default": 0 },
-        "params": { "$ref": "#/$defs/blockParams" }
-      }
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "block" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/blockParams" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "disc" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/discParams" } } }
+        }
+      ]
     },
     "blockParams": {
       "type": "object",
@@ -91,17 +118,46 @@
         "height": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
+    "discParams": {
+      "type": "object",
+      "required": ["mass", "radius"],
+      "additionalProperties": false,
+      "properties": {
+        "mass": { "type": "number", "exclusiveMinimum": 0 },
+        "radius": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
     "element": {
       "type": "object",
-      "required": ["id", "type", "a", "b", "params"],
+      "required": ["id", "type", "params"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["spring"] },
+        "type": { "enum": ["spring", "load"] },
         "a": { "$ref": "#/$defs/anchor" },
         "b": { "$ref": "#/$defs/anchor" },
-        "params": { "$ref": "#/$defs/springParams" }
-      }
+        "body": { "$ref": "#/$defs/id", "description": "load: the body the load acts on." },
+        "point": { "$ref": "#/$defs/vec2", "description": "load: body-local application point." },
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "spring" } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }] },
+            "properties": { "params": { "$ref": "#/$defs/springParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "load" } } },
+          "then": {
+            "required": ["body", "point"],
+            "not": { "anyOf": [{ "required": ["a"] }, { "required": ["b"] }] },
+            "properties": { "params": { "$ref": "#/$defs/loadParams" } }
+          }
+        }
+      ]
     },
     "springParams": {
       "type": "object",
@@ -112,7 +168,28 @@
         "rest_length": {
           "type": "number",
           "minimum": 0,
-          "description": "If omitted, the initial distance between a and b is used."
+          "description": "Relaxed length. If omitted, the initial distance between a and b is used. If it differs from the initial distance the spring starts loaded: tension (pulls the ends together) when the initial distance is larger, compression when it is smaller."
+        }
+      }
+    },
+    "loadParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "$ref": "#/$defs/vec2",
+          "default": [0, 0],
+          "description": "World-frame vector, N (constant) or N s (impulse). Does not rotate with the body."
+        },
+        "moment": {
+          "type": "number",
+          "default": 0,
+          "description": "Couple, N m (constant) or N m s (impulse), counter-clockwise positive."
+        },
+        "mode": {
+          "enum": ["constant", "impulse"],
+          "default": "constant",
+          "description": "constant acts for the whole simulation; impulse is a velocity jump at t = 0 (and after every reset)."
         }
       }
     },
@@ -122,13 +199,28 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["pin_support"] },
+        "type": { "enum": ["pin_support", "fixed_support", "roller_support"] },
         "body": { "$ref": "#/$defs/id" },
         "point": {
           "$ref": "#/$defs/vec2",
           "description": "Body-local point. The support is fixed at its initial world position."
         },
-        "params": { "type": "object", "additionalProperties": false, "default": {} }
+        "surface": {
+          "description": "Optional id of the surface the support sits on (editor reference only; the engine uses params.angle).",
+          "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "params": { "$ref": "#/$defs/supportParams", "default": {} }
+      }
+    },
+    "supportParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "angle": {
+          "type": "number",
+          "default": 0,
+          "description": "Direction of the supporting surface line in rad, counter-clockwise from +x, chosen so that the body lies on its left side (angle 0: floor below the body). roller_support slides along this line and reacts normal to it; the other supports use it for the symbol only."
+        }
       }
     }
   }

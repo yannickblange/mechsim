@@ -4,7 +4,11 @@
 #include <map>
 
 #include "../bodies/block.hpp"
+#include "../bodies/disc.hpp"
+#include "../constraints/fixed_support.hpp"
 #include "../constraints/pin_support.hpp"
+#include "../constraints/roller_support.hpp"
+#include "../elements/load.hpp"
 #include "../elements/spring.hpp"
 
 namespace ms {
@@ -12,6 +16,7 @@ namespace ms {
 BodyInitFn findBodyType(const std::string& type) {
     static const std::map<std::string, BodyInitFn> table = {
         {"block", &initBlock},
+        {"disc", &initDisc},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;
@@ -20,6 +25,7 @@ BodyInitFn findBodyType(const std::string& type) {
 ElementFactoryFn findElementType(const std::string& type) {
     static const std::map<std::string, ElementFactoryFn> table = {
         {"spring", &makeSpring},
+        {"load", &makeLoad},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;
@@ -28,6 +34,8 @@ ElementFactoryFn findElementType(const std::string& type) {
 ConstraintFactoryFn findConstraintType(const std::string& type) {
     static const std::map<std::string, ConstraintFactoryFn> table = {
         {"pin_support", &makePinSupport},
+        {"fixed_support", &makeFixedSupport},
+        {"roller_support", &makeRollerSupport},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;

@@ -1,0 +1,115 @@
+{
+  "version": "0.2",
+  "name": "Clamped beam with spring-hung weight",
+  "description": "Beam clamped to a wall by a fixed Lager (x, y and rotation locked). A weight oscillates on a spring below the tip, and a constant force pushes down on the tip, so the Lager reaction (Fx, Fy, M) varies in time.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0.7,
+      0.3
+    ],
+    "width": 2.8
+  },
+  "surfaces": [
+    {
+      "id": "wall",
+      "p1": [
+        0,
+        1.2
+      ],
+      "p2": [
+        0,
+        -0.4
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "beam",
+      "type": "block",
+      "position": [
+        0.6,
+        0.5
+      ],
+      "params": {
+        "mass": 3.0,
+        "width": 1.2,
+        "height": 0.1
+      }
+    },
+    {
+      "id": "weight",
+      "type": "block",
+      "position": [
+        1.2,
+        -0.15
+      ],
+      "params": {
+        "mass": 1.0,
+        "width": 0.2,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "k1",
+      "type": "spring",
+      "a": {
+        "body": "beam",
+        "point": [
+          0.6,
+          -0.05
+        ]
+      },
+      "b": {
+        "body": "weight",
+        "point": [
+          0.0,
+          0.1
+        ]
+      },
+      "params": {
+        "k": 200.0,
+        "rest_length": 0.35
+      }
+    },
+    {
+      "id": "F1",
+      "type": "load",
+      "body": "beam",
+      "point": [
+        0.6,
+        0.05
+      ],
+      "params": {
+        "force": [
+          0.0,
+          -5.0
+        ],
+        "mode": "constant"
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "E",
+      "type": "fixed_support",
+      "body": "beam",
+      "point": [
+        -0.6,
+        0.0
+      ],
+      "surface": "wall",
+      "params": {
+        "angle": -1.5707963267948966
+      }
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 """MockSimulation: fake physics so the frontend works without the native library. TICKET B1.
 
-Implements mechsim.protocol.SimulationLike for ANY valid v0.1 scene:
+Implements mechsim.protocol.SimulationLike for ANY valid v0.1 / v0.2 scene:
 - each body oscillates around its initial position: y(t) = y0 + 0.05 sin(2 pi t),
   phi(t) = phi0 + 0.1 sin(2 pi t); x stays at x0; velocities are the analytic derivatives
 - spring p1/p2: anchor positions computed from the current mock body poses
   (ground anchors: world point; body anchors: pos + R(phi) * point); force = 0.0
-- pin_support position: initial world position of its body point; reaction = [0.0, 0.0]
+- supports (pin / fixed / roller): position = initial world position of the body point;
+  reaction = [0, 0] ([0, 0, 0] for fixed_support)
+- load: p1 = p2 = application point on the mock body pose; force = |vector|
 - energy: {"kinetic": 0.0, "potential": 0.0}
 Frames must validate against contracts/state.schema.json.
 """
@@ -66,25 +68,15 @@ class MockSimulation:
                     "omega": omega,
                 }
             )
-        elements = []
-        for element in self._scene["elements"]:
-            elements.append(
-                {
-                    "id": element["id"],
-                    "type": element["type"],
-                    "p1": self._anchor_world(element["a"], t),
-                    "p2": self._anchor_world(element["b"], t),
-                    "force": 0.0,
-                }
-            )
+        elements = [self._element_frame(e, t) for e in self._scene.get("elements", [])]
         constraints = []
-        for constraint in self._scene["constraints"]:
+        for constraint in self._scene.get("constraints", []):
             constraints.append(
                 {
                     "id": constraint["id"],
                     "type": constraint["type"],
                     "position": self._constraint_point(constraint),
-                    "reaction": [0.0, 0.0],
+                    "reaction": [0.0, 0.0, 0.0] if constraint["type"] == "fixed_support" else [0.0, 0.0],
                 }
             )
         return {
@@ -93,6 +85,32 @@ class MockSimulation:
             "elements": elements,
             "constraints": constraints,
             "energy": {"kinetic": 0.0, "potential": 0.0},
+        }
+
+    def _element_frame(self, element: dict[str, Any], t: float) -> dict[str, Any]:
+        if element["type"] == "load":
+            params = element["params"]
+            vector = list(params.get("force", [0.0, 0.0]))
+            x, y, phi, _, _, _ = self._pose(self._bodies[element["body"]], t)
+            point = self._to_world(x, y, phi, element["point"])
+            mode = params.get("mode", "constant")
+            return {
+                "id": element["id"],
+                "type": "load",
+                "p1": point,
+                "p2": point,
+                "force": math.hypot(*vector),
+                "vector": vector,
+                "moment": float(params.get("moment", 0.0)),
+                "mode": mode,
+                "active": mode == "constant" or t <= 0.0,
+            }
+        return {
+            "id": element["id"],
+            "type": element["type"],
+            "p1": self._anchor_world(element["a"], t),
+            "p2": self._anchor_world(element["b"], t),
+            "force": 0.0,
         }
 
     def _check_open(self) -> None:
