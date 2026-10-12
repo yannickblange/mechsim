@@ -86,8 +86,8 @@ void loadConstraint(const json& spec, World& world, std::set<std::string>& ids) 
 
 std::unique_ptr<World> build(const json& scene) {
     if (!scene.is_object()) throw std::runtime_error("scene must be a JSON object");
-    if (!scene.contains("version") || scene["version"] != "0.1") {
-        throw std::runtime_error("unsupported scene version (expected \"0.1\")");
+    if (!scene.contains("version") || (scene["version"] != "0.1" && scene["version"] != "0.2")) {
+        throw std::runtime_error("unsupported scene version (expected \"0.1\" or \"0.2\")");
     }
 
     auto world = std::make_unique<World>();
@@ -102,6 +102,8 @@ std::unique_ptr<World> build(const json& scene) {
     if (scene.contains("constraints")) {
         for (const json& spec : scene["constraints"]) loadConstraint(spec, *world, ids);
     }
+    // "surfaces" (v0.2) are drawing/editor geometry: supports carry their own angle, so the
+    // engine ignores them.
     world->initialize();
     return world;
 }

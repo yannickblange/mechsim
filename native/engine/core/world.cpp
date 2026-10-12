@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 
+#include "../solver/impulse.hpp"
 #include "../solver/integrators.hpp"
 
 namespace ms {
@@ -32,6 +33,7 @@ int World::constraintRows() const {
 void World::initialize() {
     for (auto& b : bodies) b.saveInitialState();
     for (auto& c : constraints) c->initialize(*this);
+    applyInitialImpulses(*this);  // v0.2: impulsive loads act at t = 0, on top of the saved state
 }
 
 void World::step(double dt) {
@@ -46,6 +48,7 @@ void World::reset() {
     for (auto& b : bodies) b.restoreInitialState();
     time = 0.0;
     for (auto& c : constraints) c->initialize(*this);
+    applyInitialImpulses(*this);
 }
 
 double World::kineticEnergy() const {
