@@ -127,3 +127,242 @@ select:disabled {
 #error[hidden] {
   display: none;
 }
+
+/* --- v0.2: layout editor ------------------------------------------------------------------- */
+:root {
+  --c-accent: #9cc3e6;
+  --c-danger: #e8868a;
+}
+
+.edit-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-controls[hidden] {
+  display: none;
+}
+
+input[type='text'] {
+  background: var(--c-bg);
+  color: var(--c-ink);
+  border: 1px solid var(--c-muted);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  min-width: 0;
+}
+
+input[type='text']:focus-visible {
+  outline: 2px solid var(--c-support);
+  outline-offset: 1px;
+}
+
+#scene-name {
+  width: 160px;
+}
+
+#btn-edit[aria-pressed='true'] {
+  background: var(--c-support);
+  color: var(--c-panel);
+  border-color: var(--c-support);
+}
+
+/* Hovering "+" that slides the component icons out horizontally. */
+.toolbox {
+  position: absolute;
+  left: 16px;
+  bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 5;
+}
+
+.toolbox[hidden] {
+  display: none;
+}
+
+.fab {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 30px;
+  line-height: 1;
+  background: var(--c-support);
+  color: var(--c-panel);
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s;
+}
+
+.fab:hover:not(:disabled) {
+  background: #b6d4ee;
+}
+
+.toolbox[data-open='true'] .fab {
+  transform: rotate(135deg);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--c-panel);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateX(-34px) scale(0.5);
+  pointer-events: none;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s, border-color 0.15s, background 0.15s;
+  transition-delay: calc((8 - var(--i)) * 18ms);
+}
+
+.toolbox[data-open='true'] .tool {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition-delay: calc(var(--i) * 28ms);
+}
+
+.tool[aria-pressed='true'] {
+  background: var(--c-support);
+  color: var(--c-panel);
+  border-color: var(--c-support);
+}
+
+.tool .tip {
+  position: absolute;
+  bottom: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--c-panel);
+  color: var(--c-ink);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tool:hover .tip,
+.tool:focus-visible .tip {
+  opacity: 1;
+}
+
+.editor-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: rgba(26, 38, 32, 0.92);
+  color: var(--c-muted);
+  font-size: 12px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.editor-hint[hidden] {
+  display: none;
+}
+
+.editor-hint[data-error='true'] {
+  color: var(--c-danger);
+}
+
+.props {
+  position: absolute;
+  z-index: 6;
+  width: 270px;
+  padding: 12px;
+  background: var(--c-panel);
+  border: 1px solid var(--c-muted);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.props[hidden] {
+  display: none;
+}
+
+.props-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.props-info {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.props-row {
+  display: grid;
+  grid-template-columns: 1fr 84px 44px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--c-muted);
+}
+
+.props-row input,
+.props-row select {
+  width: 100%;
+  text-align: right;
+}
+
+.props-row .unit {
+  font-size: 12px;
+}
+
+.props-errors {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--c-danger);
+}
+
+.props-errors[hidden] {
+  display: none;
+}
+
+.props-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.props-buttons .primary {
+  background: var(--c-support);
+  color: var(--c-panel);
+  border-color: var(--c-support);
+}
+
+.props-buttons .danger {
+  margin-left: auto;
+  color: var(--c-danger);
+  border-color: var(--c-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab,
+  .tool {
+    transition: none;
+  }
+}

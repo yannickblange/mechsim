@@ -1,7 +1,9 @@
 // renderer.js - draws grid, constraints, elements and bodies.
 import { Camera } from './camera.js';
 import { drawGrid } from './grid.js';
-import { bodySymbols, elementSymbols, constraintSymbols } from './symbols/index.js';
+import {
+  bodySymbols, constraintSymbols, drawSpringGhost, drawSurface, elementSymbols,
+} from './symbols/index.js';
 
 const THEME_VARS = {
   background: ['--c-bg', '#22332b'],
@@ -30,6 +32,13 @@ export class Renderer {
     this.elements = new Map();
     this.constraints = new Map();
     this.warned = new Set();
+    // Faded dashed springs at their relaxed length (the "ghost"). The app turns this on while the
+    // simulation is not running.
+    this.showGhosts = false;
+    // Editor hooks: interceptor gets first refusal on pointer events (return true = handled),
+    // overlay(ctx, cam, theme) draws on top of the scene.
+    this.interceptor = null;
+    this.overlay = null;
     this.attachInput();
   }
 
@@ -53,14 +62,21 @@ export class Renderer {
     this.cam.height = rect.height;
   }
 
-  setScene(scene) {
+  // fit: move the camera to the scene (scene.view or the bounding box). The editor passes false so
+  // the view does not jump while the user is working.
+  setScene(scene, { fit = true } = {}) {
     this.scene = scene;
     const byId = (list) => new Map((list || []).map((spec) => [spec.id, spec]));
     this.bodies = byId(scene.bodies);
     this.elements = byId(scene.elements);
     this.constraints = byId(scene.constraints);
     this.theme = Renderer.readTheme();
-    this.fitToScene();
+    if (fit) this.fitToScene();
+  }
+
+  // Camera as a scene.view hint: { center, width }.
+  getView() {
+    return { center: [...this.cam.center], width: this.cam.width / this.cam.scale };
   }
 
   // scene.view if given, else the bounding box of bodies and ground anchors with 50 % padding.
@@ -72,7 +88,9 @@ export class Renderer {
       return;
     }
     const points = (scene.bodies || []).map((b) => b.position);
+    for (const surface of scene.surfaces || []) points.push(surface.p1, surface.p2);
     for (const el of scene.elements || []) {
+      if (!el.a) continue;
       for (const anchor of [el.a, el.b]) if (anchor.body === null) points.push(anchor.point);
     }
     if (points.length === 0) return;
@@ -94,9 +112,22 @@ export class Renderer {
     if (!this.scene) return;
 
     const f = frame || this.initialFrame();
+    for (const surface of this.scene.surfaces || []) drawSurface(ctx, cam, surface, theme);
+    if (this.showGhosts) this.drawGhosts(f.elements);
     this.drawAll(f.elements, this.elements, elementSymbols);
     this.drawAll(f.bodies, this.bodies, bodySymbols);
     this.drawAll(f.constraints, this.constraints, constraintSymbols);
+    if (this.overlay) this.overlay(ctx, cam, theme);
+  }
+
+  // The relaxed state of every spring that has a rest_length: it hangs from the end stored first
+  // (the ground end for springs made in the editor) along the current axis.
+  drawGhosts(entries) {
+    for (const entry of entries || []) {
+      const spec = this.elements.get(entry.id);
+      if (!spec || spec.type !== 'spring' || spec.params.rest_length === undefined) continue;
+      drawSpringGhost(this.ctx, this.cam, entry.p1, entry.p2, spec.params.rest_length, this.theme);
+    }
   }
 
   drawAll(entries, specs, symbols) {
@@ -121,6 +152,14 @@ export class Renderer {
     const pose = new Map(
       (scene.bodies || []).map((b) => [b.id, { pos: b.position, phi: b.angle || 0 }]),
     );
+    const loadEntry = (e, toWorld) => {
+      const p = toWorld(e.body, e.point);
+      const force = e.params.force || [0, 0];
+      return {
+        id: e.id, type: 'load', p1: p, p2: p, force: Math.hypot(force[0], force[1]), vector: force,
+        moment: e.params.moment || 0, mode: e.params.mode || 'constant', active: true,
+      };
+    };
     const world = (body, point) => {
       if (body === null) return point;
       const { pos, phi } = pose.get(body);
@@ -132,7 +171,7 @@ export class Renderer {
       bodies: (scene.bodies || []).map((b) => ({
         id: b.id, x: b.position[0], y: b.position[1], phi: b.angle || 0, vx: 0, vy: 0, omega: 0,
       })),
-      elements: (scene.elements || []).map((e) => ({
+      elements: (scene.elements || []).map((e) => (e.type === 'load' ? loadEntry(e, world) : {
         id: e.id, type: e.type, p1: world(e.a.body, e.a.point), p2: world(e.b.body, e.b.point), force: 0,
       })),
       constraints: (scene.constraints || []).map((c) => ({
@@ -153,17 +192,28 @@ export class Renderer {
       },
       { passive: false },
     );
+    // The editor sees every pointer event first; it returns true for the ones it used.
+    const intercepted = (type, event) =>
+      this.interceptor && this.interceptor[type] && this.interceptor[type](event);
     canvas.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 && event.button !== 1) return; // left drag or middle drag pans
+      if (event.button === 0 && intercepted('pointerdown', event)) return;
       dragging = true;
       canvas.setPointerCapture(event.pointerId);
     });
     canvas.addEventListener('pointermove', (event) => {
       if (dragging) this.cam.panBy(event.movementX, event.movementY);
+      else intercepted('pointermove', event);
     });
-    const stop = () => { dragging = false; };
+    const stop = (event) => {
+      if (!dragging) intercepted('pointerup', event);
+      dragging = false;
+    };
     canvas.addEventListener('pointerup', stop);
     canvas.addEventListener('pointercancel', stop);
-    canvas.addEventListener('dblclick', () => this.fitToScene());
+    canvas.addEventListener('pointerleave', (event) => intercepted('pointerleave', event));
+    canvas.addEventListener('dblclick', () => {
+      if (!this.interceptor) this.fitToScene();
+    });
   }
 }

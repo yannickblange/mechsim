@@ -8,10 +8,20 @@
 //     spec  the object from the scene JSON (bodies[i], elements[i] or constraints[i])
 //     entry the matching object from the current frame (same id)
 //     theme colours, see Renderer.readTheme()
+// Surfaces are not part of frames; the renderer draws them with drawSurface(ctx, cam, surface, theme).
 import { drawBlock } from './block.js';
+import { drawDisc } from './disc.js';
+import { drawLoad } from './load.js';
 import { drawSpring } from './spring.js';
-import { drawPinSupport } from './supports.js';
+import { drawFixedSupport, drawPinSupport, drawRollerSupport } from './supports.js';
 
-export const bodySymbols = { block: drawBlock };
-export const elementSymbols = { spring: drawSpring };
-export const constraintSymbols = { pin_support: drawPinSupport };
+export { drawSurface } from './surface.js';
+export { drawSpringGhost } from './spring.js';
+
+export const bodySymbols = { block: drawBlock, disc: drawDisc };
+export const elementSymbols = { spring: drawSpring, load: drawLoad };
+export const constraintSymbols = {
+  pin_support: drawPinSupport,
+  fixed_support: drawFixedSupport,
+  roller_support: drawRollerSupport,
+};

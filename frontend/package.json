@@ -1,0 +1,6 @@
+{
+  "name": "mechsim-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Marks the frontend modules as ES modules so Node can import them in tests/frontend. Not served."
+}

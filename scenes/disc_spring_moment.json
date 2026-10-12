@@ -1,7 +1,7 @@
 {
   "version": "0.2",
-  "name": "Disc with constant force and spring",
-  "description": "Disc on a Loslager sliding along a floor. A constant force pushes it right, a pre-stretched spring (ghost = relaxed state) pulls it left; it oscillates about the new equilibrium.",
+  "name": "Disc on a Festlager with spring and moment",
+  "description": "Disc pinned at its centre. A spring from the ceiling to its rim (ghost = relaxed state, shorter than installed, so it starts in tension) and a constant clockwise moment. Small oscillations have omega = sqrt(2 k / m).",
   "gravity": [
     0,
     -9.81
@@ -11,21 +11,21 @@
   },
   "view": {
     "center": [
-      0,
-      0.3
+      0.1,
+      0.8
     ],
-    "width": 2.8
+    "width": 2.4
   },
   "surfaces": [
     {
-      "id": "floor",
+      "id": "ceiling",
       "p1": [
-        -1.3,
-        0
+        1.2,
+        1.4
       ],
       "p2": [
-        1.3,
-        0
+        -0.8,
+        1.4
       ]
     }
   ],
@@ -35,11 +35,11 @@
       "type": "disc",
       "position": [
         0.0,
-        0.15
+        0.6
       ],
       "params": {
         "mass": 1.5,
-        "radius": 0.15
+        "radius": 0.25
       }
     }
   ],
@@ -50,49 +50,46 @@
       "a": {
         "body": null,
         "point": [
-          -1.0,
-          0.15
+          0.25,
+          1.4
         ]
       },
       "b": {
         "body": "disc",
         "point": [
-          -0.15,
+          0.25,
           0.0
         ]
       },
       "params": {
         "k": 30.0,
-        "rest_length": 0.6
+        "rest_length": 0.5
       }
     },
     {
-      "id": "F1",
+      "id": "M1",
       "type": "load",
       "body": "disc",
       "point": [
-        0.15,
+        0.0,
         0.0
       ],
       "params": {
-        "force": [
-          12.0,
-          0.0
-        ],
+        "moment": -1.0,
         "mode": "constant"
       }
     }
   ],
   "constraints": [
     {
-      "id": "B",
-      "type": "roller_support",
+      "id": "A",
+      "type": "pin_support",
       "body": "disc",
       "point": [
         0.0,
-        -0.15
+        0.0
       ],
-      "surface": "floor",
+      "surface": null,
       "params": {
         "angle": 0.0
       }

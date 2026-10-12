@@ -1,7 +1,7 @@
 {
   "version": "0.2",
   "name": "Block on an incline (Loslager)",
-  "description": "Block on a 30 degree incline held by a Loslager (frictionless, slides along the surface) and a spring whose relaxed length (ghost) is shorter than its installed length, so it starts in tension.",
+  "description": "Block on a 30 degree incline held by two Loslager at its lower corners (frictionless, they slide along the surface and keep the block from tipping) and a spring whose relaxed length (ghost) is shorter than its installed length, so it starts in tension.",
   "gravity": [
     0,
     -9.81
@@ -71,11 +71,24 @@
   ],
   "constraints": [
     {
-      "id": "B",
+      "id": "B1",
       "type": "roller_support",
       "body": "block",
       "point": [
-        0.0,
+        -0.15,
+        -0.1
+      ],
+      "surface": "s1",
+      "params": {
+        "angle": 0.523598776
+      }
+    },
+    {
+      "id": "B2",
+      "type": "roller_support",
+      "body": "block",
+      "point": [
+        0.15,
         -0.1
       ],
       "surface": "s1",

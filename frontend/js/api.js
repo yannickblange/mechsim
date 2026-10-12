@@ -15,12 +15,29 @@ export class Api {
     return (await this.#request('GET', '/api/scenes')).scenes;
   }
 
+  // { scenes: [...examples], user_scenes: [...saved layouts] }
+  async listSceneGroups() {
+    return this.#request('GET', '/api/scenes');
+  }
+
   async getScene() {
     return this.#request('GET', '/api/scene');
   }
 
-  async loadScene(name) {
-    return this.#request('POST', '/api/scene/load', { name });
+  // source: "example" | "user"
+  async loadScene(name, source = 'example') {
+    return this.#request('POST', '/api/scene/load', { name, source });
+  }
+
+  // Make a scene from the editor the active simulation (not saved). Rejects with the server's
+  // message if the scene is invalid or the engine cannot run it.
+  async applyScene(scene, name) {
+    return this.#request('POST', '/api/scene/apply', { scene, name });
+  }
+
+  // Store the scene as a user layout called `name` (letters, digits, _ and -).
+  async saveScene(name, scene) {
+    return this.#request('POST', '/api/scene/save', { name, scene });
   }
 
   // Opens the WebSocket (once) and reconnects after it closes.

@@ -12,7 +12,7 @@ SCENE_NAMES = [
     "two_mass_chain",
     "physical_pendulum",
     "cantilever_clamp",
-    "disc_force_spring",
+    "disc_spring_moment",
     "impulse_pendulum",
     "incline_roller",
 ]

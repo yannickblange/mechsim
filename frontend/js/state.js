@@ -2,6 +2,8 @@
 export class AppState {
   constructor() {
     this.sceneName = null;
+    this.sceneSource = 'example'; // "example" | "user" | "draft"
+    this.editing = false;
     this.scene = null;
     this.frame = null;
     this.running = false;
@@ -28,8 +30,9 @@ export class AppState {
     }
   }
 
-  setScene(name, scene) {
+  setScene(name, scene, source = 'example') {
     this.sceneName = name;
+    this.sceneSource = source;
     this.scene = scene;
     this.frame = null;
     this.lastError = null;

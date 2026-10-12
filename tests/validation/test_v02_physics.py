@@ -48,10 +48,14 @@ def test_incline_roller_acceleration_and_reaction(load_example):
     assert abs(s_normal) < 1e-9
     assert b1["phi"] == pytest.approx(theta, abs=1e-9)
 
-    fx, fy = frames[-1]["constraints"][0]["reaction"]
     mass = s["bodies"][0]["params"]["mass"]
-    assert fx * n[0] + fy * n[1] == pytest.approx(mass * G * math.cos(theta), rel=1e-6)
-    assert abs(fx * t[0] + fy * t[1]) < 1e-6, "no friction: the reaction is purely normal"
+    normals = []
+    for constraint in frames[-1]["constraints"]:
+        fx, fy = constraint["reaction"]
+        assert abs(fx * t[0] + fy * t[1]) < 1e-6, "no friction: the reaction is purely normal"
+        normals.append(fx * n[0] + fy * n[1])
+    assert sum(normals) == pytest.approx(mass * G * math.cos(theta), rel=1e-6)
+    assert normals[0] == pytest.approx(normals[1], rel=1e-6), "gravity acts midway between the two rollers"
 
 
 def test_incline_roller_spring_oscillates_about_the_equilibrium(load_example):
@@ -71,7 +75,8 @@ def test_incline_roller_spring_oscillates_about_the_equilibrium(load_example):
 def test_roller_on_the_wrong_side_of_the_angle_behaves_identically(load_example):
     a = load_example("incline_roller")
     b = copy.deepcopy(a)
-    b["constraints"][0]["params"]["angle"] += math.pi
+    for constraint in b["constraints"]:
+        constraint["params"]["angle"] += math.pi
     fa, fb = run(a, 500)[-1], run(b, 500)[-1]
     assert fa["bodies"][0]["x"] == pytest.approx(fb["bodies"][0]["x"], abs=1e-9)
     assert fa["bodies"][0]["y"] == pytest.approx(fb["bodies"][0]["y"], abs=1e-9)
@@ -161,18 +166,26 @@ def test_impulse_is_not_a_force_afterwards():
     assert all(f["bodies"][0]["vx"] == pytest.approx(1.5, rel=1e-12) for f in frames)
 
 
-def test_disc_with_force_and_spring_oscillates_about_the_shifted_equilibrium(load_example):
-    s = load_example("disc_force_spring")
-    k, m, F = 30.0, 1.5, 12.0
-    T = 2 * math.pi / math.sqrt(k / m)
-    steps = round(5 * T / 1e-3)
-    frames = run(s, steps)
-    xs = [f["bodies"][0]["x"] for f in frames]
-    # static equilibrium: F = k (L - L0) with L = x + 0.85, L0 = 0.6  ->  x = 0.15
-    assert sum(xs) / len(xs) == pytest.approx(0.15, abs=0.005)
-    assert frames[0]["elements"][0]["force"] == pytest.approx(30 * 0.25)  # ghost shorter than installed
-    assert all(abs(f["bodies"][0]["y"] - 0.15) < 1e-9 for f in frames), "stays on the surface"
-    assert all(abs(f["bodies"][0]["phi"]) < 1e-9 for f in frames)
+def test_disc_example_oscillates_with_omega_sqrt_2k_over_m(load_example):
+    scene = load_example("disc_spring_moment")
+    k, m, r, H, L0, M = 30.0, 1.5, 0.25, 0.8, 0.5, -2.2
+    # The example swings widely; for the closed-form check start close to equilibrium so the
+    # small-angle formulas apply (spring torque r k (H - L0) = 2.25 N m is almost balanced by M).
+    scene["elements"][1]["params"]["moment"] = M
+    omega = math.sqrt(2 * k / m)  # J = m r^2 / 2: independent of r
+    phi_eq = (M + r * k * (H - L0)) / (k * r * r)  # small-angle equilibrium of spring + moment
+    period = 2 * math.pi / omega
+    frames = run(scene, round(6 * period / 1e-3))
+    phis = [f["bodies"][0]["phi"] for f in frames]
+    assert sum(phis) / len(phis) == pytest.approx(phi_eq, rel=0.06)
+    # period from the upward zero crossings of phi - phi_eq
+    ups = [i * 1e-3 for i in range(1, len(phis)) if phis[i - 1] < phi_eq <= phis[i]]
+    assert len(ups) >= 5
+    measured = (ups[-1] - ups[0]) / (len(ups) - 1)
+    assert measured == pytest.approx(period, rel=0.03)
+    # the pin holds the centre; the spring starts in tension (ghost shorter than installed)
+    assert all(abs(f["bodies"][0]["x"]) < 1e-3 and abs(f["bodies"][0]["y"] - 0.6) < 1e-3 for f in frames)
+    assert frames[0]["elements"][0]["force"] == pytest.approx(k * (H - L0))
 
 
 # --- Spring with a relaxed (ghost) length -------------------------------------------------------
