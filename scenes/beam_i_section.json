@@ -1,0 +1,102 @@
+{
+  "version": "0.4",
+  "name": "I beam on two supports",
+  "description": "A 4 m steel I beam (b = 55, h = 120, tf = 6.3, tw = 4.4 mm; about an IPE 120) on a Festlager and a Loslager, loaded by a 5 kN force at mid-span. It starts straight and swings about the static deflection, F L^3 / 48 E I + 5 q L^4 / 384 E I = 12 mm + 8 mm (the picture shows the bending 50 times as large; choose 'true scale' in the toolbar). Right-click the beam and pick another cross section (H, T, L, square) to see how much stiffer or softer it gets; the graph shows the mid-span displacement.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      2.0,
+      0.0
+    ],
+    "width": 6.0,
+    "bend": 50
+  },
+  "surfaces": [
+    {
+      "id": "floor",
+      "p1": [
+        -0.6,
+        -0.07
+      ],
+      "p2": [
+        4.6,
+        -0.07
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "beam",
+      "type": "beam",
+      "position": [
+        2.0,
+        0.0
+      ],
+      "angle": 0,
+      "params": {
+        "length": 4.0,
+        "section": {
+          "type": "I",
+          "b": 0.055,
+          "h": 0.12,
+          "tf": 0.0063,
+          "tw": 0.0044
+        },
+        "segments": 16
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "F1",
+      "type": "load",
+      "body": "beam",
+      "point": [
+        0.0,
+        0.0
+      ],
+      "params": {
+        "force": [
+          0,
+          -5000
+        ],
+        "moment": 0,
+        "mode": "constant"
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "A1",
+      "type": "pin_support",
+      "body": "beam",
+      "point": [
+        -2.0,
+        0.0
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "B1",
+      "type": "roller_support",
+      "body": "beam",
+      "point": [
+        2.0,
+        0.0
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    }
+  ]
+}

@@ -27,7 +27,11 @@
       "additionalProperties": false,
       "properties": {
         "center": { "$ref": "#/$defs/vec2" },
-        "width": { "type": "number", "exclusiveMinimum": 0 }
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "bend": {
+          "enum": [1, 10, 50, 200],
+          "description": "v0.4: show the bending of beams this many times as large (display only; 1 = true to scale)."
+        }
       }
     },
     "surfaces": {

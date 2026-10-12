@@ -22,7 +22,7 @@ import { slugify } from './editor/names.js';
 import { applyTheme, currentTheme, otherTheme } from './theme.js';
 import { Recorder } from './graphs/recorder.js';
 import { GraphManager } from './graphs/panel.js';
-import { hitTest } from './editor/hit.js';
+import { massesAt } from './editor/hit.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -96,6 +96,7 @@ function updateUi() {
   // the bending selector only matters when there is a beam (in the scene being edited or shown)
   const shown = editing ? model.scene : state.scene;
   ui.bendField.hidden = !(shown && (shown.bodies || []).some((b) => b.type === 'beam'));
+  if (ui.bend.value !== String(renderer.bendScale)) ui.bend.value = String(renderer.bendScale);
   const dark = currentTheme() === 'dark';
   ui.theme.textContent = dark ? 'Light' : 'Dark';
   ui.theme.setAttribute('aria-pressed', String(dark));
@@ -126,36 +127,40 @@ function closeContextMenu() {
   contextMenu = null;
 }
 
-// Right-click on a mass while the simulation is shown (the editor has its own popup): a small menu.
+// Right-click on a mass while the simulation is shown (the editor has its own popup): a small menu with
+// the displacement graph of every mass under the pointer, where the masses are now.
 function openContextMenu(event) {
   event.preventDefault();
   closeContextMenu();
   if (state.editing || !state.scene) return;
   const rect = renderer.canvas.getBoundingClientRect();
   const world = renderer.cam.toWorld([event.clientX - rect.left, event.clientY - rect.top]);
-  const hit = hitTest(state.scene, world, renderer.cam.scale);
-  if (!hit || hit.kind !== 'body') return;
+  const ids = massesAt(state.scene, state.frame, world).slice(0, 5);
+  if (ids.length === 0) return;
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
   menu.setAttribute('role', 'menu');
   const title = document.createElement('div');
   title.className = 'ctx-title';
-  title.textContent = hit.id;
-  const item = document.createElement('button');
-  item.type = 'button';
-  item.setAttribute('role', 'menuitem');
-  item.textContent = graphs.has(hit.id) ? 'Show displacement graph' : 'Displacement graph';
-  item.addEventListener('click', () => {
-    graphs.open(hit.id);
-    closeContextMenu();
-  });
-  menu.append(title, item);
+  title.textContent = ids.length === 1 ? ids[0] : 'Masses here';
+  menu.append(title);
+  for (const id of ids) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.setAttribute('role', 'menuitem');
+    item.textContent = ids.length === 1 ? 'Displacement graph' : `Displacement graph of ${id}`;
+    item.addEventListener('click', () => {
+      graphs.open(id);
+      closeContextMenu();
+    });
+    menu.append(item);
+  }
   contextMenu = menu;
   const stageBox = stage.getBoundingClientRect();
   stage.append(menu);
   menu.style.left = `${Math.min(event.clientX - stageBox.left, stage.clientWidth - menu.offsetWidth - 8)}px`;
   menu.style.top = `${Math.min(event.clientY - stageBox.top, stage.clientHeight - menu.offsetHeight - 8)}px`;
-  item.focus();
+  menu.querySelector('button').focus();
 }
 
 renderer.canvas.addEventListener('contextmenu', openContextMenu);

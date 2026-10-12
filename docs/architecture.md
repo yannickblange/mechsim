@@ -69,3 +69,22 @@ Impulses are an optional interface (`elements/impulse_source.hpp`, found with `d
   supports and loads; contact snapping; rope normalisation), `connections.js` (attachment points grouped by position, and
   what an object is connected to), tools `LinkTool`, `JointTool`, `MoveTool`. A move drag is a `SceneModel.transaction()`:
   every pointer move re-applies the operation to the state at the start of the drag, release records one undo step.
+
+## v0.4: graphs, colour schemes, Fachwerke and beams
+
+- **Graphs.** `Simulation.step_traced(n)` / `SimSession.advance()` send the pose of every body after (at most 120 of) the engine steps of a
+  display frame as the frame message's `trace` (`contracts/protocol.md`). `frontend/js/graphs/recorder.js` keeps the history of every
+  body (reset on rewind and on a new scene), `plot.js` is the maths (ticks, units, min / max envelope per pixel column), `panel.js` the
+  floating panels. `main.js` offers them in a run-mode context menu (`editor/hit.js::massesAt`, which uses the current poses) and the
+  editor's popup has a Graph button.
+- **Colour schemes.** `css/main.css` defines the colours as variables, `:root` is the light scheme, `[data-theme='dark']` overrides it;
+  `Renderer.readTheme()` reads them, `theme.js` switches and remembers. The UI accent (`--c-accent`) and the line colour of symbols are separate.
+- **Engine.** `core/section.*` (sections), `core/material.hpp` (E, density), `bodies/node.*`, `elements/bar.*` (an elastic `Spring`),
+  `elements/beam_element.*` (the finite elements of a beam, hidden from frames), `io/beam_builder.*` (a `beam` body in the scene becomes node
+  bodies with `Body::beam >= 0`, one `BeamElement` and a `World::beams` group; attachments are remapped to the nodes before the other
+  objects are loaded), `solver/stiffness.*` (maximum frequency, substeps in `World::step`). `World::sceneBodies()` is the body list as the
+  outside sees it (a beam is one body, the middle node): `frame()` and the C API's `ms_world_get_state` use it.
+- **Editor.** `section.js` (section maths, mirrors `section.cpp`), `sectionview.js` (the drawing in the popup), `NodeTool`, `BeamTool`;
+  the Stab tool makes nodes at free ends (`SceneModel.addRod` with `{ node: true }` ends, one undo step); `setStabSection` turns a rod into an
+  elastic bar and back; property forms can reshape (a select with `reshape` rebuilds the form: cross-section type, load type);
+  symbols `node.js`, `beam.js` (smooth deformed shape, bending exaggeration about the chord), `rod.js` (force labels, tension blue, compression red).

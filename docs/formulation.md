@@ -1,4 +1,4 @@
-# Equations of motion (v0.1, extended in v0.2 and v0.3)
+# Equations of motion (v0.1, extended in v0.2, v0.3 and v0.4)
 
 ## Coordinates
 
@@ -142,6 +142,68 @@ This is the same Schur complement as the accelerations (`solveAccelerations` wit
 `ω = J h / I_A` and `v_cm = ω × r_cm`, not the free-body result `v = J / m`. The initial state saved for
 `reset()` is the state **before** the impulse; the impulse is applied again after every reset.
 
+### Harmonic load, v0.4
+
+`F(t) = F sin(2 pi f t + phi)` (and the same factor on the moment), evaluated at the time of the start of the step. It is
+not conservative (no potential). Forced vibration of a mass, spring and damper: the steady state of
+`m x'' + c x' + k x = F0 sin(Omega t)` is `x = X sin(Omega t - delta)` with
+
+```
+X = F0 / sqrt((k - m Omega^2)^2 + (c Omega)^2) = (F0 / k) / sqrt((1 - eta^2)^2 + (2 zeta eta)^2),
+tan(delta) = 2 zeta eta / (1 - eta^2),    eta = Omega / omega0,   zeta = c / (2 sqrt(k m))
+```
+
+(`tests/validation/test_v04_physics.py` checks amplitude, frequency and phase). Free vibration: `omega0 = sqrt(k/m)`,
+damped `omega_d = omega0 sqrt(1 - zeta^2)`, successive peaks fall by `exp(-2 pi zeta / sqrt(1 - zeta^2))`.
+
+### Elastic bar, v0.4
+
+An axial spring `k = E A / L0` between two anchors (`rest length = installed length L0`), force `k (L - L0)`, tension positive,
+potential `1/2 k (L - L0)^2`. It joins the force elements; unlike the rigid rod it adds no constraint rows, so statically
+indeterminate trusses have a unique solution (the direct stiffness method; `mechsim.analysis.truss` is the reference).
+
+### Beam, v0.4
+
+A bendable beam of length `L`, section area `A`, second moment `I`, Young's modulus `E` is a chain of node bodies
+(x, y, phi each, i.e. exactly the unknowns of a beam finite element). Between neighbours i -> j a corotational
+Euler-Bernoulli element: with the chord `u = (p_j - p_i) / L`, `n = perp(u)`, the elongation `e = L - L0`, the chord rotation
+`dbeta` (angle from the undeformed chord to `u`) and the end rotations against the chord
+`theta_i = phi_i - phi0_i - dbeta`, `theta_j = phi_j - phi0_j - dbeta` (wrapped to +-pi):
+
+```
+U = (EA / 2 L0) e^2 + (EI / L0) (2 theta_i^2 + 2 theta_i theta_j + 2 theta_j^2)
+N = (EA / L0) e,   M_i = (EI / L0)(4 theta_i + 2 theta_j),   M_j = (EI / L0)(2 theta_i + 4 theta_j)
+F_i = +N u - ((M_i + M_j) / L) n,   F_j = -F_i,   tau_i = -M_i,   tau_j = -M_j
+```
+
+(`-dU/dq`; the shear pair comes from `d dbeta / d p = -+ n / L`; no net force or moment). Rigid-body motion costs nothing, for any
+rotation; for small deformations this is the exact stiffness matrix of the linear beam, so a cantilever with a load at its tip
+bends by `P L^3 / 3 E I` however few elements it has (and `P L^2 / 2 E I` at the tip). Mass is lumped: node k gets the mass
+of the slice of beam of its own half segments, and the rotary inertia `m (trib^2 + depth^2) / 12` (the end nodes
+`m (trib^2 / 3 + depth^2 / 12)`). Attachments get a node of their own, or are moved onto a node within 20 % of a segment
+and keep the small offset as a rigid lever in the frame of the node. The bending moment reported at a node is
+`-M_i` of the segment that starts there and `+M_j` of the one that ends there (the mean at a support), sagging positive; the stress
+`|N| / A + max(|M_i|, |M_j|) y_max / I`.
+
+Cross sections: `square` `A = a^2`, `I = a^4/12`. `I`: `A = 2 b tf + (h - 2 tf) tw`, `I = (b h^3 - (b - tw)(h - 2 tf)^3) / 12`.
+`H`: the same `A`, `I = (2 tf b^3 + (h - 2 tf) tw^3) / 12`. `T`: centroid `y_c` above the bottom of the stem,
+`I = sum (w h^3 / 12 + w h d^2)` over flange and stem (parallel axis). `L`: the same for leg and foot.
+`tests/native/test_section.cpp`, `tests/frontend/section.test.mjs` and `tests/python/test_section_parity.py` compare all three
+implementations with a decomposition into rectangles.
+
+Textbook checks in `tests/native/test_beam.cpp`: cantilever tip deflection and rotation, the same cantilever turned by 30 degrees,
+simply supported beam `5 q L^4 / 384 E I`, free fall and rest of rotated beams (no strain), conservation of momentum and angular momentum
+of a spinning free beam, frequency of a cantilever with a tip mass `omega = sqrt(3 E I / L^3 (M + 33/140 m))`.
+
+### Substeps for stiff elements, v0.4
+
+Semi-implicit Euler is stable for `omega dt < 2`, `omega` being the highest natural frequency of the force elements. Steel is
+stiff (a 2 m, 10 mm strip has modes up to some 10^3 rad/s, a steel bar of 1 kg nodes 10^4), so `World::initialize()` estimates it:
+`K = -df/dq` of the element forces by central differences, the largest eigenvalue of `M^-1/2 K M^-1/2` by power iteration
+(constraints can only lower it), times 1.15. `World::step(dt)` runs `ceil(omega dt / 0.25)` substeps (at most 2000). The energy error of
+the stiffest mode of a symplectic Euler step is a few per cent of what the mode carries at `omega dt = 0.25`; soft systems
+(`omega dt < 0.25`, every example before v0.4) take exactly one step as before.
+
 ### Solving
 
 M is diagonal, so the Schur complement is cheap:
@@ -184,3 +246,7 @@ Energy is not exactly conserved but stays bounded (oscillates with relative ampl
   `tests/validation/test_v03_physics.py`) with `I_cm = m (l² + w²) / 12`.
 - Rigid L of two welded bars on a Festlager: physical pendulum, `T = 2π √(I_A / (M g d))`.
 - Free fall with semi-implicit Euler from rest: `y_n = y_0 + g_y dt² n(n+1)/2` (exact for the scheme).
+- A 2 m cantilever (10 mm square steel strip) under a tip load P and its own weight q per metre:
+  `delta = P L^3 / 3 E I + q L^4 / 8 E I`; first mode `omega = 3.516 sqrt(E I / (rho A L^4))` (the lumped model: `sqrt(3 E I / (33/140 m L^3))`).
+- Simply supported beam of mid-span load P: `delta = P L^3 / 48 E I`, under its own weight `5 q L^4 / 384 E I`.
+- Statically determinate truss: `2 j = m + r`; member forces by the method of joints (equilibrium of every node).

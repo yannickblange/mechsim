@@ -63,3 +63,33 @@
   `u = (p_b - p_a) / |p_b - p_a|`: tension positive (the ends move apart), compression negative, so it always resists the
   relative motion. Force on a: `+F u`, on b: `-F u`. It has no relaxed length and stores no energy (it dissipates `c (dL/dt)^2`),
   so the total energy of a system with a damper decreases. Frame: `p1`, `p2`, `force`.
+
+## v0.4 additions
+
+- **Node** (`node`, a body): a point mass (`params.mass`, kg) where Stabs meet. Stabs, supports and loads attach at its centre,
+  `[0, 0]`. Its inertia is that of a disc of radius 0.05 m (the rotation is irrelevant). The editor makes nodes at the free ends of
+  Stabs: **a Stab is never pinned to empty space** (a Stab end with `"body": null` is a ground anchor, which in the editor exists
+  only on a Festlager in free space).
+- **Material**: one for every bar and beam, steel: Young's modulus **E = 210 GPa**, density **7850 kg/m^3** (default mass of a beam).
+- **Cross sections** (`section`, dimensions in m): `square` (`a`), `L` (`b`, `h`, `t`), `T` (`b`, `h`, `tf`, `tw`), `I` (`b`, `h`, `tf`, `tw`),
+  `H` (`b`, `h`, `tf`, `tw`). Seen along the member axis, "up" is the in-plane direction normal to the axis (the direction of
+  bending) and z the out-of-plane one: the L has a leg of height `h` up and a foot of width `b` at the bottom; the T a flange (`b`
+  wide, `tf` thick) on top of a stem (`tw` wide), total height `h`; the I two flanges (`b`, `tf`) at the top and bottom of a web (`tw`);
+  the H is the I turned by 90 degrees (weak axis). Bending in the simulation plane is about z: **I = integral of y^2 dA** about the
+  centroid, y along "up". The product of inertia of the L is neglected. The axis of a member is the line of the centroids.
+- **Bar** (`bar`, an element): an elastic Stab, a pin-ended two-force member with axial stiffness `E A / L0` (`L0` the installed
+  length: it starts unstressed). Frame: `force` (tension positive) and `stress` = force / A (Pa). The rigid `rod` stays a constraint.
+  Bending and buckling of bars are not modelled.
+- **Beam** (`beam`, a body): `params.length`, `params.section`, optional `params.mass` (default density x A x L) and `params.segments`
+  (finite elements, default 8). It lies along its local x axis; `position` is the point of the centroid axis at the middle, `angle`
+  the direction of the axis. Attachments (`body: <beam>`, body-local `point`, x within +-length/2) may be anywhere along it; the
+  engine gives the beam a node at each of them. Frame: `x`, `y`, `phi` of the middle, `nodes` (`[x, y, phi]` of every node),
+  `moments` (bending moment at every node, N m, **sagging positive**), `axial` (normal force per segment, tension positive),
+  `stress` (largest normal stress: axial plus bending, linear elastic, no yielding), `A`, `I`, `EA`, `EI`.
+- **Harmonic load** (`load` with `mode: "harmonic"`): `force` and `moment` are amplitudes, `frequency` f in Hz (angular frequency
+  Omega = 2 pi f), `phase` in rad: `F(t) = force * sin(2 pi f t + phase)`, the direction fixed in the world. Frames report the
+  instantaneous `vector` and `moment`, `force` is the amplitude. A harmonic load depends on time and does work on the system: it
+  has no potential and the energy is not conserved.
+- **Displacement graphs** (frontend): displacement = pose minus the pose at the start of the recording (t = 0), x and y in m (shown
+  in mm below 5 cm), rotation in degrees.
+- **Scene `view.bend`** (1, 10, 50 or 200): display only, shows the bending of beams that many times as large.

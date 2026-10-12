@@ -1,4 +1,5 @@
-"""The editor (frontend/js/editor/section.js) and the engine (core/section.cpp) compute the same sections."""
+"""The editor (frontend/js/editor/section.js), the engine (core/section.cpp) and the Python reference
+(mechsim.analysis.sections, a sum of rectangles) compute the same sections."""
 import json
 import shutil
 import subprocess
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from mechsim.analysis.sections import section_properties
 from mechsim.sim import Simulation
 
 REPO = Path(__file__).resolve().parents[2]
@@ -30,3 +32,6 @@ def test_area_and_inertia_agree_between_javascript_and_the_engine():
         assert beam["A"] == pytest.approx(case["area"], rel=1e-12), case["section"]
         assert beam["I"] == pytest.approx(case["inertia"], rel=1e-12), case["section"]
         assert beam["EI"] == pytest.approx(210e9 * case["inertia"], rel=1e-12)
+        reference = section_properties(case["section"])
+        assert reference["area"] == pytest.approx(case["area"], rel=1e-12), case["section"]
+        assert reference["inertia"] == pytest.approx(case["inertia"], rel=1e-9), case["section"]

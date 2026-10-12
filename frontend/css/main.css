@@ -348,6 +348,8 @@ input[type='text']:focus-visible {
 .props {
   position: absolute;
   z-index: 6;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
   width: 270px;
   padding: 12px;
   background: var(--c-panel);

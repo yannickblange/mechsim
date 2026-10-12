@@ -387,6 +387,7 @@ export class SceneModel {
   // Remember the camera so the saved layout opens with the same view. Not undoable.
   setView(view) {
     this.scene.view = { center: tidyPoint(view.center), width: tidy(view.width) };
+    if (view.bend && view.bend !== 1) this.scene.view.bend = view.bend;
   }
 
   // patch: { mass, width, height, radius, length, section, segments, angle, velocity: [vx, vy], omega }.

@@ -610,9 +610,8 @@ export class LinkTool extends Tool {
   get hint() {
     if (this.kind === 'rod') {
       return this.a
-        ? 'Click the second end: a mass, a node, a Festlager - or free space, which makes a node there.'
-        : 'Click the first end of the Stab: a mass, a node, a Festlager in free space - or free space, which makes a new node (Knoten). '
-          + 'Join Stabs in nodes to build a Fachwerk; a fixed point needs a Festlager.';
+        ? 'Click the second end: a mass, node, Festlager - or free space (a new node).'
+        : 'Click the first end: a mass, node, Festlager - or free space (a new node). Join Stabs in nodes for a Fachwerk.';
     }
     if (this.a) return 'Click the second end (or release after dragging from the first).';
     const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.'
@@ -702,8 +701,7 @@ export class LinkTool extends Tool {
 // their own nodes at free ends; this tool places one first (to put a support on it, say).
 export class NodeTool extends Tool {
   get hint() {
-    return 'Click to place a node (Knoten), where Stabs meet. Supports and forces can sit on it; '
-      + 'a Stab that ends in free space makes one by itself.';
+    return 'Click to place a node (Knoten) where Stabs meet; supports and forces can sit on it.';
   }
 
   pick(world) {

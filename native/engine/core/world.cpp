@@ -47,7 +47,7 @@ void World::initialize() {
     maxOmega_ = estimateMaxOmega(*this);
 }
 
-constexpr double kOmegaDtLimit = 0.5;  // omega * dt of a substep (the scheme is stable below 2)
+constexpr double kOmegaDtLimit = 0.25;  // omega * dt of a substep: stable below 2; the energy error of the stiffest mode grows with it
 constexpr int kMaxSubsteps = 2000;
 
 int World::substepsFor(double dt) const {

@@ -1,0 +1,122 @@
+{
+  "version": "0.4",
+  "name": "Harmonische Schwingung: undamped mass-spring oscillator",
+  "description": "A 1 kg block on rollers, a spring (k = 4 pi^2 N/m) to the wall, no damping. Released from rest 0.3 m from its equilibrium it oscillates harmonically: x(t) = 0.3 m cos(omega0 t) with omega0 = sqrt(k/m) = 2 pi rad/s, period T = 1 s, forever. Right-click the mass for its displacement graph.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.35
+    ],
+    "width": 5.6
+  },
+  "surfaces": [
+    {
+      "id": "floor",
+      "p1": [
+        -2.3,
+        0
+      ],
+      "p2": [
+        2.3,
+        0
+      ]
+    },
+    {
+      "id": "wallL",
+      "p1": [
+        -2.0,
+        0.6
+      ],
+      "p2": [
+        -2.0,
+        -0.1
+      ]
+    },
+    {
+      "id": "wallR",
+      "p1": [
+        2.0,
+        -0.1
+      ],
+      "p2": [
+        2.0,
+        0.6
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "mass",
+      "type": "block",
+      "position": [
+        0.3,
+        0.1
+      ],
+      "angle": 0,
+      "params": {
+        "mass": 1.0,
+        "width": 0.4,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "spring",
+      "type": "spring",
+      "a": {
+        "body": null,
+        "point": [
+          -2.0,
+          0.1
+        ]
+      },
+      "b": {
+        "body": "mass",
+        "point": [
+          -0.2,
+          0
+        ]
+      },
+      "params": {
+        "k": 39.478418,
+        "rest_length": 1.8
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "roller1",
+      "type": "roller_support",
+      "body": "mass",
+      "point": [
+        -0.2,
+        -0.1
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "roller2",
+      "type": "roller_support",
+      "body": "mass",
+      "point": [
+        0.2,
+        -0.1
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    }
+  ]
+}

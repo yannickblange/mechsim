@@ -12,9 +12,14 @@ pytestmark = pytest.mark.native
 ALL_SCENES = sorted(p.stem for p in (Path(__file__).resolve().parents[2] / "scenes").glob("*.json"))
 
 # A rope that snaps taut is an inelastic collision and a damper dissipates: energy is lost by design
-# (tests/validation/test_v03_physics.py and test_v03c_damper.py check what happens instead).
-DISSIPATIVE = {"rope_catch", "spring_damper"}
-SCENE_NAMES = [n for n in ALL_SCENES if n not in DISSIPATIVE]
+# (tests/validation/test_v03_physics.py and test_v03c_damper.py check what happens instead); a
+# harmonic force does work on the system (tests/validation/test_v04_physics.py checks the response).
+DISSIPATIVE = {"rope_catch", "spring_damper", "free_vibration", "forced_vibration"}
+# The drift is measured against the peak kinetic energy, which is (almost) zero for a structure at rest
+# and micro-joules for a stiff steel truss: tests/validation/test_v04_physics.py checks their energy
+# on the scale of the energy that moves.
+STRUCTURES = {"truss_bridge", "truss_elastic"}
+SCENE_NAMES = [n for n in ALL_SCENES if n not in DISSIPATIVE | STRUCTURES]
 
 # Semi-implicit Euler is first order: the energy error oscillates with a relative amplitude of
 # about omega*dt/2 (docs/formulation.md). The stiffest scene, pinned_block_spring (omega of about

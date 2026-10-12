@@ -85,6 +85,7 @@ export class Renderer {
   // the view does not jump while the user is working.
   setScene(scene, { fit = true } = {}) {
     this.scene = scene;
+    if (fit) this.bendScale = (scene.view && scene.view.bend) || 1; // a loaded scene may ask for exaggerated bending
     const byId = (list) => new Map((list || []).map((spec) => [spec.id, spec]));
     this.bodies = byId(scene.bodies);
     this.elements = byId(scene.elements);
@@ -95,7 +96,9 @@ export class Renderer {
 
   // Camera as a scene.view hint: { center, width }.
   getView() {
-    return { center: [...this.cam.center], width: this.cam.width / this.cam.scale };
+    const view = { center: [...this.cam.center], width: this.cam.width / this.cam.scale };
+    if (this.bendScale !== 1) view.bend = this.bendScale;
+    return view;
   }
 
   // scene.view if given, else the bounding box of bodies and ground anchors with 50 % padding.

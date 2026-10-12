@@ -17,6 +17,9 @@
   <canvas id="c3" width="900" height="300"></canvas>
   <h1>v0.3b supports spanning a gap to their surface</h1>
   <canvas id="c4" width="900" height="300"></canvas>
+  <h1>v0.4 symbols: node, Stabs with forces, elastic bar, beams (true and exaggerated), harmonic load, light and dark</h1>
+  <p><button id="toggle5" type="button">light / dark</button></p>
+  <canvas id="c5" width="900" height="420"></canvas>
   <script type="module">
     import { Camera } from '/js/canvas/camera.js';
     import { drawSpring } from '/js/canvas/symbols/spring.js';
@@ -183,6 +186,72 @@
     const a = Math.PI / 6;
     const slope = { p1: [2.8, -1.2], p2: [4.4, -0.28] };
     draw(drawPinSupport, slope, a, [3.5 - Math.sin(a) * -0.9, -0.8 + Math.cos(a) * 0.9 + 0.1]);
+  </script>
+  <script type="module">
+    // v0.4: node, Stab (rigid and elastic, tension / compression), beam, harmonic load; both colour schemes.
+    import { Camera } from '/js/canvas/camera.js';
+    import { Renderer } from '/js/canvas/renderer.js';
+    import { drawBeam } from '/js/canvas/symbols/beam.js';
+    import { drawLoad } from '/js/canvas/symbols/load.js';
+    import { drawNode } from '/js/canvas/symbols/node.js';
+    import { drawBar, drawRod } from '/js/canvas/symbols/rod.js';
+    import { drawPinSupport } from '/js/canvas/symbols/supports.js';
+
+    // The colour scheme comes from css/main.css like in the app.
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/css/main.css';
+    document.head.append(link);
+    await new Promise((resolve) => { link.onload = resolve; });
+    document.body.style.cssText = 'margin:16px; background: var(--c-bg); color: var(--c-ink); font-family: system-ui, sans-serif';
+
+    const canvas = document.getElementById('c5');
+    const ctx = canvas.getContext('2d');
+    const cam = new Camera();
+    cam.width = 900;
+    cam.height = 420;
+    cam.center = [0, 0];
+    cam.scale = 100;
+
+    function paint() {
+      const theme = Renderer.readTheme();
+      ctx.fillStyle = theme.background;
+      ctx.fillRect(0, 0, 900, 420);
+      cam.bendScale = 1;
+
+      // A little Fachwerk: nodes, a rigid Stab in tension, one in compression, an elastic bar, a Festlager.
+      const N = { A: [-4.2, 0.4], B: [-2.6, 0.4], C: [-3.4, 1.4] };
+      drawRod(ctx, cam, {}, { p1: N.A, p2: N.B, force: 1520 }, theme);
+      drawRod(ctx, cam, {}, { p1: N.A, p2: N.C, force: -1130 }, theme);
+      drawBar(ctx, cam, {}, { p1: N.C, p2: N.B, force: -250.5 }, theme);
+      Object.entries(N).forEach(([k, p]) => drawNode(ctx, cam, { id: k }, { x: p[0], y: p[1] }, theme));
+      drawPinSupport(ctx, cam, { params: { angle: 0 } }, { position: N.A }, theme);
+      drawBar(ctx, cam, {}, { p1: [-2.2, 0.4], p2: [-0.9, 0.9], force: 0 }, theme);
+      drawNode(ctx, cam, { id: 'free' }, { x: -2.2, y: 0.4 }, theme);
+
+      // Loads: constant, harmonic (arrow = value now, label = excitation).
+      drawLoad(ctx, cam, { params: { force: [0, -20] } }, { p1: [0.2, 1.7], vector: [0, -20], force: 20, mode: 'constant', active: true }, theme);
+      drawLoad(ctx, cam, { params: { force: [30, 0], mode: 'harmonic', frequency: 1.5 } }, { p1: [0.2, 0.6], vector: [21, 0], force: 30, mode: 'harmonic', active: true }, theme);
+
+      // Beams: straight (editor), bent (a deflected cantilever: a parabola with its slope), the same exaggerated
+      // 10 times, and a T beam turned by 30 degrees.
+      const spec = { id: 'beam', params: { length: 3, section: { type: 'square', a: 0.08 } } };
+      drawBeam(ctx, cam, spec, { x: -2.5, y: -0.3, phi: 0 }, theme);
+      const bent = [0, 0.75, 1.5, 2.25, 3].map((x) => [x, -0.18 * (x / 3) ** 2, Math.atan(-0.36 * x / 9)]);
+      const bentNode = (dx, dy) => ({ x: dx, y: dy, phi: 0, nodes: bent.map(([x, y, phi]) => [dx - 1.5 + x, dy + y, phi]), stress: 2.4e8 });
+      drawBeam(ctx, cam, { ...spec, id: 'bent' }, bentNode(-2.5, -1.0), theme);
+      cam.bendScale = 10;
+      drawBeam(ctx, cam, { ...spec, id: 'x10' }, bentNode(-2.5, -1.8), theme);
+      cam.bendScale = 1;
+      const tspec = { id: 'T', params: { length: 2.4, section: { type: 'T', b: 0.4, h: 0.4, tf: 0.06, tw: 0.06 } } };
+      drawBeam(ctx, cam, tspec, { x: 2.9, y: -0.4, phi: Math.PI / 6 }, theme);
+    }
+    paint();
+    document.getElementById('toggle5').addEventListener('click', () => {
+      const dark = document.documentElement.dataset.theme !== 'dark';
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      paint();
+    });
   </script>
 </body>
 </html>

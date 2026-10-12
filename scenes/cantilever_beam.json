@@ -1,0 +1,100 @@
+{
+  "version": "0.4",
+  "name": "Cantilever beam with a tip mass",
+  "description": "A thin steel strip (2 m long, 10 mm square, E = 210 GPa) clamped at the left end, with a 1 kg block at its tip. It sags under the weights and then swings (undamped) about the static deflection of about 0.2 m: the strip bends as an Euler-Bernoulli beam, the tip follows delta(t) = delta_static (1 - cos(omega t)) with omega = sqrt(3 E I / (L^3 (M + 0.24 m))) = 6.9 rad/s. The stress shown is the linear-elastic value (yielding is not modelled). Right-click the block for its displacement graph.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      1.0,
+      -0.4
+    ],
+    "width": 4.4
+  },
+  "surfaces": [
+    {
+      "id": "wall",
+      "p1": [
+        0,
+        0.8
+      ],
+      "p2": [
+        0,
+        -1.2
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "beam",
+      "type": "beam",
+      "position": [
+        1.0,
+        0.0
+      ],
+      "angle": 0,
+      "params": {
+        "length": 2.0,
+        "section": {
+          "type": "square",
+          "a": 0.01
+        },
+        "segments": 12
+      }
+    },
+    {
+      "id": "block",
+      "type": "block",
+      "position": [
+        2.05,
+        0.0
+      ],
+      "angle": 0,
+      "params": {
+        "mass": 1.0,
+        "width": 0.1,
+        "height": 0.1
+      }
+    }
+  ],
+  "elements": [],
+  "constraints": [
+    {
+      "id": "E1",
+      "type": "fixed_support",
+      "body": "beam",
+      "point": [
+        -1.0,
+        0.0
+      ],
+      "surface": "wall",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "W1",
+      "type": "fixed_joint",
+      "a": {
+        "body": "beam",
+        "point": [
+          1.0,
+          0.0
+        ]
+      },
+      "b": {
+        "body": "block",
+        "point": [
+          -0.05,
+          0.0
+        ]
+      },
+      "params": {}
+    }
+  ]
+}

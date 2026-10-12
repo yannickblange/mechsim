@@ -12,9 +12,14 @@ from mechsim.server.app import create_app
 from mechsim.server.mock import MockSimulation
 
 SCENES = [
+    "beam_i_section",
+    "cantilever_beam",
     "cantilever_clamp",
     "disc_spring_moment",
     "double_pendulum",
+    "forced_vibration",
+    "free_vibration",
+    "harmonic_oscillation",
     "impulse_pendulum",
     "incline_roller",
     "physical_pendulum",
@@ -23,6 +28,8 @@ SCENES = [
     "rope_catch",
     "single_mass_spring",
     "spring_damper",
+    "truss_bridge",
+    "truss_elastic",
     "two_mass_chain",
     "welded_pendulum",
 ]

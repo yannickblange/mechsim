@@ -210,7 +210,7 @@ function beamForm(body, draft) {
   const fields = [
     num('length', 'Length', 'm', length, { minExclusive: 0 }),
     ...sectionFields(section),
-    select('massMode', 'Mass', massMode, [['steel', 'Steel: 7850 kg/m³ x A x L'], ['given', 'Given']], { reshape: true }),
+    select('massMode', 'Mass', massMode, [['steel', 'Steel'], ['given', 'Given']], { reshape: true }),
   ];
   if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(p.mass ?? steelMass, 6), { minExclusive: 0 }));
   fields.push(
@@ -224,7 +224,7 @@ function beamForm(body, draft) {
   return {
     title: `Beam ${body.id}`,
     info: [
-      `${sectionInfo(section)} Mass ${fixed(m, 3)} kg.`,
+      `${sectionInfo(section)} Mass ${fixed(m, 3)} kg (steel: 7850 kg/m³ × A × L, or given).`,
       'Bends in the plane (Euler-Bernoulli, large rotations allowed). Supports, springs and loads may attach anywhere along it. '
         + 'The nodes are placed by the engine, evenly and at every attachment.',
     ],

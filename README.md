@@ -6,7 +6,9 @@ Loslager, Einspannung, Gelenk. v0.1 contains block masses, springs and the Festl
 editor (draw, simulate, save your own layouts) with rectangular and circular masses, surfaces, springs
 with a relaxed-length "ghost", constant and impulsive force/moment loads, Festlager, fixed Lager and Loslager.
 v0.3 adds rope (tension only, infinitely strong), Stab (rod), hinge and rigid joints, a Festlager in free space, a
-move tool and connection markers. v0.3c adds the damper (Dämpfer).
+move tool and connection markers. v0.3c adds the damper (Dämpfer). v0.4 adds displacement graphs, a light and a dark
+colour scheme, nodes (Knoten) and elastic bars for Fachwerke, bendable steel beams with square, L, T, H and I
+sections, harmonic loads and example scenes for free, harmonic and forced vibrations.
 
 ## Quick start
 
@@ -31,14 +33,37 @@ Click **Edit** (or **New**), then the floating **+** at the bottom left: its ico
 | Force / moment | press on a mass (centre, corner, edge snap) and drag for the force; a plain click adds a moment |
 | Festlager, fixed Lager, Loslager | two clicks: a point of a mass, then the surface it sits on. The symbol adapts to the surface angle and grows to span the distance between them. The Loslager needs a surface. A Festlager can also be placed in free space with one click |
 | Damper | click end A, click end B (a mass, a Festlager in free space, or the ground); set the damping c in its properties |
-| Rope, Stab | click end A, click end B (a mass, a Festlager in free space, or the ground). The rope never stretches but can go slack (set a longer length in its properties); the Stab takes push and pull |
+| Rope | click end A, click end B (a mass, a Festlager in free space, or the ground). The rope never stretches but can go slack (set a longer length in its properties) |
+| Stab | click end A, click end B: a mass, a node, a Festlager in free space - or free space itself, which makes a **node** (Knoten) there, so Stabs can be joined into a **Fachwerk**. A Stab is never pinned to empty space: a fixed point is a Festlager. It takes push and pull; give it a cross section in its properties to make it an elastic bar (axial stiffness E A / L) |
+| Node | click to place a Knoten (a point mass where Stabs meet); supports and forces can sit on it like on any mass |
+| Beam | drag along the axis: a bendable steel beam (Euler-Bernoulli). Right-click it for length, cross section (square, L, T, H, I and their dimensions), mass, start values. The toolbar's *Bending* selector shows the bending 10, 50 or 200 times as large |
 | Joint, rigid joint | click where two masses touch or overlap: a hinge (Gelenk) or a rigid connection. On a free-space Festlager it pins the mass that lies on it |
 | Move | drag a mass (with what is attached and the masses joined to it), a surface or a free-space Festlager; drag a support or load to re-place it, or the end of a spring / rope / Stab to attach it elsewhere. Shift: no grid snap |
 
 Right-click any object for its properties (mass, size, initial velocity, spring stiffness / relaxed length,
-constant or impulse load) and **Delete**; Ctrl/Cmd+Z undoes. **Save** stores the layout in `user_scenes/`
+constant, impulse or harmonic load, cross sections) and **Delete**; Ctrl/Cmd+Z undoes. **Save** stores the layout in `user_scenes/`
 (it then appears under *My layouts*); **Done** / **Play** send it to the engine. Dotted rings mark where things
 are joined; selecting an object outlines what it is connected to.
+
+## Graphs and colour schemes (v0.4)
+
+Right-click a **mass** (while the simulation is shown) or choose **Graph** in its properties (in the editor): a floating panel
+plots its displacement from the starting position against time (x and y, the magnitude, or the rotation), with a hover
+read-out, a time window and a CSV export. The data are the poses after *every* engine step (the server sends them with each
+frame), so fast vibrations are not aliased by the 60 Hz display. The panels can be dragged and resized.
+
+The default colour scheme is a white board with black lines, a grey grid and blue forces; **Dark** in the toolbar switches to a
+dark one (remembered in the browser).
+
+## Fachwerke and beams (v0.4)
+
+- *Fachwerk*: draw Stabs with the Stab tool (free ends become nodes, existing nodes are reused), put a Festlager and a Loslager
+  on nodes, a force on a node. While the simulation runs every Stab shows its force, tension blue and compression red.
+  Rigid Stabs give the forces of statically determinate trusses (method of joints); with cross sections the Stabs are elastic bars
+  and indeterminate trusses work too. Example scenes `truss_bridge`, `truss_elastic`.
+- *Beams*: Euler-Bernoulli with large rotations, one material (steel: E = 210 GPa, 7850 kg/m³), sections square, L, T, H, I.
+  Supports, springs, loads and joints attach anywhere along the beam. Example scenes `cantilever_beam`, `beam_i_section`.
+- *Vibrations*: example scenes `harmonic_oscillation`, `free_vibration`, `forced_vibration` (a harmonic load F sin(2π f t + φ)).
 
 ## Layout
 

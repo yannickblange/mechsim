@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 from mechsim import scene as scene_module
+from mechsim.analysis import truss
 from mechsim.sim import Simulation
 
 REPO = Path(__file__).resolve().parents[2]
@@ -219,55 +220,17 @@ def test_damper_made_with_the_tool_gives_terminal_velocity(scenes):
 # --- v0.4: Fachwerk, beam, forced vibration ---------------------------------------------------------
 
 
-def joint_equilibrium(scene):
-    """Member forces (tension positive) and reactions of the Fachwerk by the method of joints, solved
-    independently of the engine: for every node sum of member forces + reactions + loads + weight = 0."""
-    nodes = {b["id"]: b for b in scene["bodies"]}
-    index = {nid: i for i, nid in enumerate(nodes)}
-    members = [c for c in scene["constraints"] if c["type"] == "rod"]
-    members += [e for e in scene["elements"] if e["type"] == "bar"]
-    supports = [c for c in scene["constraints"] if c["type"] in ("pin_support", "roller_support")]
-    unknowns = len(members) + sum(2 if c["type"] == "pin_support" else 1 for c in supports)
-    A = np.zeros((2 * len(nodes), unknowns))
-    b = np.zeros(2 * len(nodes))
-    for k, m in enumerate(members):
-        pa = np.array(nodes[m["a"]["body"]]["position"], float)
-        pb = np.array(nodes[m["b"]["body"]]["position"], float)
-        u = (pb - pa) / np.linalg.norm(pb - pa)
-        # tension pulls a towards b and b towards a
-        A[2 * index[m["a"]["body"]]: 2 * index[m["a"]["body"]] + 2, k] += u
-        A[2 * index[m["b"]["body"]]: 2 * index[m["b"]["body"]] + 2, k] -= u
-    col = len(members)
-    for c in supports:
-        i = index[c["body"]]
-        if c["type"] == "pin_support":
-            A[2 * i, col] = 1
-            A[2 * i + 1, col + 1] = 1
-            col += 2
-        else:  # a Loslager on a horizontal floor reacts vertically
-            A[2 * i + 1, col] = 1
-            col += 1
-    for nid, body in nodes.items():
-        b[2 * index[nid] + 1] += body["params"]["mass"] * G  # A x = -(external forces): the weight (0, -m g) enters as +m g
-    for e in scene["elements"]:
-        if e["type"] == "load":
-            b[2 * index[e["body"]]: 2 * index[e["body"]] + 2] -= e["params"]["force"]
-    x, residual, rank, _ = np.linalg.lstsq(A, b, rcond=None)
-    return members, x, rank, unknowns, A, b
-
-
 @pytest.mark.native
 def test_fachwerk_member_forces_equal_the_method_of_joints(scenes):
     scene = scenes["fachwerk"]
-    members, x, rank, unknowns, A, b = joint_equilibrium(scene)
-    assert rank == unknowns == A.shape[0], "statically determinate: 2 j = m + r"
-    assert np.allclose(A @ x, b)
+    expected = truss.joint_forces(scene)  # raises unless statically determinate: 2 j = 7 members + 3 reactions
+    assert len(expected) == 7
     with Simulation(scene) as sim:
         sim.step(n=3)
         frame = sim.frame()
     forces = {c["id"]: c["force"] for c in frame["constraints"] if c["type"] == "rod"}
-    for k, m in enumerate(members):
-        assert forces[m["id"]] == pytest.approx(x[k], rel=1e-4, abs=1e-3), m["id"]
+    for sid, value in expected.items():
+        assert forces[sid] == pytest.approx(value, rel=1e-4, abs=1e-3), sid
     # the load is carried: the vertical reactions add up to the load and the node weights
     reactions = sum(c["reaction"][1] for c in frame["constraints"] if c["type"] in ("pin_support", "roller_support"))
     assert reactions == pytest.approx(1000 + 5 * 1.0 * G, rel=1e-5)
@@ -283,42 +246,12 @@ def test_fachwerk_member_forces_equal_the_method_of_joints(scenes):
 @pytest.mark.native
 def test_elastic_fachwerk_with_a_redundant_bar_matches_the_stiffness_method(scenes):
     scene = scenes["fachwerkElastic"]
-    nodes = {b["id"]: np.array(b["position"], float) for b in scene["bodies"]}
-    index = {nid: i for i, nid in enumerate(nodes)}
-    bars = [e for e in scene["elements"] if e["type"] == "bar"]
-    assert len(bars) == 8  # one more than a determinate truss needs
-    EA = 210e9 * 0.02**2
-    ndof = 2 * len(nodes)
-    K = np.zeros((ndof, ndof))
-    for bar in bars:
-        a, b = bar["a"]["body"], bar["b"]["body"]
-        d = nodes[b] - nodes[a]
-        L = np.linalg.norm(d)
-        u = d / L
-        k = EA / L * np.outer(u, u)
-        ia, ib = 2 * index[a], 2 * index[b]
-        K[ia:ia + 2, ia:ia + 2] += k
-        K[ib:ib + 2, ib:ib + 2] += k
-        K[ia:ia + 2, ib:ib + 2] -= k
-        K[ib:ib + 2, ia:ia + 2] -= k
-    f = np.zeros(ndof)
-    for nid, pos in nodes.items():
-        f[2 * index[nid] + 1] -= next(b for b in scene["bodies"] if b["id"] == nid)["params"]["mass"] * G
-    f[2 * index["N2"] + 1] -= 1000
-    # supports: pin on N1 (x, y), roller on N3 (y)
-    fixed = [2 * index["N1"], 2 * index["N1"] + 1, 2 * index["N3"] + 1]
-    free = [i for i in range(ndof) if i not in fixed]
-    u = np.zeros(ndof)
-    u[free] = np.linalg.solve(K[np.ix_(free, free)], f[free])
-    expected = {}
-    for bar in bars:
-        a, b = bar["a"]["body"], bar["b"]["body"]
-        d = nodes[b] - nodes[a]
-        L = np.linalg.norm(d)
-        elong = (d / L) @ (u[2 * index[b]:2 * index[b] + 2] - u[2 * index[a]:2 * index[a] + 2])
-        expected[bar["id"]] = EA / L * elong
-    # the bars start unstressed and oscillate about the static solution (a few MHz-ish: tens of kHz):
-    # the mean force over a few thousand steps is the static force
+    assert len([e for e in scene["elements"] if e["type"] == "bar"]) == 8  # one more than a determinate truss needs
+    with pytest.raises(ValueError):
+        truss.joint_forces(scene)  # statics alone cannot do it
+    expected = truss.stiffness_forces(scene)
+    # the bars start unstressed and oscillate about the static solution: the mean force over a few
+    # thousand steps is the static force
     sums = {k: 0.0 for k in expected}
     n = 3000
     with Simulation(scene) as sim:
@@ -329,8 +262,7 @@ def test_elastic_fachwerk_with_a_redundant_bar_matches_the_stiffness_method(scen
                     sums[e["id"]] += e["force"]
     for k, v in expected.items():
         assert sums[k] / n == pytest.approx(v, rel=0.03, abs=2.0), k
-    # at least one member is in compression and one in tension
-    assert min(expected.values()) < 0 < max(expected.values())
+    assert min(expected.values()) < 0 < max(expected.values())  # tension and compression
 
 
 @pytest.mark.native

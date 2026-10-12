@@ -58,7 +58,7 @@ public:
 
     // Advance by one step of size dt using solver.integrator. Advances `time`. A step is split into
     // substeps when dt * maxOmega() is large (stiff bars and beams): the semi-implicit Euler scheme is
-    // stable for omega * dt < 2, the substeps keep it below 0.5.
+    // stable for omega * dt < 2, the substeps keep it below 0.25.
     void step(double dt);
 
     // Restore initial body states, time = 0, re-run Constraint::initialize().

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hitTest } from '../../frontend/js/editor/hit.js';
+import { hitTest, massesAt } from '../../frontend/js/editor/hit.js';
 import { SceneModel } from '../../frontend/js/editor/model.js';
 import { applyProperties, propertyFields } from '../../frontend/js/editor/properties.js';
 import { block, close, closePoint, disc, sceneWith } from './helpers.mjs';
@@ -143,4 +143,28 @@ test('resizing through the form keeps attached points on the same features', () 
   applyProperties(m, 'big', { mass: '1', width: '2', height: '1', angle: '0', vx: '0', vy: '0', omega: '0' });
   closePoint(m.find('A1').obj.point, [-1, -0.5]);
   closePoint(m.find('F1').obj.point, [1, 0.5]);
+});
+
+// --- v0.4: right-click a mass while the simulation runs -------------------------------------------------
+
+test('massesAt finds a mass where it is now, even with a support or load on it', () => {
+  const m = new SceneModel(sceneWith({ bodies: [block('a', 0, 0.1, 0.4, 0.2), block('b', 3, 0.1, 0.4, 0.2)] }));
+  m.addSupport('pin_support', { body: 'a', point: [0, 0] });
+  m.addLoad({ body: 'a', point: [0, 0], force: [5, 0] });
+  // at rest: the centre of a is covered by a support and a load, hitTest picks those
+  assert.equal(hitTest(m.scene, [0, 0.1], 400).kind, 'constraint');
+  assert.deepEqual(massesAt(m.scene, null, [0, 0.1]), ['a']);
+  assert.deepEqual(massesAt(m.scene, null, [1.5, 0.1]), []);
+  // a has moved to x = 1 and turned: the frame says so, the scene does not
+  const frame = { bodies: [{ id: 'a', x: 1, y: 0.1, phi: Math.PI / 2 }, { id: 'b', x: 3, y: 0.1, phi: 0 }] };
+  assert.deepEqual(massesAt(m.scene, frame, [1, 0.25]), ['a'], 'turned: it is tall now');
+  assert.deepEqual(massesAt(m.scene, frame, [0.25, 0.1]), [], 'its old place is empty');
+  assert.deepEqual(massesAt(m.scene, frame, [3.1, 0.1]), ['b']);
+});
+
+test('massesAt lists the small mass on top first (nodes, then masses on larger masses)', () => {
+  const m = new SceneModel(sceneWith({ bodies: [block('big', 0, 0, 2, 1)] }));
+  m.addNode({ point: [0, 0] });
+  m.addBlock({ center: [0.1, 0], width: 0.3, height: 0.3 });
+  assert.deepEqual(massesAt(m.scene, null, [0.02, 0]), ['N1', 'm1', 'big']);
 });

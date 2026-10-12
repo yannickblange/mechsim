@@ -52,6 +52,22 @@ function lineDistance(p, ends, obj, scene) {
   return best;
 }
 
+// The masses under `world` as they are in `frame` (the running simulation; null = the scene as drawn),
+// smallest first: nodes, then small masses on top of large ones. A beam is taken as the straight beam
+// through its middle. Unlike hitTest, supports, loads and springs on a mass do not hide it: this is
+// what "right-click a mass" means while the simulation runs.
+export function massesAt(scene, frame, world) {
+  const poses = new Map(((frame && frame.bodies) || []).map((b) => [b.id, b]));
+  return scene.bodies
+    .map((spec) => {
+      const p = poses.get(spec.id);
+      return p ? { ...spec, position: [p.x, p.y], angle: p.phi } : spec;
+    })
+    .filter((b) => pointInBody(b, world))
+    .sort((a, b) => bodyArea(a) - bodyArea(b))
+    .map((b) => b.id);
+}
+
 // A Knoten (node) under the pointer: it sits where Stabs end, so it must win over them.
 function nodeAtPoint(scene, world, radius) {
   return [...scene.bodies].reverse().find((b) => b.type === 'node' && dist(b.position, world) <= radius) || null;
