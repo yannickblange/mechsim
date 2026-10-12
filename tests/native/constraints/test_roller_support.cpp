@@ -81,6 +81,17 @@ TEST_CASE("roller on a horizontal surface carries the weight and lets the body s
     REQUIRE_THAT(w.frame()["constraints"][0]["reaction"][1].get<double>(), WithinAbs(2.0 * 9.81, 1e-6));
 }
 
+TEST_CASE("the frame position of a roller follows the sliding body point", "[roller]") {
+    ms::World w = onSurface(0.0);
+    w.bodies[0].vel = {2.0, 0.0};
+    w.initialize();
+    for (int i = 0; i < 500; ++i) w.step(1e-3);
+    const auto frame = w.frame()["constraints"][0];
+    REQUIRE_THAT(frame["position"][0].get<double>(), WithinAbs(w.bodies[0].pos.x, 1e-9));
+    REQUIRE_THAT(frame["position"][0].get<double>(), WithinAbs(1.0, 1e-6));  // 2 m/s for 0.5 s
+    REQUIRE_THAT(frame["position"][1].get<double>(), WithinAbs(0.0, 1e-9));
+}
+
 TEST_CASE("roller factory validates its input", "[roller]") {
     ms::World w;
     ms::Body b;

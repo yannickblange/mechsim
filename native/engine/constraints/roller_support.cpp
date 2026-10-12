@@ -39,8 +39,11 @@ void RollerSupport::fill(const World& world, double* G, int cols, double* gamma)
 // G^T lambda is the force on the body, so the reaction is lambda * n (no friction).
 void RollerSupport::setMultipliers(const double* lambda) { reaction = lambda[0] * normal(); }
 
-void RollerSupport::writeFrame(const World& /*world*/, nlohmann::json& out) const {
-    out["position"] = {groundPoint.x, groundPoint.y};
+// The supported point slides along the surface, so the symbol follows the body: "position" is the
+// current world position of the body point (not the fixed groundPoint used by the constraint).
+void RollerSupport::writeFrame(const World& world, nlohmann::json& out) const {
+    const Vec2 p = world.bodies[body].toWorld(localPoint);
+    out["position"] = {p.x, p.y};
     out["reaction"] = {reaction.x, reaction.y};
 }
 

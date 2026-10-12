@@ -23,7 +23,7 @@ public:
     void initialize(const World& world) override;
     void fill(const World& world, double* G, int cols, double* gamma) const override;
     void setMultipliers(const double* lambda) override;
-    // Adds "position" (groundPoint) and "reaction" ([Fx, Fy]).
+    // Adds "position" (current world position of the body point, it slides) and "reaction" ([Fx, Fy]).
     void writeFrame(const World& world, nlohmann::json& out) const override;
 
     // Unit normal of the surface: (-sin angle, cos angle).

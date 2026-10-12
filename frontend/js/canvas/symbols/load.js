@@ -88,7 +88,7 @@ export function drawLoad(ctx, cam, spec, entry, theme) {
     ctx.font = '11px system-ui, sans-serif';
     ctx.textBaseline = 'bottom';
     const at = tip || [p[0] + MOMENT_RADIUS + 4, p[1] - MOMENT_RADIUS];
-    ctx.fillText(`${impulse ? 'Î ' : ''}${parts.join(', ')}`, at[0] + 6, at[1] - 4);
+    ctx.fillText(`${impulse ? 'impulse ' : ''}${parts.join(', ')}`, at[0] + 6, at[1] - 4);
   }
   ctx.restore();
 }

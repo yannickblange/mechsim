@@ -103,6 +103,10 @@ export class Renderer {
   }
 
   render(frame) {
+    // The canvas box also changes when the toolbar wraps (e.g. the edit controls appear), which
+    // fires no window resize event.
+    const box = this.canvas.getBoundingClientRect();
+    if (box.width !== this.cam.width || box.height !== this.cam.height) this.resize();
     const { ctx, cam, theme } = this;
     ctx.save();
     ctx.fillStyle = theme.background;

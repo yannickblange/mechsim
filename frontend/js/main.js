@@ -291,6 +291,9 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// Handle for debugging in the browser console (and for UI tests).
+window.__mechsim = { api, state, renderer, model, editor };
+
 renderer.resize();
 init();
 requestAnimationFrame(loop);

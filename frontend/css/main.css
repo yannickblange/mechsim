@@ -17,6 +17,7 @@
 
 body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   height: 100vh;
   margin: 0;
@@ -30,8 +31,9 @@ body {
 .statusbar {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 10px;
   padding: 6px 12px;
   background: var(--c-panel);
 }
@@ -160,7 +162,14 @@ input[type='text']:focus-visible {
 }
 
 #scene-name {
-  width: 160px;
+  width: 130px;
+}
+
+#btn-undo,
+#btn-redo {
+  padding: 4px 9px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 #btn-edit[aria-pressed='true'] {

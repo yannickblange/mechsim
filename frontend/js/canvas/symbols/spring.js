@@ -61,9 +61,11 @@ export function drawSpringGhost(ctx, cam, from, towards, restLength, theme) {
   const [ax, ay] = cam.toScreen(from);
   const [bx, by] = cam.toScreen(end);
 
+  // Lighter than the spring itself, so a ghost that lies on top of a longer installed spring is
+  // still distinguishable.
   ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.strokeStyle = theme.spring;
+  ctx.globalAlpha = 0.65;
+  ctx.strokeStyle = theme.ink;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   strokeSpring(ctx, ax, ay, bx, by);

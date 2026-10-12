@@ -31,11 +31,14 @@ function label(ctx, cam, theme, worldPoint, text) {
   ctx.save();
   ctx.font = '12px system-ui, sans-serif';
   const w = ctx.measureText(text).width + 10;
+  // Right of and above the point; flipped to the other side when it would leave the canvas.
+  const left = x + 12 + w > cam.width - 4 ? x - 12 - w : x + 12;
+  const top = Math.max(4, y - 30);
   ctx.fillStyle = 'rgba(20, 30, 25, 0.85)';
-  ctx.fillRect(x + 12, y - 30, w, 20);
+  ctx.fillRect(left, top, w, 20);
   ctx.fillStyle = theme.ink;
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + 17, y - 20);
+  ctx.fillText(text, left + 5, top + 10);
   ctx.restore();
 }
 
