@@ -97,3 +97,57 @@ def test_apply_and_save_v03_scene_through_the_api(tmp_path, monkeypatch):
         broken["constraints"][4]["a"]["body"] = "e"
         r = client.post("/api/scene/apply", json={"scene": broken})
         assert r.status_code == 422 and "same mass" in r.json()["detail"]
+
+
+# --- damper (v0.3c) ---------------------------------------------------------------------------------------
+
+
+def with_damper():
+    s = base03()
+    s["elements"] = [
+        {"id": "c1", "type": "damper", "a": {"body": None, "point": [2.0, 1.5]}, "b": {"body": "c", "point": [0, 0]}, "params": {"c": 3.0}}
+    ]
+    return s
+
+
+def test_damper_validates():
+    assert scene.validate_scene(with_damper()) == []
+
+
+@pytest.mark.parametrize(
+    "mutate, fragment",
+    [
+        (lambda s: s["elements"][0]["params"].update(c=-1), "c"),
+        (lambda s: s["elements"][0]["params"].pop("c"), "c"),
+        (lambda s: s["elements"][0]["params"].update(rest_length=1), "rest_length"),
+        (lambda s: s["elements"][0].update(body="c"), "body"),
+        (lambda s: s["elements"][0].pop("b"), "b"),
+    ],
+)
+def test_damper_invalid_variants(mutate, fragment):
+    s = with_damper()
+    mutate(s)
+    errors = scene.validate_scene(s)
+    assert errors and any(fragment in e for e in errors), errors
+
+
+@pytest.mark.parametrize(
+    "mutate, fragment",
+    [
+        (lambda s: s["elements"][0]["b"].update(body="ghost"), "unknown body 'ghost'"),
+        (lambda s: s["elements"][0].update(a={"body": None, "point": [0, 0]}, b={"body": None, "point": [1, 1]}), "two points of the ground"),
+        (lambda s: s["elements"][0].update(a={"body": "c", "point": [0, 0]}, b={"body": "c", "point": [0.1, 0]}), "same mass"),
+    ],
+)
+def test_damper_reference_errors(mutate, fragment):
+    s = with_damper()
+    mutate(s)
+    assert any(fragment in e for e in scene.validate_scene(s)), scene.validate_scene(s)
+
+
+def test_mock_frame_of_a_damper(state_schema):
+    sim = MockSimulation(with_damper())
+    sim.step(n=2)
+    frame = sim.frame()
+    jsonschema.validate(frame, state_schema)
+    assert frame["elements"][0]["type"] == "damper"

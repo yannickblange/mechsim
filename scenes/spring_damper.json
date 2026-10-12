@@ -1,0 +1,104 @@
+{
+  "version": "0.3",
+  "name": "Spring and damper in parallel",
+  "description": "A mass hangs from the ceiling on a spring; a damper below it (c = 8 N s/m, damping ratio 0.2) acts in parallel to the spring. Released 0.4 m below its relaxed position, it oscillates with a decaying amplitude about the static equilibrium.",
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.5
+    ],
+    "width": 3.0
+  },
+  "surfaces": [
+    {
+      "id": "ceiling",
+      "p1": [
+        0.8,
+        1.5
+      ],
+      "p2": [
+        -0.8,
+        1.5
+      ]
+    },
+    {
+      "id": "floor",
+      "p1": [
+        -0.8,
+        -0.6
+      ],
+      "p2": [
+        0.8,
+        -0.6
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "mass",
+      "type": "block",
+      "position": [
+        0.0,
+        0.2
+      ],
+      "params": {
+        "mass": 2.0,
+        "width": 0.4,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "k1",
+      "type": "spring",
+      "a": {
+        "body": null,
+        "point": [
+          0.0,
+          1.5
+        ]
+      },
+      "b": {
+        "body": "mass",
+        "point": [
+          0.0,
+          0.1
+        ]
+      },
+      "params": {
+        "k": 200.0,
+        "rest_length": 0.8
+      }
+    },
+    {
+      "id": "c1",
+      "type": "damper",
+      "a": {
+        "body": null,
+        "point": [
+          0.0,
+          -0.6
+        ]
+      },
+      "b": {
+        "body": "mass",
+        "point": [
+          0.0,
+          -0.1
+        ]
+      },
+      "params": {
+        "c": 8.0
+      }
+    }
+  ],
+  "constraints": []
+}

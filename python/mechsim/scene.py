@@ -104,9 +104,16 @@ def check_references(scene: dict[str, Any]) -> list[str]:
             errors.append(f"'{owner}' refers to unknown body '{body_id}'")
 
     for element in elements:
-        if element["type"] == "spring":
-            need_body(element["id"], element["a"]["body"])
-            need_body(element["id"], element["b"]["body"])
+        if element["type"] in ("spring", "damper"):
+            ends = [element["a"]["body"], element["b"]["body"]]
+            for end in ends:
+                need_body(element["id"], end)
+            if element["type"] == "damper":
+                if ends[0] == ends[1]:
+                    errors.append(
+                        f"'{element['id']}' connects "
+                        + ("the same mass to itself" if ends[0] is not None else "two points of the ground")
+                    )
         else:
             need_body(element["id"], element["body"])
     for constraint in constraints:

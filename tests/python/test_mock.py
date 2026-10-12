@@ -15,6 +15,7 @@ SCENE_NAMES = [
     "disc_spring_moment",
     "double_pendulum",
     "rod_truss",
+    "spring_damper",
     "rope_catch",
     "welded_pendulum",
     "impulse_pendulum",

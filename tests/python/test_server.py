@@ -22,6 +22,7 @@ SCENES = [
     "rod_truss",
     "rope_catch",
     "single_mass_spring",
+    "spring_damper",
     "two_mass_chain",
     "welded_pendulum",
 ]

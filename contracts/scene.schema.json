@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
   "title": "MechSim scene v0.3",
-  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints and Festlager in free space. Version 0.1 and 0.2 scenes remain valid.",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper. Version 0.1 and 0.2 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
@@ -133,7 +133,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["spring", "load"] },
+        "type": { "enum": ["spring", "load", "damper"] },
         "a": { "$ref": "#/$defs/anchor" },
         "b": { "$ref": "#/$defs/anchor" },
         "body": { "$ref": "#/$defs/id", "description": "load: the body the load acts on." },
@@ -147,6 +147,14 @@
             "required": ["a", "b"],
             "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }] },
             "properties": { "params": { "$ref": "#/$defs/springParams" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "damper" } } },
+          "then": {
+            "required": ["a", "b"],
+            "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }] },
+            "properties": { "params": { "$ref": "#/$defs/damperParams" } }
           }
         },
         {
@@ -169,6 +177,18 @@
           "type": "number",
           "minimum": 0,
           "description": "Relaxed length. If omitted, the initial distance between a and b is used. If it differs from the initial distance the spring starts loaded: tension (pulls the ends together) when the initial distance is larger, compression when it is smaller."
+        }
+      }
+    },
+    "damperParams": {
+      "type": "object",
+      "required": ["c"],
+      "additionalProperties": false,
+      "properties": {
+        "c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Damping coefficient in N s / m: the force is c times the rate of change of the length between the ends (tension while they move apart). At least one end on a mass, the ends on different masses."
         }
       }
     },

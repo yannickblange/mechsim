@@ -11,9 +11,9 @@ pytestmark = pytest.mark.native
 
 ALL_SCENES = sorted(p.stem for p in (Path(__file__).resolve().parents[2] / "scenes").glob("*.json"))
 
-# A rope that snaps taut is an inelastic collision: energy is lost by design (see
-# tests/validation/test_v03_physics.py for what is checked instead).
-DISSIPATIVE = {"rope_catch"}
+# A rope that snaps taut is an inelastic collision and a damper dissipates: energy is lost by design
+# (tests/validation/test_v03_physics.py and test_v03c_damper.py check what happens instead).
+DISSIPATIVE = {"rope_catch", "spring_damper"}
 SCENE_NAMES = [n for n in ALL_SCENES if n not in DISSIPATIVE]
 
 # Semi-implicit Euler is first order: the energy error oscillates with a relative amplitude of

@@ -10,6 +10,7 @@
 #include "../constraints/link.hpp"
 #include "../constraints/pin_support.hpp"
 #include "../constraints/roller_support.hpp"
+#include "../elements/damper.hpp"
 #include "../elements/load.hpp"
 #include "../elements/spring.hpp"
 
@@ -28,6 +29,7 @@ ElementFactoryFn findElementType(const std::string& type) {
     static const std::map<std::string, ElementFactoryFn> table = {
         {"spring", &makeSpring},
         {"load", &makeLoad},
+        {"damper", &makeDamper},
     };
     auto it = table.find(type);
     return it == table.end() ? nullptr : it->second;
