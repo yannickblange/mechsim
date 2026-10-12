@@ -19,6 +19,7 @@ import { Renderer } from './canvas/renderer.js';
 import { Editor } from './editor/editor.js';
 import { SceneModel } from './editor/model.js';
 import { slugify } from './editor/names.js';
+import { applyTheme, currentTheme, otherTheme } from './theme.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -48,6 +49,7 @@ const ui = {
   save: $('btn-save'),
   undo: $('btn-undo'),
   redo: $('btn-redo'),
+  theme: $('btn-theme'),
 };
 
 let userScenes = [];
@@ -83,6 +85,9 @@ function updateUi() {
   ui.edit.textContent = editing ? 'Done' : 'Edit';
   ui.edit.setAttribute('aria-pressed', String(editing));
   ui.editControls.hidden = !editing;
+  const dark = currentTheme() === 'dark';
+  ui.theme.textContent = dark ? 'Light' : 'Dark';
+  ui.theme.setAttribute('aria-pressed', String(dark));
   ui.undo.disabled = !model.canUndo;
   ui.redo.disabled = !model.canRedo;
   showError(state.lastError);
@@ -271,6 +276,11 @@ ui.edit.addEventListener('click', () => {
   if (state.editing) leaveEdit();
   else if (state.scene) enterEdit(state.scene, state.scene.name ?? state.sceneName, { source: state.sceneSource, name: state.sceneName });
   else enterEdit(SceneModel.emptyScene(), '');
+});
+ui.theme.addEventListener('click', () => {
+  applyTheme(otherTheme(currentTheme()));
+  renderer.refreshTheme();
+  updateUi();
 });
 ui.newScene.addEventListener('click', newLayout);
 ui.save.addEventListener('click', saveLayout);

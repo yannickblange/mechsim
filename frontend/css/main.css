@@ -1,15 +1,53 @@
-/* main.css - blackboard look (lecture-hall board with chalk colours). */
+/* main.css - colour tokens first: the light scheme (white board, black lines, grey grid, blue forces)
+   is the default, [data-theme='dark'] overrides it. Canvas colours are read from these variables by
+   Renderer.readTheme(), so a theme switch only has to call renderer.refreshTheme(). */
 :root {
-  --c-bg: #22332b;
-  --c-panel: #1a2620;
-  --c-grid: rgba(233, 238, 228, 0.07);
-  --c-ink: #e9eee4;
-  --c-muted: #9fb0a4;
-  --c-spring: #f0c96a;
-  --c-support: #9cc3e6;
-  --c-force: #e8868a;
-  --c-rope: #dcae78;
-  --c-damper: #8fd1c0;
+  --c-bg: #ffffff;
+  --c-panel: #f2f3f5;
+  --c-grid: #e7e7e7;
+  --c-grid-major: #cbcbcb;
+  --c-axis: #8f8f8f;
+  --c-ink: #111111;
+  --c-muted: #5b6168;
+  --c-spring: #111111;
+  --c-support: #111111;
+  --c-rope: #111111;
+  --c-damper: #111111;
+  --c-force: #1565c0;
+  --c-compression: #c62828;
+  --c-accent: #1e88e5;
+  --c-on-accent: #ffffff;
+  --c-danger: #c62828;
+  --c-label-bg: rgba(255, 255, 255, 0.92);
+  --c-shadow: rgba(0, 0, 0, 0.22);
+  --c-plot-1: #1565c0;
+  --c-plot-2: #d9480f;
+  --c-plot-3: #2b8a3e;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --c-bg: #15171c;
+  --c-panel: #1f2229;
+  --c-grid: #232730;
+  --c-grid-major: #353c49;
+  --c-axis: #66707f;
+  --c-ink: #eceff4;
+  --c-muted: #98a1ad;
+  --c-spring: #eceff4;
+  --c-support: #eceff4;
+  --c-rope: #eceff4;
+  --c-damper: #eceff4;
+  --c-force: #5aa9ff;
+  --c-compression: #ff7b72;
+  --c-accent: #6db3ff;
+  --c-on-accent: #0b1220;
+  --c-danger: #ff7b72;
+  --c-label-bg: rgba(21, 23, 28, 0.92);
+  --c-shadow: rgba(0, 0, 0, 0.6);
+  --c-plot-1: #6db3ff;
+  --c-plot-2: #ff9f6b;
+  --c-plot-3: #69d086;
   color-scheme: dark;
 }
 
@@ -38,6 +76,14 @@ body {
   gap: 8px 10px;
   padding: 6px 12px;
   background: var(--c-panel);
+}
+
+.toolbar {
+  border-bottom: 1px solid var(--c-grid-major);
+}
+
+.statusbar {
+  border-top: 1px solid var(--c-grid-major);
 }
 
 .app-name {
@@ -75,7 +121,7 @@ button:hover:not(:disabled) {
 
 button:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--c-support);
+  outline: 2px solid var(--c-accent);
   outline-offset: 1px;
 }
 
@@ -111,7 +157,7 @@ select:disabled {
 }
 
 #conn[data-connected="true"] {
-  color: var(--c-support);
+  color: var(--c-accent);
 }
 
 #conn[data-connected="false"] {
@@ -133,11 +179,6 @@ select:disabled {
 }
 
 /* --- v0.2: layout editor ------------------------------------------------------------------- */
-:root {
-  --c-accent: #9cc3e6;
-  --c-danger: #e8868a;
-}
-
 .edit-controls {
   display: flex;
   align-items: center;
@@ -159,7 +200,7 @@ input[type='text'] {
 }
 
 input[type='text']:focus-visible {
-  outline: 2px solid var(--c-support);
+  outline: 2px solid var(--c-accent);
   outline-offset: 1px;
 }
 
@@ -175,9 +216,9 @@ input[type='text']:focus-visible {
 }
 
 #btn-edit[aria-pressed='true'] {
-  background: var(--c-support);
-  color: var(--c-panel);
-  border-color: var(--c-support);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
 }
 
 /* Hovering "+" that slides the component icons out horizontally. */
@@ -203,15 +244,15 @@ input[type='text']:focus-visible {
   padding: 0;
   font-size: 30px;
   line-height: 1;
-  background: var(--c-support);
-  color: var(--c-panel);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
   border: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 14px var(--c-shadow);
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s;
 }
 
 .fab:hover:not(:disabled) {
-  background: #b6d4ee;
+  filter: brightness(1.12);
 }
 
 .toolbox[data-open='true'] .fab {
@@ -233,7 +274,7 @@ input[type='text']:focus-visible {
   place-items: center;
   border-radius: 50%;
   background: var(--c-panel);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 3px 10px var(--c-shadow);
   opacity: 0;
   transform: translateX(-34px) scale(0.5);
   pointer-events: none;
@@ -249,9 +290,9 @@ input[type='text']:focus-visible {
 }
 
 .tool[aria-pressed='true'] {
-  background: var(--c-support);
-  color: var(--c-panel);
-  border-color: var(--c-support);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
 }
 
 .tool .tip {
@@ -283,7 +324,7 @@ input[type='text']:focus-visible {
   max-width: calc(100% - 32px);
   padding: 5px 12px;
   border-radius: 14px;
-  background: rgba(26, 38, 32, 0.92);
+  background: var(--c-label-bg);
   color: var(--c-muted);
   font-size: 12px;
   pointer-events: none;
@@ -306,7 +347,7 @@ input[type='text']:focus-visible {
   background: var(--c-panel);
   border: 1px solid var(--c-muted);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px var(--c-shadow);
 }
 
 .props[hidden] {
@@ -360,9 +401,9 @@ input[type='text']:focus-visible {
 }
 
 .props-buttons .primary {
-  background: var(--c-support);
-  color: var(--c-panel);
-  border-color: var(--c-support);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
 }
 
 .props-buttons .danger {

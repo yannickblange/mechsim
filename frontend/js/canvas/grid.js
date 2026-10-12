@@ -40,14 +40,13 @@ export function drawGrid(ctx, cam, theme) {
   sweep(x0, x1, minor, (x, i) => { if (!isMajor(i)) vertical(x); });
   sweep(yBottom, yTop, minor, (y, i) => { if (!isMajor(i)) horizontal(y); });
 
-  // Major lines are drawn twice for a stronger effect.
-  for (let pass = 0; pass < 2; pass++) {
-    sweep(x0, x1, major, vertical);
-    sweep(yBottom, yTop, major, horizontal);
-  }
+  // Major lines (every metre) in their own, darker grey.
+  ctx.strokeStyle = theme.gridMajor;
+  sweep(x0, x1, major, vertical);
+  sweep(yBottom, yTop, major, horizontal);
 
   // Axes through the origin.
-  ctx.strokeStyle = theme.muted;
+  ctx.strokeStyle = theme.axis;
   vertical(0);
   horizontal(0);
   ctx.restore();

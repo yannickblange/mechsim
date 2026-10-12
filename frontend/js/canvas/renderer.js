@@ -6,15 +6,23 @@ import {
 } from './symbols/index.js';
 
 const THEME_VARS = {
-  background: ['--c-bg', '#22332b'],
-  grid: ['--c-grid', 'rgba(233,238,228,0.07)'],
-  ink: ['--c-ink', '#e9eee4'],
-  muted: ['--c-muted', '#9fb0a4'],
-  spring: ['--c-spring', '#f0c96a'],
-  support: ['--c-support', '#9cc3e6'],
-  force: ['--c-force', '#e8868a'],
-  rope: ['--c-rope', '#dcae78'],
-  damper: ['--c-damper', '#8fd1c0'],
+  background: ['--c-bg', '#ffffff'],
+  grid: ['--c-grid', '#e7e7e7'],
+  gridMajor: ['--c-grid-major', '#cbcbcb'],
+  axis: ['--c-axis', '#8f8f8f'],
+  ink: ['--c-ink', '#111111'],
+  muted: ['--c-muted', '#5b6168'],
+  spring: ['--c-spring', '#111111'],
+  support: ['--c-support', '#111111'],
+  accent: ['--c-accent', '#1e88e5'],
+  force: ['--c-force', '#1565c0'],
+  compression: ['--c-compression', '#c62828'],
+  rope: ['--c-rope', '#111111'],
+  damper: ['--c-damper', '#111111'],
+  labelBg: ['--c-label-bg', 'rgba(255,255,255,0.92)'],
+  plot1: ['--c-plot-1', '#1565c0'],
+  plot2: ['--c-plot-2', '#d9480f'],
+  plot3: ['--c-plot-3', '#2b8a3e'],
 };
 
 const SUPPORT_TYPES = ['pin_support', 'fixed_support', 'roller_support'];
@@ -64,6 +72,11 @@ export class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.cam.width = rect.width;
     this.cam.height = rect.height;
+  }
+
+  // Re-read the colours after a light / dark switch.
+  refreshTheme() {
+    this.theme = Renderer.readTheme();
   }
 
   // fit: move the camera to the scene (scene.view or the bounding box). The editor passes false so

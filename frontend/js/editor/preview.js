@@ -44,7 +44,7 @@ function drawConnections(ctx, cam, theme, scene) {
   for (const c of connectionPoints(scene)) {
     const [x, y] = cam.toScreen(c.point);
     if (c.hub) {
-      ctx.strokeStyle = theme.support;
+      ctx.strokeStyle = theme.accent;
       ctx.globalAlpha = 0.55;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -53,7 +53,7 @@ function drawConnections(ctx, cam, theme, scene) {
       ctx.setLineDash([]);
       if (c.items.length >= 3) {
         ctx.globalAlpha = 0.9;
-        ctx.fillStyle = theme.support;
+        ctx.fillStyle = theme.accent;
         ctx.font = '10px system-ui, sans-serif';
         ctx.fillText(String(c.items.length), x + 12, y - 10);
       }
@@ -135,7 +135,7 @@ function label(ctx, cam, theme, worldPoint, text) {
   // Right of and above the point; flipped to the other side when it would leave the canvas.
   const left = x + 12 + w > cam.width - 4 ? x - 12 - w : x + 12;
   const top = Math.max(4, y - 30);
-  ctx.fillStyle = 'rgba(20, 30, 25, 0.85)';
+  ctx.fillStyle = theme.labelBg;
   ctx.fillRect(left, top, w, 20);
   ctx.fillStyle = theme.ink;
   ctx.textBaseline = 'middle';
@@ -201,7 +201,7 @@ function drawToolPreview(ctx, cam, theme, pv, scene) {
           // the surface the support would sit on
           ctx.globalAlpha = 0.5;
           ctx.lineWidth = 5;
-          ctx.strokeStyle = theme.support;
+          ctx.strokeStyle = theme.accent;
           const [ax, ay] = cam.toScreen(surface.p1);
           const [bx, by] = cam.toScreen(surface.p2);
           ctx.beginPath();
@@ -222,7 +222,7 @@ function drawMarker(ctx, cam, theme, marker) {
   const r = 6;
   ctx.save();
   ctx.lineWidth = 1.8;
-  ctx.strokeStyle = marker.kind === 'invalid' ? theme.force : theme.support;
+  ctx.strokeStyle = marker.kind === 'invalid' ? theme.compression : theme.accent;
   ctx.beginPath();
   switch (marker.kind) {
     case 'center': // circle with a cross: centre of mass
@@ -265,8 +265,8 @@ function drawMarker(ctx, cam, theme, marker) {
 function drawSelection(ctx, cam, theme, scene, sel) {
   const find = (list) => list.find((o) => o.id === sel.id);
   ctx.save();
-  ctx.strokeStyle = theme.support;
-  ctx.fillStyle = theme.support;
+  ctx.strokeStyle = theme.accent;
+  ctx.fillStyle = theme.accent;
   ctx.lineWidth = 3;
   ctx.globalAlpha = 0.55;
   ctx.setLineDash([7, 4]);

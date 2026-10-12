@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MechSim</title>
   <link rel="stylesheet" href="/css/main.css">
+  <script>
+    /* Apply the remembered colour scheme before the first paint (no white flash in dark mode). */
+    try { document.documentElement.dataset.theme = localStorage.getItem('mechsim.theme') === 'dark' ? 'dark' : 'light'; } catch (e) {}
+  </script>
 </head>
 <body>
   <!-- Element ids are part of the frontend contract: main.js depends on them. Do not rename.
@@ -43,6 +47,8 @@
         <option value="2">2×</option>
       </select>
     </label>
+
+    <button id="btn-theme" type="button" aria-pressed="false" title="Switch between the light and the dark colour scheme">Dark</button>
   </header>
 
   <main class="stage">
