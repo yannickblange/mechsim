@@ -23,6 +23,8 @@
   --c-plot-1: #1565c0;
   --c-plot-2: #d9480f;
   --c-plot-3: #2b8a3e;
+  --c-fab-bg: #232d4b;
+  --c-fab-fg: #ffd24d;
   color-scheme: light;
 }
 
@@ -48,6 +50,8 @@
   --c-plot-1: #6db3ff;
   --c-plot-2: #ff9f6b;
   --c-plot-3: #69d086;
+  --c-fab-bg: #ffd24d;
+  --c-fab-fg: #232d4b;
   color-scheme: dark;
 }
 
@@ -105,7 +109,138 @@ body {
 
 .transport {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+/* --- v0.5: icon controls, time bar, floating dark-mode button -------------------------------- */
+.ico {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 30px;
+  padding: 0;
+}
+
+.icon-btn .ico-pause,
+.icon-btn[data-state='pause'] .ico-play {
+  display: none;
+}
+
+.icon-btn[data-state='pause'] .ico-pause {
+  display: block;
+}
+
+#btn-play {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: var(--c-on-accent);
+}
+
+#btn-play:hover:not(:disabled) {
+  filter: brightness(1.1);
+  border-color: var(--c-accent);
+}
+
+.ico-speed {
+  width: 16px;
+  height: 16px;
+}
+
+.timeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  color: var(--c-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline input[type='range'] {
+  width: clamp(120px, 22vw, 340px);
+  margin: 0;
+  accent-color: var(--c-accent);
+}
+
+.timeline input[type='range']:not(:disabled) {
+  cursor: pointer;
+}
+
+.clock output {
+  color: var(--c-ink);
+}
+
+#t-max {
+  width: 64px;
+  padding: 3px 6px;
+  text-align: right;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  border: 1px solid var(--c-muted);
+  border-radius: 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+#t-max:focus-visible,
+input[type='range']:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+#t-max[aria-invalid='true'] {
+  border-color: var(--c-danger);
+}
+
+#t-max:disabled {
+  opacity: 0.4;
+}
+
+.theme-fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--c-fab-bg);
+  color: var(--c-fab-fg);
+  box-shadow: 0 4px 14px var(--c-shadow);
+  transition: background 0.45s, color 0.45s, transform 0.15s;
+}
+
+.theme-fab:hover:not(:disabled) {
+  transform: scale(1.07);
+}
+
+.theme-fab .ico {
+  width: 26px;
+  height: 26px;
+  transform: rotate(0deg);
+  transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+:root[data-theme='dark'] .theme-fab .ico {
+  transform: rotate(360deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-fab,
+  .theme-fab .ico {
+    transition: none;
+  }
 }
 
 button,

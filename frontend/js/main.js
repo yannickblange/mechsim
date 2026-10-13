@@ -6,7 +6,7 @@
 //                                   connect(onMessage, onConnectionChange), send(cmd, extra)
 //   AppState  (state.js)            setScene(name, scene, source), applyMessage(msg), setConnected(bool),
 //                                   subscribe(fn); fields sceneName, sceneSource, scene, frame, running,
-//                                   speed, mode, connected, lastError, editing
+//                                   speed, tMax, finished, mode, connected, lastError, editing
 //   Renderer  (canvas/renderer.js)  setScene(scene, {fit}), render(frame | null), resize(), getView()
 //   Editor    (editor/editor.js)    enable(), disable()  - the layout editor (v0.2)
 //   SceneModel(editor/model.js)     the scene being edited
@@ -41,6 +41,8 @@ const ui = {
   step: $('btn-step'),
   reset: $('btn-reset'),
   speed: $('speed'),
+  timeline: $('timeline'),
+  tMax: $('t-max'),
   time: $('time'),
   eKin: $('e-kin'),
   ePot: $('e-pot'),
@@ -60,6 +62,14 @@ const ui = {
   bend: $('bend-scale'),
 };
 
+const TIMELINE_STEPS = 1000; // resolution of the time bar
+const T_MAX_RANGE = [0.1, 600]; // s, as the server clamps it
+const SEEK_INTERVAL_MS = 60; // at most this often while dragging the time bar
+let scrubbing = false;
+let resumeAfterScrub = false;
+let seekTimer = 0;
+let seekLast = 0;
+
 let userScenes = [];
 let editOrigin = null; // { source, name } of the scene being edited; null for a new layout
 
@@ -72,10 +82,32 @@ function showError(message) {
   ui.error.hidden = !message;
 }
 
+const fmtTMax = (x) => String(Math.round(x * 1000) / 1000);
+
+function updateTimeline(t, editing) {
+  ui.time.textContent = fmt(t);
+  if (!scrubbing) ui.timeline.value = String(Math.round(Math.min(1, Math.max(0, t / state.tMax)) * TIMELINE_STEPS));
+  ui.timeline.disabled = editing || !state.scene || !state.connected;
+  // the box keeps what is being typed; otherwise it shows the server's (clamped) value
+  if (document.activeElement !== ui.tMax) {
+    ui.tMax.value = fmtTMax(state.tMax);
+    ui.tMax.removeAttribute('aria-invalid');
+  }
+  ui.tMax.disabled = !state.connected;
+}
+
+function updatePlayButton(editing) {
+  const again = !editing && state.finished && !state.running;
+  const label = state.running ? 'Pause (Space)' : again ? 'Play again from t = 0 (Space)' : 'Play (Space)';
+  ui.play.dataset.state = state.running ? 'pause' : 'play';
+  ui.play.title = label;
+  ui.play.setAttribute('aria-label', label);
+}
+
 function updateUi() {
   const f = state.frame;
   const editing = state.editing;
-  ui.time.textContent = f && !editing ? fmt(f.t) : '0.000';
+  updateTimeline(f && !editing ? f.t : 0, editing);
   if (f && f.energy && !editing) {
     ui.eKin.textContent = fmt(f.energy.kinetic);
     ui.ePot.textContent = fmt(f.energy.potential);
@@ -83,8 +115,8 @@ function updateUi() {
   } else {
     ui.eKin.textContent = ui.ePot.textContent = ui.eTotal.textContent = '–';
   }
-  ui.play.textContent = state.running ? 'Pause' : 'Play';
-  ui.step.disabled = editing || state.running || !state.scene;
+  updatePlayButton(editing);
+  ui.step.disabled = editing || state.running || !state.scene || state.finished;
   ui.reset.disabled = editing || !state.scene || !state.connected;
   ui.play.disabled = !state.connected || (!editing && !state.scene);
   ui.mode.textContent = editing ? 'Editing' : state.mode ? `Engine: ${state.mode}` : '–';
@@ -98,8 +130,9 @@ function updateUi() {
   ui.bendField.hidden = !(shown && (shown.bodies || []).some((b) => b.type === 'beam'));
   if (ui.bend.value !== String(renderer.bendScale)) ui.bend.value = String(renderer.bendScale);
   const dark = currentTheme() === 'dark';
-  ui.theme.textContent = dark ? 'Light' : 'Dark';
   ui.theme.setAttribute('aria-pressed', String(dark));
+  ui.theme.title = dark ? 'Light mode' : 'Dark mode';
+  ui.theme.setAttribute('aria-label', ui.theme.title);
   ui.undo.disabled = !model.canUndo;
   ui.redo.disabled = !model.canRedo;
   showError(state.lastError);
@@ -350,6 +383,68 @@ ui.play.addEventListener('click', () => {
 ui.step.addEventListener('click', () => api.send('step'));
 ui.reset.addEventListener('click', () => api.send('reset'));
 ui.speed.addEventListener('change', () => api.send('speed', { value: Number(ui.speed.value) }));
+
+// The time bar: dragging jumps to that time (the server runs forward, or resets and runs forward). The run
+// is paused while the thumb is held and continues afterwards, unless the thumb was dropped at the end.
+function seekTo(t, immediately = false) {
+  clearTimeout(seekTimer);
+  const send = () => {
+    seekLast = performance.now();
+    api.send('seek', { value: t });
+  };
+  if (immediately) send();
+  else seekTimer = setTimeout(send, Math.max(0, SEEK_INTERVAL_MS - (performance.now() - seekLast)));
+}
+
+const timelineTime = () => (Number(ui.timeline.value) / TIMELINE_STEPS) * state.tMax;
+
+ui.timeline.addEventListener('pointerdown', () => {
+  scrubbing = true;
+  resumeAfterScrub = state.running;
+  if (state.running) api.send('pause');
+});
+ui.timeline.addEventListener('input', () => {
+  ui.time.textContent = fmt(timelineTime());
+  seekTo(timelineTime());
+});
+function finishScrub() {
+  if (!scrubbing) return;
+  scrubbing = false;
+  seekTo(timelineTime(), true);
+  if (resumeAfterScrub && Number(ui.timeline.value) < TIMELINE_STEPS) api.send('play');
+  resumeAfterScrub = false;
+}
+ui.timeline.addEventListener('change', () => {
+  if (!scrubbing) seekTo(timelineTime(), true); // keyboard
+});
+window.addEventListener('pointerup', finishScrub);
+window.addEventListener('pointercancel', finishScrub);
+
+// t_max: the simulation stops there (Enter or leaving the box applies it).
+ui.tMax.addEventListener('change', () => {
+  const value = Number(ui.tMax.value);
+  if (ui.tMax.value.trim() === '' || !Number.isFinite(value) || value <= 0) {
+    ui.tMax.setAttribute('aria-invalid', 'true');
+    return;
+  }
+  const clamped = Math.min(T_MAX_RANGE[1], Math.max(T_MAX_RANGE[0], value));
+  ui.tMax.value = fmtTMax(clamped);
+  ui.tMax.removeAttribute('aria-invalid');
+  state.tMax = clamped;
+  api.send('tmax', { value: clamped });
+  updateUi();
+});
+ui.tMax.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') ui.tMax.blur();
+});
+
+// Space plays / pauses unless a control that uses the key itself has the focus.
+window.addEventListener('keydown', (e) => {
+  if (e.key !== ' ' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest?.('input, select, textarea, button, [contenteditable]')) return;
+  e.preventDefault();
+  if (!ui.play.disabled) ui.play.click();
+});
 ui.edit.addEventListener('click', () => {
   if (state.editing) leaveEdit();
   else if (state.scene) enterEdit(state.scene, state.scene.name ?? state.sceneName, { source: state.sceneSource, name: state.sceneName });

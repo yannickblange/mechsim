@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.4b",
-  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads; v0.4b lets elastic bars bend and buckle and adds viscous damping. Version 0.1 to 0.3 scenes remain valid.",
+  "title": "MechSim scene v0.5",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads; v0.4b lets elastic bars bend and buckle and adds viscous damping; v0.5 adds the optional end time t_max. Version 0.1 to 0.3 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
@@ -10,6 +10,12 @@
     "version": { "enum": ["0.1", "0.2", "0.3", "0.4"] },
     "name": { "type": "string" },
     "description": { "type": "string" },
+    "t_max": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 600,
+      "description": "Optional end time of a run in s (the time bar of the UI). Ignored by the engine; without it the UI keeps its current setting (10 s at start)."
+    },
     "gravity": { "$ref": "#/$defs/vec2", "default": [0, -9.81] },
     "solver": {
       "type": "object",

@@ -25,6 +25,7 @@ SCENES = [
     "incline_roller",
     "physical_pendulum",
     "pinned_block_spring",
+    "resonance",
     "rod_truss",
     "rope_catch",
     "single_mass_spring",
@@ -134,3 +135,84 @@ def test_websocket_play_runs_and_pauses(client):
                 break
         else:
             raise AssertionError("never saw a paused status")
+
+
+# --- v0.5: end time t_max, the time bar (seek) ------------------------------------------------------------
+
+
+def _status_after(ws, cmd: dict) -> dict:
+    """Send a command and return the status that answers it (frames before it are skipped)."""
+    ws.send_json(cmd)
+    return _read_until(ws, "status", limit=50)
+
+
+def test_status_reports_the_end_time(client):
+    client.post("/api/scene/load", json={"name": "single_mass_spring"})
+    with client.websocket_connect("/ws") as ws:
+        status = _read_until(ws, "status")
+        assert status["t_max"] == 10.0 and status["finished"] is False
+        assert _status_after(ws, {"cmd": "tmax", "value": 2.5})["t_max"] == 2.5
+        assert _status_after(ws, {"cmd": "tmax", "value": 1e9})["t_max"] == 600.0  # clamped
+        assert _status_after(ws, {"cmd": "tmax", "value": 0})["t_max"] == 0.1
+
+
+def test_a_scene_can_suggest_its_end_time(client):
+    client.post("/api/scene/load", json={"name": "resonance"})
+    with client.websocket_connect("/ws") as ws:
+        assert _read_until(ws, "status")["t_max"] == 30
+    client.post("/api/scene/load", json={"name": "single_mass_spring"})  # no t_max: the setting stays
+    with client.websocket_connect("/ws") as ws:
+        assert _read_until(ws, "status")["t_max"] == 30
+
+
+def test_bad_end_time_is_an_error(client):
+    with client.websocket_connect("/ws") as ws:
+        _read_until(ws, "status")
+        ws.send_json({"cmd": "tmax", "value": "soon"})
+        assert "tmax" in _read_until(ws, "error")["message"]
+        ws.send_json({"cmd": "seek", "value": float("nan")})
+        assert "seek" in _read_until(ws, "error")["message"]
+
+
+def test_a_run_stops_exactly_at_t_max_and_play_starts_again(client):
+    client.post("/api/scene/load", json={"name": "single_mass_spring"})
+    with client.websocket_connect("/ws") as ws:
+        _read_until(ws, "status")
+        _read_until(ws, "frame")  # the frame sent on connect
+        _status_after(ws, {"cmd": "tmax", "value": 0.25})
+        _status_after(ws, {"cmd": "speed", "value": 4})
+        ws.send_json({"cmd": "play"})
+        last_t = 0.0
+        for _ in range(200):
+            msg = ws.receive_json()
+            if msg["type"] == "frame":
+                last_t = msg["data"]["t"]
+            if msg["type"] == "status" and msg["finished"]:
+                break
+        else:
+            raise AssertionError("the run never finished")
+        assert last_t == pytest.approx(0.25) and not msg["running"]
+        # step does nothing at the end ...
+        assert _status_after(ws, {"cmd": "step"})["finished"] is True
+        # ... and play runs again from t = 0
+        ws.send_json({"cmd": "play"})
+        frame = _read_until(ws, "frame")
+        assert frame["data"]["t"] == 0.0
+        assert _read_until(ws, "status")["running"] is True
+
+
+def test_seek_jumps_forward_and_back_with_a_trace(client):
+    client.post("/api/scene/load", json={"name": "single_mass_spring"})
+    with client.websocket_connect("/ws") as ws:
+        _read_until(ws, "status")
+        assert _read_until(ws, "frame")["data"]["t"] == 0.0  # the frame sent on connect
+        ws.send_json({"cmd": "seek", "value": 1.0})
+        msg = _read_until(ws, "frame")
+        assert msg["data"]["t"] == pytest.approx(1.0)
+        assert 1 < len(msg["trace"]["t"]) <= 600 and msg["trace"]["t"][-1] == pytest.approx(1.0)
+        ws.send_json({"cmd": "seek", "value": 0.4})  # back: reset (t = 0), then forward
+        assert _read_until(ws, "frame")["data"]["t"] == 0.0
+        assert _read_until(ws, "frame")["data"]["t"] == pytest.approx(0.4)
+        assert _read_until(ws, "status")["finished"] is False
+        status = _status_after(ws, {"cmd": "seek", "value": 99})  # beyond the end: stops at t_max
+        assert status["finished"] is True and status["running"] is False

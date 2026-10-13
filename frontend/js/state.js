@@ -8,6 +8,8 @@ export class AppState {
     this.frame = null;
     this.running = false;
     this.speed = 1;
+    this.tMax = 10; // s, the end of a run (the time bar shows t / tMax)
+    this.finished = false; // the run has reached tMax
     this.mode = null;
     this.connected = false;
     this.lastError = null;
@@ -69,6 +71,8 @@ export class AppState {
       case 'status':
         this.running = msg.running;
         this.speed = msg.speed;
+        if (Number.isFinite(msg.t_max)) this.tMax = msg.t_max;
+        this.finished = Boolean(msg.finished);
         this.mode = msg.mode;
         if (msg.running) this.lastError = null;
         break;

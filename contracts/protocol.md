@@ -1,4 +1,4 @@
-# Server <-> browser protocol (v0.1; v0.2 adds scene source, `apply`, `save`; v0.4 adds the frame `trace`)
+# Server <-> browser protocol (v0.1; v0.2 adds scene source, `apply`, `save`; v0.4 adds the frame `trace`; v0.5 adds `seek`, `tmax` and the end of a run)
 
 ## REST (JSON)
 
@@ -30,21 +30,29 @@ Client -> server (JSON text messages):
 {"cmd": "reset"}
 {"cmd": "step"}
 {"cmd": "speed", "value": 0.5}
+{"cmd": "seek", "value": 3.2}
+{"cmd": "tmax", "value": 20}
 ```
 
 - `step` advances exactly one display frame while paused.
 - `speed` scales simulated time per display frame, allowed range 0.05 to 4.0 (clamp).
+- `tmax` sets the end time of a run in s (clamped to 0.1 to 600; 10 at start, or the scene's own `t_max`, which is applied
+  when the scene is loaded). A running simulation stops exactly at `t_max` (the last display frame is shortened), `step` does
+  nothing there, and `play` at the end starts again from t = 0.
+- `seek` jumps to the simulated time `value` (clamped to 0 .. `t_max`) for the time bar: an earlier time resets and runs
+  forward again. The frame carries the trace of the whole jump (at most 600 samples), so the graphs stay complete.
 
 Server -> client:
 
 ```json
 {"type": "frame",  "data": <frame matching state.schema.json>, "trace"?: <trace>}
-{"type": "status", "running": true, "scene": "single_mass_spring", "speed": 1.0, "mode": "native"}
+{"type": "status", "running": true, "scene": "single_mass_spring", "speed": 1.0, "mode": "native", "t_max": 10.0, "finished": false}
 {"type": "error",  "message": "human readable text"}
 ```
 
 - On connect the server sends one `status` and, if a scene is loaded, one `frame`.
-- After every command the server sends a `status`.
+- After every command the server sends a `status`. Its `t_max` is the end time of a run, `finished` is true while the simulation is at `t_max`
+  (the server also sends a `status` when a running simulation reaches `t_max`).
 - While running, the server sends `frame` messages at **60 Hz**. Each display frame advances
   simulated time by `speed / 60` s, using `n = max(1, round(speed / 60 / solver.dt))` engine steps.
 

@@ -53,8 +53,15 @@ plots its displacement from the starting position against time (x and y, the mag
 read-out, a time window and a CSV export. The data are the poses after *every* engine step (the server sends them with each
 frame), so fast vibrations are not aliased by the 60 Hz display. The panels can be dragged and resized.
 
-The default colour scheme is a white board with black lines, a grey grid and blue forces; **Dark** in the toolbar switches to a
-dark one (remembered in the browser).
+The default colour scheme is a white board with black lines, a grey grid and blue forces; the round **moon button** in the bottom-right corner
+switches to a dark one (remembered in the browser).
+
+## Playing a simulation (v0.5)
+
+Play / pause, step and reset are icon buttons (Space plays and pauses). The **time bar** shows `t / t_max`: drag it to jump to a time (the run pauses
+while you hold it; going back resets and runs forward again, the graphs keep their history), and type the end time `t_max` (0.1 to 600 s, 10 s at start)
+in the box next to it. The run stops exactly at `t_max`; Play at the end starts again from t = 0. A scene can suggest its own end time with the optional
+top-level `"t_max"`.
 
 ## Fachwerke and beams (v0.4)
 
@@ -68,7 +75,9 @@ dark one (remembered in the browser).
   Supports, springs, loads and joints attach anywhere along the beam. A load that is applied suddenly makes an elastic beam swing about its static
   deflection; the **damping α** (1/s, in the properties of beams, elastic Stabs and nodes; 5 for new beams and bars) lets it settle. Example scenes
   `cantilever_beam` (undamped: it swings), `beam_i_section` (damped: it settles).
-- *Vibrations*: example scenes `harmonic_oscillation`, `free_vibration`, `forced_vibration` (a harmonic load F sin(2π f t + φ)).
+- *Vibrations*: example scenes `harmonic_oscillation`, `free_vibration`, `forced_vibration` (a harmonic load F sin(2π f t + φ)), and (v0.5) `resonance`:
+  the same oscillator excited at its natural frequency (η = 1) with a damping ratio ζ = 0.02. The magnification factor V = 1/(2ζ) = 25 lets the
+  swing grow period by period, x_max(t) = V F₀/k (1 − e^(−ζ ω₀ t)), to 1.27 m, 25 times the static deflection (undamped it would grow without bound).
 
 ## Layout
 

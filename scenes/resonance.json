@@ -1,0 +1,161 @@
+{
+  "version": "0.4",
+  "name": "Resonanz: forced vibration at resonance (eta = 1, zeta = 0.02)",
+  "description": "The same block, spring and damper as in forced_vibration, but the force F(t) = 2 N sin(2 pi 1.0 Hz t) now hits the natural frequency (eta = 1) and the damping is very small (zeta = 0.02). The magnification factor is V = 1/(2 zeta) = 25: the steady-state amplitude is 1.27 m, 25 times the static deflection F0/k = 0.051 m. Starting at rest, the swing grows with every period, x_max(t) = 1.27 m (1 - exp(-zeta omega0 t)), time constant 1/(zeta omega0) = 8.0 s, until the block nearly sweeps the whole space between the walls. With zeta = 0 the amplitude would grow without bound (F0 t / (2 m omega0)). Run to t_max = 30 s; right-click the mass for its displacement graph.",
+  "t_max": 30,
+  "gravity": [
+    0,
+    -9.81
+  ],
+  "solver": {
+    "dt": 0.001
+  },
+  "view": {
+    "center": [
+      0,
+      0.35
+    ],
+    "width": 5.6
+  },
+  "surfaces": [
+    {
+      "id": "floor",
+      "p1": [
+        -2.3,
+        0
+      ],
+      "p2": [
+        2.3,
+        0
+      ]
+    },
+    {
+      "id": "wallL",
+      "p1": [
+        -2.0,
+        0.6
+      ],
+      "p2": [
+        -2.0,
+        -0.1
+      ]
+    },
+    {
+      "id": "wallR",
+      "p1": [
+        2.0,
+        -0.1
+      ],
+      "p2": [
+        2.0,
+        0.6
+      ]
+    }
+  ],
+  "bodies": [
+    {
+      "id": "mass",
+      "type": "block",
+      "position": [
+        0.0,
+        0.1
+      ],
+      "angle": 0,
+      "params": {
+        "mass": 1.0,
+        "width": 0.4,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "spring",
+      "type": "spring",
+      "a": {
+        "body": null,
+        "point": [
+          -2.0,
+          0.1
+        ]
+      },
+      "b": {
+        "body": "mass",
+        "point": [
+          -0.2,
+          0
+        ]
+      },
+      "params": {
+        "k": 39.478418,
+        "rest_length": 1.8
+      }
+    },
+    {
+      "id": "damper",
+      "type": "damper",
+      "a": {
+        "body": null,
+        "point": [
+          2.0,
+          0.1
+        ]
+      },
+      "b": {
+        "body": "mass",
+        "point": [
+          0.2,
+          0
+        ]
+      },
+      "params": {
+        "c": 0.251327
+      }
+    },
+    {
+      "id": "force",
+      "type": "load",
+      "body": "mass",
+      "point": [
+        0,
+        0
+      ],
+      "params": {
+        "force": [
+          2.0,
+          0
+        ],
+        "mode": "harmonic",
+        "frequency": 1.0
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "id": "roller1",
+      "type": "roller_support",
+      "body": "mass",
+      "point": [
+        -0.2,
+        -0.1
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    },
+    {
+      "id": "roller2",
+      "type": "roller_support",
+      "body": "mass",
+      "point": [
+        0.2,
+        -0.1
+      ],
+      "surface": "floor",
+      "params": {
+        "angle": 0
+      }
+    }
+  ]
+}

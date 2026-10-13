@@ -32,13 +32,27 @@
     </div>
 
     <div class="transport" role="group" aria-label="Simulation controls">
-      <button id="btn-play" type="button">Play</button>
-      <button id="btn-step" type="button">Step</button>
-      <button id="btn-reset" type="button">Reset</button>
+      <button id="btn-play" class="icon-btn" type="button" data-state="play" title="Play (Space)" aria-label="Play">
+        <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+        <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+      </button>
+      <button id="btn-step" class="icon-btn" type="button" title="Step one frame" aria-label="Step one frame">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13l9-6.5zM16.5 5H19v14h-2.5z"/></svg>
+      </button>
+      <button id="btn-reset" class="icon-btn" type="button" title="Back to t = 0" aria-label="Reset to t = 0">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h2.5v14H5zM18.5 5.5v13L9 12z"/></svg>
+      </button>
+
+      <div class="timeline">
+        <input id="timeline" type="range" min="0" max="1000" step="1" value="0" aria-label="Simulation time" title="Drag to jump to a time">
+        <span class="clock"><output id="time" for="timeline">0.00</output> /</span>
+        <input id="t-max" type="number" min="0.1" max="600" step="any" value="10" inputmode="decimal" aria-label="End time t_max in seconds" title="End time t_max: the simulation stops here">
+        <span class="clock">s</span>
+      </div>
     </div>
 
-    <label class="field">
-      <span>Speed</span>
+    <label class="field" title="Simulation speed">
+      <svg class="ico ico-speed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6v12l8.5-6zM12.5 6v12L21 12z"/></svg>
       <select id="speed" aria-label="Simulation speed">
         <option value="0.1">0.1×</option>
         <option value="0.25">0.25×</option>
@@ -58,16 +72,17 @@
       </select>
     </label>
 
-    <button id="btn-theme" type="button" aria-pressed="false" title="Switch between the light and the dark colour scheme">Dark</button>
   </header>
 
   <main class="stage">
     <canvas id="view" aria-label="Simulation view"></canvas>
     <div id="error" class="error" role="alert" hidden></div>
+    <button id="btn-theme" class="theme-fab" type="button" aria-pressed="false" title="Dark mode" aria-label="Dark mode">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.8.8 0 0 0-1.1-.9A10 10 0 1 0 21.4 15.7a.8.8 0 0 0-.9-1.1z"/></svg>
+    </button>
   </main>
 
   <footer class="statusbar">
-    <span>t = <output id="time">0.000</output> s</span>
     <span>E<sub>kin</sub> = <output id="e-kin">–</output> J</span>
     <span>E<sub>pot</sub> = <output id="e-pot">–</output> J</span>
     <span>E<sub>total</sub> = <output id="e-total">–</output> J</span>
