@@ -1,3 +1,5 @@
+import { decimal } from '../format.js';
+
 // plot.js - the maths of the displacement graphs: tick marks, units, and a min / max envelope so
 // that hundreds of thousands of samples draw as fast as a few hundred. Pure, tested with Node.
 
@@ -22,7 +24,7 @@ export function niceTicks(lo, hi, count = 5) {
 export function formatTick(value, step) {
   const decimals = Math.max(0, Math.min(6, -Math.floor(Math.log10(step) + 1e-9)));
   const v = Math.abs(value) < step * 1e-6 ? 0 : value;
-  return v.toFixed(decimals);
+  return decimal(v, decimals);
 }
 
 // Unit for displacements: millimetres when everything stays below 5 cm, metres otherwise.

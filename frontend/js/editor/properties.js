@@ -1,5 +1,6 @@
 // properties.js - the right-click property forms, as data. Pure: editor.js renders the fields and
 // calls applyProperties() with what the user typed.
+import { comma, decimal } from '../format.js';
 import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
 import { dist } from './geometry.js';
 import {
@@ -10,7 +11,7 @@ import {
 const RAD = Math.PI / 180;
 const SUPPORT_NAMES = {
   pin_support: 'Festlager',
-  fixed_support: 'Lager (fixed)',
+  fixed_support: 'Einspannung',
   roller_support: 'Loslager',
 };
 
@@ -18,7 +19,8 @@ const num = (key, label, unit, value, extra = {}) => ({ key, label, unit, type: 
 const select = (key, label, value, options, extra = {}) => ({ key, label, type: 'select', value, options, ...extra });
 
 // { title, info: [string], fields: [...], section?: { ...section } } or null for an unknown id.
-// Field: { key, label, unit, type: "number" | "select", value, min?, minExclusive?, options?, reshape? }
+// Field: { key, label, unit, type: "number" | "select", value, min?, minExclusive?, options?, reshape?, onDrawing? }
+// (`onDrawing`: a dimension of the cross section, entered on the dimensioned drawing, not in a row)
 // `draft` holds what the user has typed so far ({ key: string }): a select with `reshape` changes which
 // fields exist (the cross-section type, the load type), so the form is built again with the draft.
 export function propertyFields(model, id, draft = {}) {
@@ -31,27 +33,27 @@ export function propertyFields(model, id, draft = {}) {
     const len = dist(obj.p1, obj.p2);
     const deg = (Math.atan2(obj.p2[1] - obj.p1[1], obj.p2[0] - obj.p1[0]) / RAD);
     return {
-      title: `Surface ${obj.id}`,
-      info: [`Length ${fixed(len)} m, direction ${fixed(deg, 1)}°. Fixed in space; supports sit on it.`],
+      title: `Fläche ${obj.id}`,
+      info: [`Länge ${fixed(len)} m, Richtung ${fixed(deg, 1)}°. Im Raum fest; Lager sitzen auf ihr.`],
       fields: [],
     };
   }
   if (kind === 'constraint' && isLink(obj)) return linkForm(model, obj, draft);
   if (kind === 'constraint' && isJoint(obj)) return jointForm(obj);
   if (kind === 'constraint' && obj.type === 'pin_support' && obj.body === null) {
-    const where = obj.surface ? `on surface ${obj.surface}` : 'not on a surface';
+    const where = obj.surface ? `auf Fläche ${obj.surface}` : 'nicht auf einer Fläche';
     return {
-      title: `Festlager ${obj.id} (free space)`,
-      info: [`At (${fixed(obj.point[0])}, ${fixed(obj.point[1])}) m, ${where}.`,
-        'Springs, ropes and Stabs can be attached to it; use the joint tool on it to pin a mass.'],
+      title: `Festlager ${obj.id} (freier Raum)`,
+      info: [`Bei (${fixed(obj.point[0])}; ${fixed(obj.point[1])}) m, ${where}.`,
+        'Federn, Seile und Stäbe können daran angreifen; mit dem Gelenk-Werkzeug lässt sich darauf eine Masse lagern.'],
       fields: [],
     };
   }
   if (kind === 'constraint') {
-    const where = obj.surface ? `on surface ${obj.surface}` : 'not on a surface';
+    const where = obj.surface ? `auf Fläche ${obj.surface}` : 'nicht auf einer Fläche';
     return {
       title: `${SUPPORT_NAMES[obj.type]} ${obj.id}`,
-      info: [`At a point of mass ${obj.body}, ${where}.`, SUPPORT_NOTES[obj.type]],
+      info: [`An einem Punkt der Masse ${obj.body}, ${where}.`, SUPPORT_NOTES[obj.type]],
       fields: [],
     };
   }
@@ -79,11 +81,11 @@ function formSection(current, draft, fallbackType = 'square') {
 // Fields of a cross section: type select plus the dimensions of the type, in mm.
 function sectionFields(section, { allowRigid = false, rigid = false } = {}) {
   const options = SECTION_TYPES.map((t) => [t, SECTION_LABELS[t]]);
-  if (allowRigid) options.unshift(['rigid', 'Rigid (no cross section)']);
-  const fields = [select('sectionType', 'Cross section', rigid ? 'rigid' : section.type, options, { reshape: true })];
+  if (allowRigid) options.unshift(['rigid', 'Starr (kein Querschnitt)']);
+  const fields = [select('sectionType', 'Querschnitt', rigid ? 'rigid' : section.type, options, { reshape: true })];
   if (!rigid) {
     for (const [key, label] of SECTION_FIELDS[section.type]) {
-      fields.push(num(sectionKey(key), label, 'mm', round(section[key] * MM, 4), { minExclusive: 0 }));
+      fields.push(num(sectionKey(key), label, 'mm', round(section[key] * MM, 4), { minExclusive: 0, onDrawing: true }));
     }
   }
   return fields;
@@ -101,16 +103,16 @@ export function sectionFromValues(values) {
 const sectionInfo = (section) => {
   const p = sectionProps(section);
   return `${describeSection(section)}: A = ${fixed(p.area * 1e4, 2)} cm², I = ${fixed(p.inertia * 1e8, 2)} cm⁴, `
-    + `EI = ${fixed(E_MODULUS * p.inertia, 1)} N·m² (E = 210 GPa, steel).`;
+    + `EI = ${fixed(E_MODULUS * p.inertia, 1)} N·m² (E = 210 GPa, Stahl).`;
 };
 
 const SUPPORT_NOTES = {
-  pin_support: 'Locks x and y, rotation is free.',
-  fixed_support: 'Locks x, y and rotation.',
-  roller_support: 'Locks the direction normal to the surface; slides along it without friction.',
+  pin_support: 'Sperrt x und y, die Drehung ist frei.',
+  fixed_support: 'Sperrt x, y und die Drehung.',
+  roller_support: 'Sperrt die Richtung senkrecht zur Fläche; gleitet reibungsfrei an ihr entlang.',
 };
 
-const JOINT_NAMES = { pin_joint: 'Hinge (Gelenk)', fixed_joint: 'Rigid joint' };
+const JOINT_NAMES = { pin_joint: 'Gelenk', fixed_joint: 'Starre Verbindung' };
 
 function installedLength(model, link) {
   const ends = linkEnds(model.scene, link);
@@ -122,9 +124,9 @@ function linkForm(model, link, draft) {
   if (link.type === 'rod') return stabForm(model, link, draft);
   const length = link.params.length ?? d;
   return {
-    title: `Rope ${link.id}`,
-    info: [`Distance between the ends ${fixed(d)} m. The rope never stretches, only pulls, and hangs slack when the ends are closer than its length.`],
-    fields: [num('length', 'Length', 'm', round(length, 6), { min: round(d - 1e-9, 9) })],
+    title: `Seil ${link.id}`,
+    info: [`Abstand der Enden ${fixed(d)} m. Das Seil dehnt sich nie, zieht nur und hängt durch, wenn die Enden näher beieinander liegen als seine Länge.`],
+    fields: [num('length', 'Länge', 'm', round(length, 6), { min: round(d - 1e-9, 9) })],
   };
 }
 
@@ -137,7 +139,7 @@ function stabForm(model, stab, draft) {
   const d = installedLength(model, stab);
   const rigid = stab.type === 'rod' ? !draft.sectionType || draft.sectionType === 'rigid' : draft.sectionType === 'rigid';
   const section = rigid ? null : formSection(stab.type === 'bar' ? stab.params.section : null, draft);
-  const info = [`Length ${fixed(d)} m (the distance between its ends). A massless two-force member that takes push and pull.`];
+  const info = [`Länge ${fixed(d)} m (Abstand seiner Enden). Ein masseloses Zweikraftglied, das Druck und Zug aufnimmt.`];
   const fields = sectionFields(section || defaultSection('square'), { allowRigid: true, rigid: !section });
   if (section) {
     const p = sectionProps(section);
@@ -145,23 +147,23 @@ function stabForm(model, stab, draft) {
     const slender = d / Math.sqrt(p.inertia / p.area);
     const params = stab.type === 'bar' ? stab.params : {};
     info.length = 0;
-    info.push(`Length ${fixed(d)} m. Elastic steel member, pinned at both ends: axial stiffness E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m.`);
+    info.push(`Länge ${fixed(d)} m. Elastischer Stahlstab, an beiden Enden gelenkig gelagert: Dehnsteifigkeit E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m.`);
     info.push(sectionInfo(section));
-    info.push(`It buckles in the plane when the compression reaches the Euler load π² E I / L² = ${fixedForce(pcr)} (slenderness L / i = ${fixed(slender, 0)}); `
-      + 'the force labels show the percentage while it is compressed. It bends under its own weight.');
+    info.push(`Er knickt in der Ebene aus, wenn die Druckkraft die Eulersche Knicklast π² E I / L² = ${fixedForce(pcr)} erreicht (Schlankheit L / i = ${fixed(slender, 0)}); `
+      + 'die Kraftanzeige nennt den Prozentsatz, solange er gedrückt wird. Er biegt sich unter seinem Eigengewicht durch.');
     const massMode = draft.massMode || (params.mass === undefined ? 'steel' : 'given');
-    fields.push(num('segments', 'Elements', '', params.segments ?? DEFAULT_SEGMENTS, { min: 1, max: 16, integer: true }));
-    fields.push(select('massMode', 'Mass', massMode, [['steel', 'Steel'], ['given', 'Given']], { reshape: true }));
-    if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(params.mass ?? 7850 * p.area * d, 6), { minExclusive: 0 }));
+    fields.push(num('segments', 'Elemente', '', params.segments ?? DEFAULT_SEGMENTS, { min: 1, max: 16, integer: true }));
+    fields.push(select('massMode', 'Masse', massMode, [['steel', 'Stahl'], ['given', 'Vorgegeben']], { reshape: true }));
+    if (massMode === 'given') fields.push(num('mass', 'Masse', 'kg', round(params.mass ?? 7850 * p.area * d, 6), { minExclusive: 0 }));
     fields.push(
-      num('damping', 'Damping α', '1/s', params.damping ?? 0, { min: 0 }),
-      num('bow', 'Initial bow', 'mm', round((params.imperfection ?? DEFAULT_BOW) * d * MM, 4), { min: 0 }),
+      num('damping', 'Dämpfung α', '1/s', params.damping ?? 0, { min: 0 }),
+      num('bow', 'Vorkrümmung', 'mm', round((params.imperfection ?? DEFAULT_BOW) * d * MM, 4), { min: 0 }),
     );
-    info.push('Elements: 1 is the pure axial bar (massless, cannot bend or buckle). The initial bow (a half sine) is what lets a straight column buckle at all.');
+    info.push('Elemente: 1 ist der reine Zugstab (masselos, kann sich nicht biegen oder knicken). Die Vorkrümmung (eine Halbsinuswelle) lässt eine gerade Stütze überhaupt erst ausknicken.');
   } else {
-    info.push('Rigid: infinitely stiff, no mass, cannot buckle. Give it a cross section to make it an elastic steel bar.');
+    info.push('Starr: unendlich steif, ohne Masse, knickt nicht. Mit einem Querschnitt wird daraus ein elastischer Stahlstab.');
   }
-  return { title: `${section ? 'Stab (elastic)' : 'Stab'} ${stab.id}`, info, fields, section };
+  return { title: `${section ? 'Stab (elastisch)' : 'Stab'} ${stab.id}`, info, fields, section };
 }
 
 // What the submitted form says about an elastic Stab beyond its section (the bar parameters), for a Stab of length d.
@@ -176,13 +178,13 @@ function stabParams(parsed, d) {
 const fixedForce = (n) => (n >= 1e4 ? `${fixed(n / 1e3, 1)} kN` : `${fixed(n, 0)} N`);
 
 function jointForm(joint) {
-  const at = `Joins ${joint.a.body} and ${joint.b.body}.`;
+  const at = `Verbindet ${joint.a.body} und ${joint.b.body}.`;
   return {
     title: `${JOINT_NAMES[joint.type]} ${joint.id}`,
     info: [at, joint.type === 'pin_joint'
-      ? 'The masses can rotate against each other about this point.'
-      : 'The masses cannot move against each other at all.'],
-    fields: [{ key: 'jointType', label: 'Type', type: 'select', value: joint.type,
+      ? 'Die Massen können sich um diesen Punkt gegeneinander drehen.'
+      : 'Die Massen können sich überhaupt nicht gegeneinander bewegen.'],
+    fields: [{ key: 'jointType', label: 'Art', type: 'select', value: joint.type,
       options: [['pin_joint', JOINT_NAMES.pin_joint], ['fixed_joint', JOINT_NAMES.fixed_joint]] }],
   };
 }
@@ -191,13 +193,13 @@ function bodyForm(body, draft) {
   if (body.type === 'beam') return beamForm(body, draft);
   const p = body.params;
   const v = body.velocity || [0, 0];
-  const fields = [num('mass', 'Mass', 'kg', p.mass, { minExclusive: 0 })];
+  const fields = [num('mass', 'Masse', 'kg', p.mass, { minExclusive: 0 })];
   if (body.type === 'node') {
-    fields.push(num('vx', 'Initial vx', 'm/s', v[0]), num('vy', 'Initial vy', 'm/s', v[1]), num('damping', 'Damping α', '1/s', p.damping ?? 0, { min: 0 }));
+    fields.push(num('vx', 'vx (Anfang)', 'm/s', v[0]), num('vy', 'vy (Anfang)', 'm/s', v[1]), num('damping', 'Dämpfung α', '1/s', p.damping ?? 0, { min: 0 }));
     return {
-      title: `Node ${body.id}`,
-      info: ['A node (Knoten) is a point mass where Stabs meet. Supports and forces can sit on it. '
-        + 'Its weight loads the Fachwerk; keep the mass small next to the loads.'],
+      title: `Knoten ${body.id}`,
+      info: ['Ein Knoten ist eine Punktmasse, an der Stäbe zusammentreffen. Lager und Kräfte können an ihm angreifen. '
+        + 'Sein Gewicht belastet das Fachwerk; die Masse klein gegenüber den Lasten halten.'],
       fields,
     };
   }
@@ -208,19 +210,19 @@ function bodyForm(body, draft) {
     fields.push(num('radius', 'Radius', 'm', p.radius, { minExclusive: 0 }));
   } else {
     fields.push(
-      num('width', 'Width', 'm', p.width, { minExclusive: 0 }),
-      num('height', 'Height', 'm', p.height, { minExclusive: 0 }),
+      num('width', 'Breite', 'm', p.width, { minExclusive: 0 }),
+      num('height', 'Höhe', 'm', p.height, { minExclusive: 0 }),
     );
   }
   fields.push(
-    num('angle', 'Angle', '°', round((body.angle || 0) / RAD, 4)),
-    num('vx', 'Initial vx', 'm/s', v[0]),
-    num('vy', 'Initial vy', 'm/s', v[1]),
-    num('omega', 'Initial ω', 'rad/s', body.omega || 0),
+    num('angle', 'Winkel', '°', round((body.angle || 0) / RAD, 4)),
+    num('vx', 'vx (Anfang)', 'm/s', v[0]),
+    num('vy', 'vy (Anfang)', 'm/s', v[1]),
+    num('omega', 'ω (Anfang)', 'rad/s', body.omega || 0),
   );
   return {
-    title: `${body.type === 'disc' ? 'Circular' : 'Rectangular'} mass ${body.id}`,
-    info: [`Moment of inertia J = ${fixed(inertia, 4)} kg·m² about the centre of mass.`],
+    title: `${body.type === 'disc' ? 'Kreisförmige' : 'Rechteckige'} Masse ${body.id}`,
+    info: [`Massenträgheitsmoment J = ${fixed(inertia, 4)} kg·m² um den Schwerpunkt.`],
     fields,
   };
 }
@@ -234,27 +236,27 @@ function beamForm(body, draft) {
   const massMode = draft.massMode || (p.mass === undefined ? 'steel' : 'given');
   const steelMass = beamMass(section, length);
   const fields = [
-    num('length', 'Length', 'm', length, { minExclusive: 0 }),
+    num('length', 'Länge', 'm', length, { minExclusive: 0 }),
     ...sectionFields(section),
-    select('massMode', 'Mass', massMode, [['steel', 'Steel'], ['given', 'Given']], { reshape: true }),
+    select('massMode', 'Masse', massMode, [['steel', 'Stahl'], ['given', 'Vorgegeben']], { reshape: true }),
   ];
-  if (massMode === 'given') fields.push(num('mass', 'Mass', 'kg', round(p.mass ?? steelMass, 6), { minExclusive: 0 }));
+  if (massMode === 'given') fields.push(num('mass', 'Masse', 'kg', round(p.mass ?? steelMass, 6), { minExclusive: 0 }));
   fields.push(
-    num('damping', 'Damping α', '1/s', p.damping ?? 0, { min: 0 }),
-    num('segments', 'Finite elements', '', p.segments ?? 8, { min: 2, integer: true, max: 64 }),
-    num('angle', 'Angle', '°', round((body.angle || 0) / RAD, 4)),
-    num('vx', 'Initial vx', 'm/s', v[0]),
-    num('vy', 'Initial vy', 'm/s', v[1]),
-    num('omega', 'Initial ω', 'rad/s', body.omega || 0),
+    num('damping', 'Dämpfung α', '1/s', p.damping ?? 0, { min: 0 }),
+    num('segments', 'Finite Elemente', '', p.segments ?? 8, { min: 2, integer: true, max: 64 }),
+    num('angle', 'Winkel', '°', round((body.angle || 0) / RAD, 4)),
+    num('vx', 'vx (Anfang)', 'm/s', v[0]),
+    num('vy', 'vy (Anfang)', 'm/s', v[1]),
+    num('omega', 'ω (Anfang)', 'rad/s', body.omega || 0),
   );
   const m = massMode === 'given' ? (p.mass ?? steelMass) : steelMass;
   return {
-    title: `Beam ${body.id}`,
+    title: `Balken ${body.id}`,
     info: [
-      `${sectionInfo(section)} Mass ${fixed(m, 3)} kg (steel: 7850 kg/m³ × A × L, or given).`,
-      'Bends in the plane (Euler-Bernoulli, large rotations allowed). Supports, springs and loads may attach anywhere along it. '
-        + 'The nodes are placed by the engine, evenly and at every attachment. Damping α (viscous, force -α m v) lets it settle: '
-        + 'every mode decays like e^(-α t / 2); 0 = it swings for ever (and a free beam keeps flying).',
+      `${sectionInfo(section)} Masse ${fixed(m, 3)} kg (Stahl: 7850 kg/m³ × A × L, oder vorgegeben).`,
+      'Biegt sich in der Ebene (Euler-Bernoulli, große Drehungen erlaubt). Lager, Federn und Lasten können überall am Balken angreifen. '
+        + 'Die Knoten setzt der Rechenkern gleichmäßig und an jeder Anbindung. Die Dämpfung α (viskos, Kraft −α m v) lässt ihn zur Ruhe kommen: '
+        + 'jede Eigenform klingt wie e^(−α t / 2) ab; 0 = er schwingt ewig (und ein freier Balken fliegt weiter).',
     ],
     fields,
     section,
@@ -265,10 +267,10 @@ function damperForm(model, damper) {
   const a = anchorWorld(model.scene, damper.a);
   const b = anchorWorld(model.scene, damper.b);
   return {
-    title: `Damper ${damper.id}`,
-    info: [`Between two points ${fixed(a && b ? dist(a, b) : 0)} m apart. The force is c times the rate of change of the length: `
-      + 'it resists every relative motion of its ends, stores no energy and has no relaxed length.'],
-    fields: [num('c', 'Damping c', 'N·s/m', damper.params.c, { min: 0 })],
+    title: `Dämpfer ${damper.id}`,
+    info: [`Zwischen zwei Punkten im Abstand von ${fixed(a && b ? dist(a, b) : 0)} m. Die Kraft ist c mal die Änderungsrate der Länge: `
+      + 'er wirkt jeder Relativbewegung seiner Enden entgegen, speichert keine Energie und hat keine entspannte Länge.'],
+    fields: [num('c', 'Dämpfung c', 'N·s/m', damper.params.c, { min: 0 })],
   };
 }
 
@@ -277,14 +279,14 @@ function springForm(model, spring) {
   const b = anchorWorld(model.scene, spring.b);
   const installed = a && b ? dist(a, b) : 0;
   const rest = spring.params.rest_length ?? installed;
-  const state = rest < installed - 1e-9 ? 'tension (pulls the ends together)'
-    : rest > installed + 1e-9 ? 'compression (pushes the ends apart)' : 'unloaded';
+  const state = rest < installed - 1e-9 ? 'Zug (zieht die Enden zusammen)'
+    : rest > installed + 1e-9 ? 'Druck (drückt die Enden auseinander)' : 'unbelastet';
   return {
-    title: `Spring ${spring.id}`,
-    info: [`Installed length ${fixed(installed)} m. At the start the spring is in ${state}.`],
+    title: `Feder ${spring.id}`,
+    info: [`Eingebaute Länge ${fixed(installed)} m. Zu Beginn: ${state}.`],
     fields: [
-      num('k', 'Stiffness k', 'N/m', spring.params.k, { min: 0 }),
-      num('restLength', 'Relaxed length (ghost)', 'm', round(rest, 6), { min: 0 }),
+      num('k', 'Steifigkeit k', 'N/m', spring.params.k, { min: 0 }),
+      num('restLength', 'Entspannte Länge (Schatten)', 'm', round(rest, 6), { min: 0 }),
     ],
   };
 }
@@ -295,24 +297,24 @@ function loadForm(load, draft) {
   const impulse = mode === 'impulse';
   const harmonic = mode === 'harmonic';
   const fields = [
-    select('mode', 'Type', mode, [['constant', 'Constant'], ['impulse', 'Impulse at t = 0'], ['harmonic', 'Harmonic: F sin(2π f t + φ)']], { reshape: true }),
-    num('fx', harmonic ? 'Amplitude x' : 'Force x', impulse ? 'N·s' : 'N', f[0]),
-    num('fy', harmonic ? 'Amplitude y' : 'Force y', impulse ? 'N·s' : 'N', f[1]),
-    num('moment', harmonic ? 'Moment amplitude' : 'Moment', impulse ? 'N·m·s' : 'N·m', load.params.moment || 0),
+    select('mode', 'Art', mode, [['constant', 'Konstant'], ['impulse', 'Impuls bei t = 0'], ['harmonic', 'Harmonisch: F sin(2π f t + φ)']], { reshape: true }),
+    num('fx', harmonic ? 'Amplitude x' : 'Kraft x', impulse ? 'N·s' : 'N', f[0]),
+    num('fy', harmonic ? 'Amplitude y' : 'Kraft y', impulse ? 'N·s' : 'N', f[1]),
+    num('moment', harmonic ? 'Momentamplitude' : 'Moment', impulse ? 'N·m·s' : 'N·m', load.params.moment || 0),
   ];
-  let info = 'A constant load acts for the whole simulation; the force direction stays fixed in the world.';
-  if (impulse) info = 'An impulse is a velocity jump at t = 0 (also after Reset).';
+  let info = 'Eine konstante Last wirkt während der ganzen Simulation; die Kraftrichtung bleibt im Raum fest.';
+  if (impulse) info = 'Ein Impuls ist ein Geschwindigkeitssprung bei t = 0 (auch nach dem Zurücksetzen).';
   if (harmonic) {
     const freq = load.params.frequency ?? 1;
     fields.push(
-      num('frequency', 'Frequency f', 'Hz', freq, { minExclusive: 0 }),
-      num('phase', 'Phase φ', '°', round((load.params.phase || 0) / RAD, 4)),
+      num('frequency', 'Frequenz f', 'Hz', freq, { minExclusive: 0 }),
+      num('phase', 'Phasenwinkel φ', '°', round((load.params.phase || 0) / RAD, 4)),
     );
-    info = `The force is F₀ sin(2π f t + φ) (Ω = 2π f = ${fixed(2 * Math.PI * freq, 3)} rad/s); its direction stays fixed in the world. `
-      + 'It does work on the system: the energy is not conserved.';
+    info = `Die Kraft ist F₀ sin(2π f t + φ) (Ω = 2π f = ${fixed(2 * Math.PI * freq, 3)} rad/s); ihre Richtung bleibt im Raum fest. `
+      + 'Sie verrichtet Arbeit am System: die Energie bleibt nicht erhalten.';
   }
   return {
-    title: `${impulse ? 'Impulse' : harmonic ? 'Harmonic load' : 'Force / moment'} ${load.id}`,
+    title: `${impulse ? 'Impuls' : harmonic ? 'Harmonische Last' : 'Kraft / Moment'} ${load.id}`,
     info: [info],
     fields,
   };
@@ -322,28 +324,28 @@ function loadForm(load, draft) {
 // unless every value is valid.
 export function applyProperties(model, id, values) {
   const form = propertyFields(model, id, values);
-  if (!form) return { ok: false, errors: [`unknown object "${id}"`] };
+  if (!form) return { ok: false, errors: [`unbekanntes Objekt „${id}“`] };
 
   const parsed = {};
   const errors = [];
   for (const f of form.fields) {
     if (f.type === 'select') {
       parsed[f.key] = String(values[f.key]);
-      if (!f.options.some(([v]) => v === parsed[f.key])) errors.push(`${f.label}: unknown option`);
+      if (!f.options.some(([v]) => v === parsed[f.key])) errors.push(`${f.label}: unbekannte Auswahl`);
       continue;
     }
     const text = String(values[f.key] ?? '').trim().replace(',', '.');
     const n = text === '' ? NaN : Number(text);
     if (!Number.isFinite(n)) {
-      errors.push(`${f.label}: enter a number`);
+      errors.push(`${f.label}: eine Zahl eingeben`);
     } else if (f.minExclusive !== undefined && !(n > f.minExclusive)) {
-      errors.push(`${f.label}: must be greater than ${f.minExclusive}`);
+      errors.push(`${f.label}: muss größer als ${comma(f.minExclusive)} sein`);
     } else if (f.min !== undefined && n < f.min) {
-      errors.push(`${f.label}: must be at least ${fixed(f.min, 3)}`);
+      errors.push(`${f.label}: muss mindestens ${fixed(f.min, 3)} sein`);
     } else if (f.max !== undefined && n > f.max) {
-      errors.push(`${f.label}: must be at most ${fixed(f.max, 3)}`);
+      errors.push(`${f.label}: darf höchstens ${fixed(f.max, 3)} sein`);
     } else if (f.integer && !Number.isInteger(n)) {
-      errors.push(`${f.label}: must be a whole number`);
+      errors.push(`${f.label}: muss eine ganze Zahl sein`);
     } else {
       parsed[f.key] = n;
     }
@@ -352,7 +354,7 @@ export function applyProperties(model, id, values) {
   if (!errors.length && form.fields.some((f) => f.key === 'sectionType')) {
     const section = sectionFromValues(parsed);
     const problem = section && sectionError(section);
-    if (problem) errors.push(`Cross section: ${problem}.`);
+    if (problem) errors.push(`Querschnitt: ${problem}.`);
   }
   if (errors.length) return { ok: false, errors };
 
@@ -400,9 +402,7 @@ export function applyProperties(model, id, values) {
   return { ok: true, errors: [] };
 }
 
-function fixed(x, digits = 2) {
-  return Number.isFinite(x) ? x.toFixed(digits) : '–';
-}
+const fixed = decimal;
 
 function round(x, digits) {
   const f = 10 ** digits;

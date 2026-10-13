@@ -1,3 +1,5 @@
+import { comma } from '../../format.js';
+
 // load.js - external force and moment at a point: arrow (force) and circular arrow (moment).
 // Constant loads are drawn solid, impulses dashed; an impulse fades once it has been applied. A harmonic
 // load (v0.4) is drawn solid with its frequency in the label; its arrow follows the instantaneous force.
@@ -58,7 +60,7 @@ function drawMoment(ctx, p, moment, impulse) {
   arrowHead(ctx, tip[0], tip[1], -sign * Math.sin(end), -sign * Math.cos(end));
 }
 
-const trimNumber = (x) => String(Math.round(x * 100) / 100);
+const trimNumber = (x) => comma(Math.round(x * 100) / 100);
 
 export function drawLoad(ctx, cam, spec, entry, theme) {
   const params = spec.params || {};
@@ -96,7 +98,7 @@ export function drawLoad(ctx, cam, spec, entry, theme) {
     ctx.font = '11px system-ui, sans-serif';
     ctx.textBaseline = 'bottom';
     const at = tip || [p[0] + MOMENT_RADIUS + 4, p[1] - MOMENT_RADIUS];
-    ctx.fillText(`${impulse ? 'impulse ' : ''}${parts.join(', ')}`, at[0] + 6, at[1] - 4);
+    ctx.fillText(`${impulse ? 'Impuls ' : ''}${parts.join(', ')}`, at[0] + 6, at[1] - 4);
   }
   ctx.restore();
 }

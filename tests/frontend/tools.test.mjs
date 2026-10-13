@@ -48,7 +48,7 @@ test('rect: a degenerate rectangle is rejected with a message', () => {
   const t = tools.get('rect');
   drag(t, [0, 0], [0.01, 0.4]);
   assert.equal(model.scene.bodies.length, 0);
-  assert.match(t.error, /small/i);
+  assert.match(t.error, /klein/i);
 });
 
 test('rect: starting on a surface aligns the rectangle with it', () => {
@@ -140,7 +140,7 @@ test('surface: length is rounded to the grid and shown while dragging', () => {
   t.move({ world: [0, 0] });
   t.down({ world: [0, 0] });
   t.move({ world: [1.02, 0.57] });
-  assert.match(t.preview.label, /1\.15 m, 30°/);
+  assert.match(t.preview.label, /1,15 m, 30°/);
   t.up({ world: [1.02, 0.57] });
   close(surfaceLen(model.scene.surfaces[0]), 1.15, 1e-6);
 });
@@ -181,7 +181,7 @@ test('spring: A on the ground, B on a mass, then the relaxed length (ghost)', ()
   click(t, [0, 0.5]);
   click(t, [0.8, 0.5]); // left edge midpoint of m1
   assert.equal(model.scene.elements.length, 0);
-  assert.match(t.hint, /relaxed length/);
+  assert.match(t.hint, /entspannte Länge/);
   click(t, [0.5, 0.5]);
   const sp = model.scene.elements[0];
   assert.equal(sp.type, 'spring');
@@ -201,11 +201,11 @@ test('spring: the ghost preview hangs from the ground end and says tension or co
   let pv = t.preview;
   closePoint(pv.ghost.from, [0, 0.5]);
   closePoint(pv.ghost.to, [0.5, 0.5]);
-  assert.match(pv.label, /relaxed L0 = 0\.50 m \(tension\)/);
+  assert.match(pv.label, /entspannt L0 = 0,50 m \(Zug\)/);
   t.move({ world: [1.1, 0.5] });
   pv = t.preview;
   closePoint(pv.ghost.to, [1.1, 0.5]);
-  assert.match(pv.label, /\(compression\)/);
+  assert.match(pv.label, /\(Druck\)/);
 });
 
 test('spring: Enter, or a click at the installed length, means no pre-stress', () => {
@@ -225,7 +225,7 @@ test('spring: the end on the ground is stored first, whichever was clicked first
   const t = tools.get('spring');
   click(t, [0.8, 0.5]); // the mass first
   click(t, [0, 0.5]);
-  assert.match(t.preview.label, /tension|compression|unloaded/);
+  assert.match(t.preview.label, /Zug|Druck|spannungsfrei/);
   assert.deepEqual(t.preview.ghost.from, [0, 0.5], 'ghost starts at the ground end');
   click(t, [0.3, 0.5]);
   const sp = model.scene.elements[0];
@@ -248,7 +248,7 @@ test('spring: both ends on the ground is refused and B can be picked again', () 
   const t = tools.get('spring');
   click(t, [0, 0.5]);
   click(t, [0, 1.5]);
-  assert.match(t.error, /on a mass/);
+  assert.match(t.error, /Masse/);
   assert.equal(t.stage, 1);
   click(t, [0.8, 0.5]);
   assert.equal(t.stage, 2);
@@ -316,7 +316,7 @@ test('load: refuses to act off a mass, and shows an invalid marker while hoverin
   t.move({ world: [3, 3] });
   assert.equal(t.marker.kind, 'invalid');
   click(t, [3, 3]);
-  assert.match(t.error, /on a mass/);
+  assert.match(t.error, /Masse/);
   assert.equal(model.scene.elements.length, 0);
   t.up({ world: [3, 3] });
 });
@@ -327,7 +327,7 @@ test('load: the force arrow preview reports newtons', () => {
   t.down({ world: [1.2, 0.6] });
   t.move({ world: [1.6, 0.6] });
   assert.deepEqual(t.preview.force.map((v) => Math.round(v)), [8, 0]);
-  assert.match(t.preview.label, /8\.0 N/);
+  assert.match(t.preview.label, /8,0 N/);
 });
 
 // --- supports ------------------------------------------------------------------------------------
@@ -340,14 +340,14 @@ test('Festlager: first a point of the mass, then the surface', () => {
   const t = tools.get('pin');
   click(t, [0.3, 0.0]);
   assert.equal(model.scene.constraints.length, 0, 'nothing yet');
-  assert.match(t.hint, /click the surface/i);
+  assert.match(t.hint, /Fläche anklicken/i);
   assert.ok(t.marker, 'the picked point stays marked');
   click(t, [0.8, 0.0]); // anywhere on the surface: it only picks the surface
   assert.deepEqual(model.scene.constraints[0], {
     id: 'A1', type: 'pin_support', body: 'm1', point: [-0.2, -0.1], surface: 's1', params: { angle: 0 },
   });
   assert.deepEqual(log.created, [['constraint', 'A1']]);
-  assert.match(t.hint, /Click a point of a mass/, 'ready for the next one');
+  assert.match(t.hint, /Einen Punkt einer Masse anklicken/, 'ready for the next one');
 });
 
 test('supports: the surface may be further away than the mass; the preview spans the gap', () => {
@@ -385,14 +385,14 @@ test('Loslager: the second click must be a surface; Escape cancels the first', (
   t.move({ world: [1.5, 1.5] });
   assert.equal(t.preview.valid, false);
   click(t, [1.5, 1.5]);
-  assert.match(t.error, /needs a surface/);
+  assert.match(t.error, /braucht eine Fläche/);
   assert.equal(model.scene.constraints.length, 0);
   assert.ok(t.first, 'still waiting for the surface');
   assert.equal(t.key('Escape'), true);
   assert.equal(t.first, null);
   assert.equal(t.key('Escape'), false);
   click(t, [1.5, 1.5]);
-  assert.match(t.error, /point of a mass/);
+  assert.match(t.error, /Punkt einer Masse/);
 });
 
 test('Festlager and fixed Lager without a surface: second click elsewhere', () => {
@@ -445,7 +445,7 @@ test('supports: not on a mass is an error, with an invalid marker (except the Fe
   assert.equal(t.marker.kind, 'invalid');
   assert.equal(t.preview.valid, false);
   click(t, [1.5, 0.5]);
-  assert.match(t.error, /point of a mass/);
+  assert.match(t.error, /Punkt einer Masse/);
   assert.equal(model.scene.constraints.length, 0);
 });
 

@@ -3,6 +3,7 @@
 // axial force is written next to it and the bar is drawn in the colour of the force: tension blue,
 // compression red. An elastic bar (v0.4b) is drawn along its bent shape (entry.nodes, with the Bending
 // exaggeration of the toolbar) and, while compressed, says how much of its Euler load it carries.
+import { decimal } from '../../format.js';
 import { beamCurve, exaggerate } from './beam.js';
 
 const HINGE = 4; // px
@@ -10,7 +11,7 @@ const MIN_FORCE = 1e-6; // N: below this no label
 
 export const formatForce = (f) => {
   const a = Math.abs(f);
-  const text = a >= 1e5 ? `${(a / 1e3).toFixed(0)} kN` : a >= 1e3 ? `${(a / 1e3).toFixed(2)} kN` : `${a.toFixed(a >= 100 ? 0 : 1)} N`;
+  const text = a >= 1e5 ? `${decimal(a / 1e3, 0)} kN` : a >= 1e3 ? `${decimal(a / 1e3, 2)} kN` : `${decimal(a, a >= 100 ? 0 : 1)} N`;
   return `${f < 0 ? '−' : '+'}${text}`;
 };
 
@@ -71,7 +72,7 @@ export function strokeStab(ctx, cam, entry, theme, elastic) {
     // a compressed elastic bar: how much of its Euler load it carries
     const ratio = elastic && force < 0 && entry.pcr > 0 ? -force / entry.pcr : 0;
     let text = formatForce(force);
-    if (ratio >= 0.05) text += `  (${Math.round(ratio * 100)} % of Pcr${ratio >= 1 ? ', buckled' : ''})`;
+    if (ratio >= 0.05) text += `  (${Math.round(ratio * 100)} % der Knicklast${ratio >= 1 ? ', geknickt' : ''})`;
     ctx.font = `${ratio >= 0.9 ? 'bold ' : ''}11px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

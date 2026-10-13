@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Fachwerk: statically determinate truss",
+  "name": "Fachwerk: statisch bestimmt",
   "description": "Five nodes joined by seven rigid Stabs, a Festlager on A and a Loslager on C: 2 j = 10 = 7 members + 3 reactions, so the forces are determined by equilibrium alone (method of joints). A 2 kN load hangs on B. While it runs, every Stab shows its force: tension blue, compression red (the bottom chord pulls, the top chord and the diagonals towards the supports push). Reactions: 1 kN at each support plus half the weight of the nodes.",
   "gravity": [
     0,

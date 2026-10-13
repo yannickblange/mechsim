@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "name": "Single mass on a spring",
+  "name": "Einzelmasse an einer Feder",
   "description": "Block hanging from a ceiling spring. Pure vertical oscillation, omega0 = sqrt(k/m) = 10 rad/s.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },

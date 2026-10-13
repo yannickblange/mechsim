@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "name": "Two-mass chain",
+  "name": "Zwei-Massen-Kette",
   "description": "Two blocks connected in series by springs, hanging from the ceiling. Body-to-body spring test.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },

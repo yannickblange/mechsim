@@ -1,6 +1,6 @@
 {
   "version": "0.3",
-  "name": "Mass on two Stabs",
+  "name": "Masse an zwei Stäben",
   "description": "A block hangs from two Stabs (rods that take push and pull) whose upper ends are Festlager in free space. It swings sideways (the start velocity is the one the rods allow); the rod forces change in time.",
   "gravity": [
     0,

@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "name": "Physical pendulum",
+  "name": "Physikalisches Pendel",
   "description": "Slender block pinned at its top end (Festlager), released at 0.1 rad.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },

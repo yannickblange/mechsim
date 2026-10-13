@@ -16,7 +16,7 @@ test('Festlager: a click in free space places a pin that belongs to no mass', ()
   const t = tools.get('pin');
   t.move({ world: [1.0, 1.5] });
   assert.equal(t.preview.valid, true);
-  assert.match(t.preview.label, /free space/);
+  assert.match(t.preview.label, /freier Raum/);
   click(t, [1.0, 1.5]);
   assert.deepEqual(model.scene.constraints[0], {
     id: 'A1', type: 'pin_support', body: null, point: [1, 1.5], surface: null, params: { angle: 0 },
@@ -40,11 +40,11 @@ test('Festlager in free space: not twice at the same place; other supports still
   const pin = tools.get('pin');
   click(pin, [1, 1]);
   click(pin, [1.004, 1.003]);
-  assert.match(pin.error, /already a Festlager/);
+  assert.match(pin.error, /schon ein Festlager/);
   assert.equal(model.scene.constraints.length, 1);
   const fixed = tools.get('fixed');
   click(fixed, [2, 2]);
-  assert.match(fixed.error, /point of a mass/);
+  assert.match(fixed.error, /Punkt einer Masse/);
 });
 
 test('snapping: ends snap to a Festlager in free space only when asked', () => {
@@ -89,18 +89,18 @@ test('links: both ends on the ground, the same mass, or too close together are r
   const t = tools.get('rope'); // (a Stab makes a node of a free end: see truss.test.mjs)
   click(t, [0, 1.5]);
   click(t, [1, 1.5]);
-  assert.match(t.error, /at least one end on a mass/);
+  assert.match(t.error, /Mindestens ein Ende muss an einer Masse/);
   click(t, [0.0, 0.5]); // the first end is still set: this one is fine
   assert.equal(model.scene.constraints.length, 1);
 
   click(t, [-0.2, 0.5]);
   click(t, [0.2, 0.5]);
-  assert.match(t.error, /same mass/);
+  assert.match(t.error, /derselben Masse/);
   t.key('Escape');
 
   click(t, [0, 1.5]);
   click(t, [0.02, 1.5]);
-  assert.match(t.error, /too close|at least one end/);
+  assert.match(t.error, /zu dicht|Mindestens ein Ende/);
   assert.equal(model.scene.constraints.length, 1);
 });
 
@@ -146,7 +146,7 @@ test('joint: one mass is not enough; three masses join the top two', () => {
   t.move({ world: [0.2, 0] });
   assert.equal(t.marker.kind, 'invalid');
   click(t, [0.2, 0]);
-  assert.match(t.error, /two masses/);
+  assert.match(t.error, /zwei Massen/);
   assert.equal(one.model.scene.constraints.length, 0);
 
   const three = setup(sceneWith({ bodies: [block('a', 0, 0, 0.4, 0.4), block('b', 0, 0, 0.4, 0.4), block('c', 0, 0, 0.4, 0.4)] }));
@@ -169,7 +169,7 @@ test('joint: on a free-space Festlager it pins the mass that lies on it (same id
   // a pin without a mass on it cannot be attached
   model.addGroundPin({ point: [2, 2] });
   click(t, [2, 2]);
-  assert.match(t.error, /mass onto the Festlager/);
+  assert.match(t.error, /Masse auf das Festlager/);
 });
 
 // --- model ---------------------------------------------------------------------------------------
@@ -249,27 +249,27 @@ test('rope form: length at least the distance between the ends; equal means taut
   assert.deepEqual(form.fields.map((f) => f.key), ['length']);
   close(form.fields[0].value, 1.4, 1e-6); // (0,1.5) to (0,0.1)
   assert.equal(applyProperties(m, 'R1', { length: '1.0' }).ok, false);
-  assert.match(applyProperties(m, 'R1', { length: '1.0' }).errors[0], /at least 1\.400/);
+  assert.match(applyProperties(m, 'R1', { length: '1.0' }).errors[0], /mindestens 1,400/);
   assert.equal(applyProperties(m, 'R1', { length: '2.5' }).ok, true);
   assert.deepEqual(m.find('R1').obj.params, { length: 2.5 });
   assert.equal(applyProperties(m, 'R1', { length: '1.4' }).ok, true);
   assert.deepEqual(m.find('R1').obj.params, {}, 'the rope is taut again');
-  assert.match(propertyFields(m, 'R1').info[0], /never stretches/);
+  assert.match(propertyFields(m, 'R1').info[0], /dehnt sich nie/);
 });
 
 test('Stab, joint and free pin forms', () => {
   const { m } = wired();
   const rod = propertyFields(m, 'S1');
   assert.deepEqual(rod.fields.map((f) => [f.key, f.value]), [['sectionType', 'rigid']]); // v0.4: a cross section is optional
-  assert.match(rod.info[0], /two-force/);
+  assert.match(rod.info[0], /Zweikraftglied/);
   const joint = propertyFields(m, 'G1');
-  assert.match(joint.title, /Hinge/);
-  assert.match(joint.info[0], /Joins a and b/);
+  assert.match(joint.title, /Gelenk/);
+  assert.match(joint.info[0], /Verbindet a und b/);
   assert.equal(applyProperties(m, 'G1', { jointType: 'fixed_joint' }).ok, true);
   assert.equal(m.find('G1').obj.type, 'fixed_joint');
-  assert.match(propertyFields(m, 'G1').title, /Rigid/);
+  assert.match(propertyFields(m, 'G1').title, /Starr/);
   assert.equal(applyProperties(m, 'G1', { jointType: 'bogus' }).ok, false);
-  assert.match(propertyFields(m, 'A1').title, /free space/);
+  assert.match(propertyFields(m, 'A1').title, /freier Raum/);
 });
 
 // --- slack rope geometry -------------------------------------------------------------------------

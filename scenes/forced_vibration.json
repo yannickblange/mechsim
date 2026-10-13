@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Erzwungene Schwingung: forced vibration near resonance",
+  "name": "Erzwungene Schwingung nahe der Resonanz",
   "description": "Block, spring and damper (zeta = 0.1) as before, at rest at its equilibrium, shaken by a harmonic force F(t) = 4 N sin(2 pi 0.9 Hz t) at the centre of mass. The excitation is at 0.90 times the natural frequency (1 Hz): after a beating transient that decays like exp(-zeta omega0 t) the block oscillates at the exciting frequency with the steady-state amplitude F0/k / sqrt((1 - eta^2)^2 + (2 zeta eta)^2) = 0.387 m, almost 4 times the static deflection F0/k = 0.101 m. Right-click the mass for its displacement graph.",
   "gravity": [
     0,

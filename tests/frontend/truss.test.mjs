@@ -14,7 +14,7 @@ test('Stab: free ends make nodes, the Stab is anchored to them (not to the groun
   const { model, tools, log } = setup();
   const t = tools.get('rod');
   click(t, [0, 0]);
-  assert.match(t.hint, /second end/);
+  assert.match(t.hint, /zweite Ende/);
   assert.equal(t.preview.newNodes.length, 2, 'both ends of the Stab are free: two nodes will be made');
   click(t, [1, 0]);
   assert.equal(model.scene.bodies.length, 2);
@@ -79,7 +79,7 @@ test('Stab: from a Festlager in free space the end is a fixed point; two of them
   assert.equal(rods(model)[0].b.body, 'N1');
   click(t, [0, 2]);
   click(t, [2, 2]); // the second pin: both ends on the ground
-  assert.match(t.error, /at least one end on a mass/);
+  assert.match(t.error, /Mindestens ein Ende muss an einer Masse/);
   assert.equal(rods(model).length, 1);
 });
 
@@ -99,19 +99,19 @@ test('Stab ends too close together or on one mass are refused', () => {
   const t = tools.get('rod');
   click(t, [0, 0]);
   click(t, [0.02, 0]);
-  assert.match(t.error, /too close/);
+  assert.match(t.error, /zu dicht/);
   assert.equal(model.scene.bodies.length, 0, 'no nodes were made for a refused Stab');
 });
 
 test('node tool: places a node, refuses a second one at the same point, one undo step', () => {
   const { model, tools, log } = setup();
   const t = tools.get('node');
-  assert.match(t.hint, /node/i);
+  assert.match(t.hint, /Knoten/i);
   click(t, [0.5, 0.5]);
   assert.deepEqual(nodes(model)[0], { id: 'N1', type: 'node', position: [0.5, 0.5], angle: 0, params: { mass: 1 } });
   assert.deepEqual(log.created.at(-1), ['body', 'N1']);
   click(t, [0.5, 0.5]);
-  assert.match(t.error, /already a node/);
+  assert.match(t.error, /schon ein Knoten/);
   assert.equal(nodes(model).length, 1);
   assert.equal(model.undoStack.length, 1);
 });
@@ -179,7 +179,7 @@ test('node properties: mass and start velocity', () => {
   click(tools.get('node'), [0, 0]);
   const form = propertyFields(model, 'N1');
   assert.deepEqual(form.fields.map((f) => f.key), ['mass', 'vx', 'vy', 'damping']);
-  assert.match(form.title, /Node/);
+  assert.match(form.title, /Knoten/);
   assert.equal(applyProperties(model, 'N1', { mass: '2.5', vx: '0', vy: '0.5', damping: '0' }).ok, true);
   assert.equal(model.body('N1').params.mass, 2.5);
   assert.equal('damping' in model.body('N1').params, false, 'no damping is not stored');
@@ -196,13 +196,13 @@ test('a Stab becomes elastic with a cross section and rigid again, keeping id an
   const before = rods(model)[0];
   let form = propertyFields(model, 'S1');
   assert.equal(form.fields[0].value, 'rigid');
-  assert.match(form.info.join(' '), /Rigid/);
+  assert.match(form.info.join(' '), /Starr/);
 
   // the select was changed to I: the form is built again with default I dimensions
   form = propertyFields(model, 'S1', { sectionType: 'I' });
   assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_b', 'sec_h', 'sec_tf', 'sec_tw', 'segments', 'massMode', 'damping', 'bow']);
   assert.ok(form.section && form.section.type === 'I');
-  assert.match(form.info.join(' '), /Euler load/);
+  assert.match(form.info.join(' '), /Knicklast/);
 
   const values = { sectionType: 'I', sec_b: '100', sec_h: '200', sec_tf: '10', sec_tw: '6', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' };
   assert.equal(applyProperties(model, 'S1', values).ok, true);
@@ -211,8 +211,8 @@ test('a Stab becomes elastic with a cross section and rigid again, keeping id an
   assert.deepEqual(bar, { id: 'S1', type: 'bar', a: before.a, b: before.b, params: { section: { type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.006 }, damping: 5 } });  // a bow of 0.02 mm on 2 m is the default: not stored
 
   form = propertyFields(model, 'S1');
-  assert.match(form.title, /elastic/);
-  assert.match(form.info.join(' '), /axial stiffness/);
+  assert.match(form.title, /elastisch/);
+  assert.match(form.info.join(' '), /Dehnsteifigkeit/);
   assert.equal(form.fields[0].value, 'I');
   assert.equal(form.fields.find((f) => f.key === 'sec_h').value, 200);
 
@@ -230,7 +230,7 @@ test('an impossible cross section is refused with the reason', () => {
   click(tools.get('rod'), [0, 0]); click(tools.get('rod'), [2, 0]);
   const r = applyProperties(model, 'S1', { sectionType: 'I', sec_b: '100', sec_h: '20', sec_tf: '12', sec_tw: '6', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' });
   assert.equal(r.ok, false);
-  assert.match(r.errors.join(' '), /flanges/);
+  assert.match(r.errors.join(' '), /Flansche/);
   assert.equal(rods(model).length, 1, 'nothing changed');
   const nan = applyProperties(model, 'S1', { sectionType: 'square', sec_a: 'abc', segments: '4', massMode: 'steel', damping: '5', bow: '0.02' });
   assert.equal(nan.ok, false);
@@ -260,8 +260,8 @@ test('elastic Stab form: Euler load, elements, mass, damping and the bow in mm',
   assert.equal(form.fields.find((f) => f.key === 'bow').value, 4);
   assert.equal(form.fields.find((f) => f.key === 'segments').value, 8);
   const pcr = (Math.PI ** 2 * 210e9 * 0.02 ** 4 / 12) / 4; // 6909 N
-  assert.match(form.info.join(' '), /Euler load .* 6909 N/);
-  assert.match(form.info.join(' '), /slenderness L \/ i = 346/);
+  assert.match(form.info.join(' '), /Knicklast .* 6909 N/);
+  assert.match(form.info.join(' '), /Schlankheit L \/ i = 346/);
   assert.ok(pcr > 6900 && pcr < 6910);
 
   // back to the defaults: 4 elements, steel, the standard bow (0.02 mm on 2 m) are not stored

@@ -52,7 +52,7 @@ test('block form: mass properties with the moment of inertia', () => {
   const m = scene();
   const form = propertyFields(m, 'small');
   assert.deepEqual(form.fields.map((f) => f.key), ['mass', 'width', 'height', 'angle', 'vx', 'vy', 'omega']);
-  assert.match(form.info[0], /J = 0\.0067 kg·m²/); // 1 * (0.04 + 0.04) / 12
+  assert.match(form.info[0], /J = 0,0067 kg·m²/); // 1 * (0.04 + 0.04) / 12
   assert.equal(fieldMap(form).mass.value, 1);
   assert.equal(fieldMap(form).mass.unit, 'kg');
 });
@@ -62,7 +62,7 @@ test('disc form: radius instead of width and height, J = m r^2 / 2', () => {
   m.updateBody('d', { mass: 2 });
   const form = propertyFields(m, 'd');
   assert.deepEqual(form.fields.map((f) => f.key), ['mass', 'radius', 'angle', 'vx', 'vy', 'omega']);
-  assert.match(form.info[0], /J = 0\.0225 kg·m²/);
+  assert.match(form.info[0], /J = 0,0225 kg·m²/);
 });
 
 test('applying a valid block form updates mass, size, angle and initial velocity', () => {
@@ -83,9 +83,9 @@ test('invalid input changes nothing and lists every problem', () => {
   const res = applyProperties(m, 'small', { mass: '-1', width: 'abc', height: '0.3', angle: '', vx: '0', vy: '0', omega: '0' });
   assert.equal(res.ok, false);
   assert.equal(res.errors.length, 3);
-  assert.match(res.errors.join(' '), /Mass.*greater than 0/);
-  assert.match(res.errors.join(' '), /Width.*enter a number/);
-  assert.match(res.errors.join(' '), /Angle.*enter a number/);
+  assert.match(res.errors.join(' '), /Masse.*größer als 0/);
+  assert.match(res.errors.join(' '), /Breite.*Zahl eingeben/);
+  assert.match(res.errors.join(' '), /Winkel.*Zahl eingeben/);
   assert.equal(JSON.stringify(m.scene), before);
   assert.equal(m.revision, revision, 'no undo step was recorded');
 });
@@ -94,10 +94,10 @@ test('spring form: stiffness and relaxed length, with tension / compression info
   const m = scene();
   const form = propertyFields(m, 'k1');
   assert.deepEqual(form.fields.map((f) => f.key), ['k', 'restLength']);
-  assert.match(form.info[0], /Installed length 0\.49 m.*tension/); // (3, 0.5) to the disc rim at (2.65, 0.15)
+  assert.match(form.info[0], /Eingebaute Länge 0,49 m.*Zug/); // (3, 0.5) to the disc rim at (2.65, 0.15)
   assert.equal(applyProperties(m, 'k1', { k: '40', restLength: '0.6' }).ok, true);
   assert.deepEqual(m.find('k1').obj.params, { k: 40, rest_length: 0.6 });
-  assert.match(propertyFields(m, 'k1').info[0], /compression/);
+  assert.match(propertyFields(m, 'k1').info[0], /Druck/);
   assert.equal(applyProperties(m, 'k1', { k: '-5', restLength: '0.6' }).ok, false);
   assert.equal(applyProperties(m, 'k1', { k: '0', restLength: '0' }).ok, true, 'k = 0 and L0 = 0 are allowed');
 });
@@ -107,7 +107,7 @@ test('spring without a rest length shows the installed length as the default', (
   const id = m.addSpring({ a: { body: null, point: [2, 0] }, b: { body: 'a', point: [0.5, 0] } });
   const form = propertyFields(m, id);
   assert.equal(fieldMap(form).restLength.value, 1.5);
-  assert.match(form.info[0], /unloaded/);
+  assert.match(form.info[0], /unbelastet/);
 });
 
 test('load form: type switch changes the units; a load can become an impulse', () => {
@@ -121,18 +121,18 @@ test('load form: type switch changes the units; a load can become an impulse', (
   assert.deepEqual(m.find('F1').obj.params, { force: [2, -3], moment: 0.5, mode: 'impulse' });
   form = propertyFields(m, 'F1');
   assert.equal(fieldMap(form).fx.unit, 'N·s');
-  assert.match(form.title, /Impulse/);
+  assert.match(form.title, /Impuls/);
   assert.equal(applyProperties(m, 'F1', { mode: 'ramp', fx: '1', fy: '1', moment: '0' }).ok, false);
 });
 
 test('surfaces and supports have no editable fields but describe themselves', () => {
   const m = scene();
   assert.deepEqual(propertyFields(m, 's1').fields, []);
-  assert.match(propertyFields(m, 's1').info[0], /Length 3\.00 m, direction 0\.0°/);
+  assert.match(propertyFields(m, 's1').info[0], /Länge 3,00 m, Richtung 0,0°/);
   const pin = propertyFields(m, 'A1');
   assert.deepEqual(pin.fields, []);
   assert.match(pin.title, /Festlager/);
-  assert.match(pin.info.join(' '), /on surface s1/);
+  assert.match(pin.info.join(' '), /auf Fläche s1/);
   assert.deepEqual(applyProperties(m, 'A1', {}), { ok: true, errors: [] });
   assert.equal(propertyFields(m, 'nope'), null);
   assert.equal(applyProperties(m, 'nope', {}).ok, false);

@@ -1,6 +1,6 @@
 {
   "version": "0.3",
-  "name": "Double pendulum (pin joint)",
+  "name": "Doppelpendel (Gelenk)",
   "description": "Two bars: the upper one on a Festlager, the lower one hinged to it with a pin joint (Gelenk).",
   "gravity": [
     0,

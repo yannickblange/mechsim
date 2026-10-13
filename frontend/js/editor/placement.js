@@ -5,7 +5,7 @@ import { SNAP_TOLERANCE_PX, snapPoint, surfaceNear } from './snap.js';
 
 export const SUPPORT_LABELS = {
   pin_support: 'Festlager',
-  fixed_support: 'Lager (fixed)',
+  fixed_support: 'Einspannung',
   roller_support: 'Loslager',
 };
 
@@ -19,8 +19,8 @@ export const SURFACE_PICK_PX = 1.5 * SNAP_TOLERANCE_PX;
 export function pickSupportPoint(scene, type, world, scale) {
   const s = snapPoint(world, scene, { scale, interior: true, surfaces: true, pins: true });
   if (s.body) return { body: s.body, point: s.point, local: s.local, kind: s.kind };
-  if (type !== 'pin_support') return { error: 'Click a point of a mass first.', point: s.point };
-  if (s.kind === 'pin') return { error: 'There is already a Festlager here.', point: s.point };
+  if (type !== 'pin_support') return { error: 'Zuerst einen Punkt einer Masse anklicken.', point: s.point };
+  if (s.kind === 'pin') return { error: 'Hier ist schon ein Festlager.', point: s.point };
   // Festlager in free space: on a surface it adopts it, on the side the pointer is on.
   const surface = surfaceNear(s.point, scene.surfaces, scale);
   return {

@@ -1,6 +1,6 @@
 {
   "version": "0.3",
-  "name": "Welded L pendulum (fixed joint)",
+  "name": "Geschweißtes L-Pendel (starre Verbindung)",
   "description": "A vertical and a horizontal bar welded together with a fixed joint and pinned at the top: it swings as one rigid L-shaped body.",
   "gravity": [
     0,

@@ -1,6 +1,6 @@
 {
   "version": "0.3",
-  "name": "Spring and damper in parallel",
+  "name": "Feder und Dämpfer parallel",
   "description": "A mass hangs from the ceiling on a spring; a damper below it (c = 8 N s/m, damping ratio 0.2) acts in parallel to the spring. Released 0.4 m below its relaxed position, it oscillates with a decaying amplitude about the static equilibrium.",
   "gravity": [
     0,

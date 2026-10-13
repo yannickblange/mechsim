@@ -7,6 +7,7 @@ import {
   add, dist, dot, length, normalizeAngle, rotate, roundTo, snapSegmentEnd, sub, surfaceAngle, tidy,
   worldToLocal,
 } from './geometry.js';
+import { decimal } from '../format.js';
 import { FORCE_M_PER_N, hitTest, anchorWorld, moveTarget } from './hit.js';
 import {
   contactOffset, jointGroup, linkProblem, moveBodies, movePin, moveSurface, reattachEnd,
@@ -46,7 +47,7 @@ class Tool {
 // --- select -------------------------------------------------------------------------------------
 
 export class SelectTool extends Tool {
-  get hint() { return 'Click an object to select it, Delete removes it. Right-click for its properties.'; }
+  get hint() { return 'Objekt anklicken zum Auswählen, Entf löscht es. Rechtsklick öffnet die Eigenschaften.'; }
 
   down(e) {
     const hit = hitTest(this.scene, e.world, this.scale);
@@ -105,7 +106,7 @@ class TwoPointTool extends Tool {
 
   finish(e) {
     const end = this.constrainEnd(this.p1, e.world, e);
-    if (!this.commit(this.p1, end, this.start)) this.error = this.error || 'Too small - try again.';
+    if (!this.commit(this.p1, end, this.start)) this.error = this.error || 'Zu klein – bitte noch einmal.';
     this.cancel();
   }
 
@@ -133,8 +134,8 @@ export class RectTool extends TwoPointTool {
 
   get hint() {
     return this.p1
-      ? 'Release / click the opposite corner.'
-      : 'Drag from corner to corner to create a rectangular mass. Start on a surface to align the rectangle with it.';
+      ? 'Loslassen bzw. die gegenüberliegende Ecke anklicken.'
+      : 'Von Ecke zu Ecke ziehen, um eine rechteckige Masse zu erzeugen. Auf einer Fläche beginnen, um das Rechteck an ihr auszurichten.';
   }
 
   down(e) {
@@ -191,7 +192,7 @@ export class RectTool extends TwoPointTool {
 
 export class CircleTool extends TwoPointTool {
   get hint() {
-    return this.p1 ? 'Click / release to set the radius.' : 'Click the centre, then drag or click to set the radius.';
+    return this.p1 ? 'Klicken bzw. loslassen, um den Radius festzulegen.' : 'Den Mittelpunkt anklicken, dann ziehen oder klicken, um den Radius festzulegen.';
   }
 
   constrainEnd(p1, world) {
@@ -220,8 +221,8 @@ export class CircleTool extends TwoPointTool {
 export class SurfaceTool extends TwoPointTool {
   get hint() {
     return this.p1
-      ? 'Release / click the end point. The angle snaps to 0, 30, 45, 60, 90 degrees (hold Shift for free angles).'
-      : 'Drag to draw a fixed surface.';
+      ? 'Loslassen bzw. den Endpunkt anklicken. Der Winkel rastet bei 0, 30, 45, 60, 90 Grad ein (Umschalt gedrückt halten für freie Winkel).'
+      : 'Ziehen, um eine feste Fläche zu zeichnen.';
   }
 
   constrainEnd(p1, world, e) {
@@ -263,9 +264,9 @@ export class SpringTool extends Tool {
 
   get hint() {
     return [
-      'Click the first end of the spring (on a mass, a surface or free space).',
-      'Click the second end (drag from the first end also works).',
-      'Move the ghost spring to the relaxed length and click. Enter keeps the installed length.',
+      'Das erste Ende der Feder anklicken (an einer Masse, einer Fläche oder im freien Raum).',
+      'Das zweite Ende anklicken (Ziehen vom ersten Ende aus geht auch).',
+      'Die Schattenfeder auf die entspannte Länge ziehen und klicken. Enter behält die eingebaute Länge.',
     ][this.stage];
   }
 
@@ -315,11 +316,11 @@ export class SpringTool extends Tool {
   setB(world) {
     const b = this.anchorFrom(world);
     if (this.a.body === null && b.body === null) {
-      this.error = 'A spring needs at least one end on a mass.';
+      this.error = 'Eine Feder braucht mindestens ein Ende an einer Masse.';
       return;
     }
     if (dist(this.a.world, b.world) < MIN_SIZE_M) {
-      this.error = 'The spring is too short.';
+      this.error = 'Die Feder ist zu kurz.';
       return;
     }
     // Keep the end on the ground first: the relaxed ("ghost") spring hangs from it, and so does
@@ -394,7 +395,7 @@ export class SpringTool extends Tool {
     return {
       type: 'spring', a: g.a, b: g.b,
       ghost: { from: g.a, to: [g.a[0] + axis[0] * rest, g.a[1] + axis[1] * rest] },
-      label: `L = ${fmt(g.length)} m, relaxed L0 = ${fmt(rest)} m (${rest < g.length - 1e-9 ? 'tension' : rest > g.length + 1e-9 ? 'compression' : 'unloaded'})`,
+      label: `L = ${fmt(g.length)} m, entspannt L0 = ${fmt(rest)} m (${rest < g.length - 1e-9 ? 'Zug' : rest > g.length + 1e-9 ? 'Druck' : 'spannungsfrei'})`,
     };
   }
 }
@@ -411,8 +412,8 @@ export class LoadTool extends Tool {
 
   get hint() {
     return this.start
-      ? 'Release to set the force vector.'
-      : 'Press on a mass (centre, corner or edge) and drag to set a force. A plain click adds a moment.';
+      ? 'Loslassen, um den Kraftvektor festzulegen.'
+      : 'Auf eine Masse (Mitte, Ecke oder Kante) drücken und ziehen, um eine Kraft festzulegen. Ein einfacher Klick fügt ein Moment hinzu.';
   }
 
   pick(world) {
@@ -423,7 +424,7 @@ export class LoadTool extends Tool {
     this.error = null;
     const s = this.pick(e.world);
     if (!s.body) {
-      this.error = 'Place a force or moment on a mass.';
+      this.error = 'Kraft oder Moment an einer Masse ansetzen.';
       return true;
     }
     this.start = s;
@@ -498,13 +499,13 @@ export class SupportTool extends Tool {
     const name = SUPPORT_LABELS[this.type];
     if (this.first) {
       return this.type === 'roller_support'
-        ? 'Now click the surface the Loslager rolls on. It slides along it and adapts to its angle.'
-        : `Now click the surface the ${name} sits on: it adapts to its angle and spans the distance. `
-          + 'Click elsewhere for a support without a surface.';
+        ? 'Jetzt die Fläche anklicken, auf der das Loslager rollt. Es gleitet an ihr entlang und passt sich ihrem Winkel an.'
+        : `Jetzt die Fläche anklicken, auf der es sitzt (${name}): Es passt sich ihrem Winkel an und überbrückt den Abstand. `
+          + 'Woanders klicken für ein Lager ohne Fläche.';
     }
-    if (this.type === 'roller_support') return 'Click a point of a mass, then the surface it rolls on.';
-    const free = this.type === 'pin_support' ? ' Click free space to place a Festlager that ropes, Stabs and springs can attach to.' : '';
-    return `Click a point of a mass for the ${name}, then the surface it sits on.${free}`;
+    if (this.type === 'roller_support') return 'Einen Punkt einer Masse anklicken, dann die Fläche, auf der es rollt.';
+    const free = this.type === 'pin_support' ? ' Im freien Raum klicken, um ein Festlager zu setzen, an dem Seile, Stäbe und Federn angreifen können.' : '';
+    return `Einen Punkt einer Masse anklicken (${name}), dann die Fläche, auf der es sitzt.${free}`;
   }
 
   // What a click at `world` would do right now.
@@ -512,7 +513,7 @@ export class SupportTool extends Tool {
     if (!this.first) return pickSupportPoint(this.scene, this.type, world, this.scale);
     const surface = surfaceUnder(this.scene, world, this.scale);
     if (!surface && this.type === 'roller_support') {
-      return { error: 'A Loslager needs a surface: click on one.', point: this.first.point };
+      return { error: 'Ein Loslager braucht eine Fläche: eine anklicken.', point: this.first.point };
     }
     return { ...describeSupport(this.scene, this.first, surface), point: this.first.point, kind: this.first.kind, surfaceId: surface && surface.id };
   }
@@ -568,7 +569,7 @@ export class SupportTool extends Tool {
     return {
       type: 'support', supportType: this.type, point: p.point, angle: p.angle || 0, height,
       surface: p.surfaceId || null, valid: !p.error,
-      label: p.error ? '' : `${SUPPORT_LABELS[this.type]}${p.free ? ' (free space)' : ''}`,
+      label: p.error ? '' : `${SUPPORT_LABELS[this.type]}${p.free ? ' (freier Raum)' : ''}`,
     };
   }
 
@@ -589,7 +590,7 @@ export class SupportTool extends Tool {
 
 // --- rope and Stab ----------------------------------------------------------------------------------
 
-const LINK_NAMES = { rope: 'rope', rod: 'Stab', damper: 'damper' };
+const LINK_NAMES = { rope: 'Seil', rod: 'Stab', damper: 'Dämpfer' };
 
 // Two ends, each on a mass, on a Festlager in free space, or on the ground. The rope never stretches
 // but may go slack; the Stab keeps its length and takes push and pull; the damper resists the
@@ -610,13 +611,13 @@ export class LinkTool extends Tool {
   get hint() {
     if (this.kind === 'rod') {
       return this.a
-        ? 'Click the second end: a mass, node, Festlager - or free space (a new node).'
-        : 'Click the first end: a mass, node, Festlager - or free space (a new node). Join Stabs in nodes for a Fachwerk.';
+        ? 'Das zweite Ende anklicken: eine Masse, ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten).'
+        : 'Das erste Ende anklicken: eine Masse, ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten). Stäbe in Knoten verbinden ergibt ein Fachwerk.';
     }
-    if (this.a) return 'Click the second end (or release after dragging from the first).';
-    const extra = this.kind === 'rope' ? ' It never stretches; set a longer length in its properties to let it hang slack.'
-      : this.kind === 'damper' ? ' Set its damping c in its properties.' : '';
-    return `Click the first end of the ${LINK_NAMES[this.kind]}: a point of a mass, a Festlager in free space, or the ground.${extra}`;
+    if (this.a) return 'Das zweite Ende anklicken (oder nach dem Ziehen vom ersten Ende loslassen).';
+    const extra = this.kind === 'rope' ? ' Es dehnt sich nie; in den Eigenschaften eine größere Länge eintragen, damit es durchhängt.'
+      : this.kind === 'damper' ? ' Die Dämpfung c in den Eigenschaften einstellen.' : '';
+    return `Das erste Ende anklicken (${LINK_NAMES[this.kind]}): ein Punkt einer Masse, ein Festlager im freien Raum oder der Untergrund.${extra}`;
   }
 
   // A Stab never pins itself to empty space: its free ends become nodes (made when the Stab is created).
@@ -690,7 +691,7 @@ export class LinkTool extends Tool {
     }
     return {
       type: 'link', kind: this.kind, a: this.a.world, b: this.cursor, newNodes,
-      label: `${LINK_NAMES[this.kind]} ${dist(this.a.world, this.cursor).toFixed(2)} m`,
+      label: `${LINK_NAMES[this.kind]} ${fmt(dist(this.a.world, this.cursor))} m`,
     };
   }
 }
@@ -701,7 +702,7 @@ export class LinkTool extends Tool {
 // their own nodes at free ends; this tool places one first (to put a support on it, say).
 export class NodeTool extends Tool {
   get hint() {
-    return 'Click to place a node (Knoten) where Stabs meet; supports and forces can sit on it.';
+    return 'Anklicken, um einen Knoten dort zu setzen, wo Stäbe zusammentreffen; Lager und Kräfte können an ihm angreifen.';
   }
 
   pick(world) {
@@ -719,7 +720,7 @@ export class NodeTool extends Tool {
     this.error = null;
     const s = this.pick(e.world);
     if (s.existing) {
-      this.error = `There is already a node here (${s.existing}).`;
+      this.error = `Hier ist schon ein Knoten (${s.existing}).`;
       return true;
     }
     this.env.created('body', this.env.model.addNode({ point: s.point }));
@@ -740,8 +741,8 @@ export const MIN_BEAM_M = 0.1;
 export class BeamTool extends TwoPointTool {
   get hint() {
     return this.p1
-      ? 'Release / click the other end of the beam. Hold Shift for free angles.'
-      : 'Drag along the beam axis to create a bendable beam (steel); choose its cross section with a right-click.';
+      ? 'Loslassen bzw. das andere Ende des Balkens anklicken. Umschalt gedrückt halten für freie Winkel.'
+      : 'Entlang der Balkenachse ziehen, um einen biegbaren Balken (Stahl) zu erzeugen; den Querschnitt per Rechtsklick wählen.';
   }
 
   snapStart(world) { return this.snap(world, { surfaces: true, pins: true }); }
@@ -759,13 +760,13 @@ export class BeamTool extends TwoPointTool {
 
   get preview() {
     if (!this.p1) return null;
-    return { type: 'beam', start: this.p1, end: this.end, label: `${fmt(dist(this.p1, this.end))} m beam` };
+    return { type: 'beam', start: this.p1, end: this.end, label: `Balken ${fmt(dist(this.p1, this.end))} m` };
   }
 }
 
 // --- joints ---------------------------------------------------------------------------------------
 
-const JOINT_NAMES = { pin_joint: 'hinge (Gelenk)', fixed_joint: 'rigid joint' };
+const JOINT_NAMES = { pin_joint: 'Gelenk', fixed_joint: 'starre Verbindung' };
 
 // Joins two masses where they touch or overlap (hinge or rigid connection); on a Festlager in free
 // space with a mass on it, it pins that mass to the Festlager.
@@ -777,20 +778,20 @@ export class JointTool extends Tool {
   }
 
   get hint() {
-    return `Click where two masses touch or overlap to join them with a ${JOINT_NAMES[this.type]}. `
-      + 'On a Festlager in free space it pins the mass that lies on it.';
+    return `Dort anklicken, wo sich zwei Massen berühren oder überlappen, um sie zu verbinden (${JOINT_NAMES[this.type]}). `
+      + 'Auf einem Festlager im freien Raum lagert es die darauf liegende Masse.';
   }
 
   find(world) {
     const s = this.snap(world, { interior: true, pins: true });
     if (s.kind === 'pin') {
       const body = bodiesAt(s.point, this.scene, this.scale)[0];
-      if (!body) return { error: 'Move a mass onto the Festlager first.', point: s.point };
+      if (!body) return { error: 'Zuerst eine Masse auf das Festlager schieben.', point: s.point };
       return { pin: s.pin, body, point: s.point };
     }
     const bodies = bodiesAt(s.point, this.scene, this.scale);
     if (bodies.length < 2) {
-      return { error: 'A joint connects two masses: click where they touch or overlap.', point: s.point };
+      return { error: 'Ein Gelenk verbindet zwei Massen: dort anklicken, wo sie sich berühren oder überlappen.', point: s.point };
     }
     return { a: bodies[0], b: bodies[1], point: s.point, many: bodies.length > 2 };
   }
@@ -814,7 +815,7 @@ export class JointTool extends Tool {
     }
     const end = (body) => ({ body: body.id, point: worldToLocal(body, f.point) });
     const id = this.env.model.addJoint(this.type, { a: end(f.a), b: end(f.b) });
-    if (f.many) this.error = 'More than two masses meet here: joined the top two.';
+    if (f.many) this.error = 'Hier treffen mehr als zwei Massen zusammen: die obersten zwei wurden verbunden.';
     this.env.created('constraint', id);
     return true;
   }
@@ -822,7 +823,7 @@ export class JointTool extends Tool {
   get preview() {
     const p = this.last;
     if (!p || p.error) return null;
-    return { type: 'joint', jointType: this.type, point: p.point, label: p.pin ? 'pin the mass' : JOINT_NAMES[this.type] };
+    return { type: 'joint', jointType: this.type, point: p.point, label: p.pin ? 'Masse lagern' : JOINT_NAMES[this.type] };
   }
 
   cancel() {
@@ -853,9 +854,9 @@ export class MoveTool extends Tool {
   get tol() { return SNAP_TOLERANCE_PX / this.scale; }
 
   get hint() {
-    if (this.drag) return 'Release to drop it here. Escape cancels. Hold Shift to switch the grid snap off.';
-    return 'Drag a mass, surface or Festlager to move it. Drag a support or load to re-place it, '
-      + 'or the end of a spring, rope or Stab to attach it elsewhere.';
+    if (this.drag) return 'Loslassen, um es hier abzulegen. Esc bricht ab. Umschalt gedrückt halten schaltet das Raster aus.';
+    return 'Eine Masse, Fläche oder ein Festlager ziehen, um sie zu verschieben. Ein Lager oder eine Last ziehen, um sie neu zu setzen, '
+      + 'oder das Ende einer Feder, eines Seils oder Stabs, um es woanders anzubringen.';
   }
 
   move(e) {
@@ -946,7 +947,7 @@ export class MoveTool extends Tool {
     // A Stab is never pinned to empty space: it ends on a mass, a node or a Festlager.
     const stab = link.type === 'rod' || link.type === 'bar';
     const problem = stab && anchor.body === null && s.kind !== 'pin'
-      ? 'A Stab ends on a mass, a node or a Festlager. Draw it from a free point to make a node there.'
+      ? 'Ein Stab endet an einer Masse, einem Knoten oder einem Festlager. Von einem freien Punkt aus zeichnen, um dort einen Knoten zu erzeugen.'
       : linkProblem(test, link);
     this.marker = { point: s.point, kind: problem ? 'invalid' : s.kind };
     if (problem) {
@@ -964,7 +965,7 @@ export class MoveTool extends Tool {
       const pt = pickSupportPoint(base, old.type, e.world, this.scale);
       this.marker = { point: pt.point, kind: pt.error || pt.free ? 'invalid' : pt.kind };
       if (pt.error || pt.free) {
-        this.error = pt.error || 'A support must sit on a mass.';
+        this.error = pt.error || 'Ein Lager muss an einer Masse sitzen.';
         tx.update(() => {});
         return;
       }
@@ -978,7 +979,7 @@ export class MoveTool extends Tool {
       const s = snapPoint(e.world, base, { scale: this.scale, interior: true });
       this.marker = { point: s.point, kind: s.body ? s.kind : 'invalid' };
       if (!s.body) {
-        this.error = 'A load must act on a mass.';
+        this.error = 'Eine Last muss an einer Masse angreifen.';
         tx.update(() => {});
         return;
       }
@@ -991,32 +992,30 @@ export class MoveTool extends Tool {
 
 // The toolbox order. `icon` names are drawn by editor/icons.js.
 export const TOOL_DEFS = [
-  { id: 'select', label: 'Select', icon: 'select', make: (env) => new SelectTool(env) },
-  { id: 'move', label: 'Move', icon: 'move', make: (env) => new MoveTool(env) },
-  { id: 'rect', label: 'Rectangular mass', icon: 'rect', make: (env) => new RectTool(env) },
-  { id: 'circle', label: 'Circular mass', icon: 'circle', make: (env) => new CircleTool(env) },
-  { id: 'beam', label: 'Beam (bendable)', icon: 'beam', make: (env) => new BeamTool(env) },
-  { id: 'surface', label: 'Surface', icon: 'surface', make: (env) => new SurfaceTool(env) },
-  { id: 'spring', label: 'Spring', icon: 'spring', make: (env) => new SpringTool(env) },
-  { id: 'damper', label: 'Damper', icon: 'damper', make: (env) => new LinkTool(env, 'damper') },
-  { id: 'rope', label: 'Rope', icon: 'rope', make: (env) => new LinkTool(env, 'rope') },
-  { id: 'rod', label: 'Stab (rod)', icon: 'rod', make: (env) => new LinkTool(env, 'rod') },
-  { id: 'node', label: 'Node (Knoten)', icon: 'node', make: (env) => new NodeTool(env) },
-  { id: 'load', label: 'Force / moment', icon: 'load', make: (env) => new LoadTool(env) },
+  { id: 'select', label: 'Auswählen', icon: 'select', make: (env) => new SelectTool(env) },
+  { id: 'move', label: 'Verschieben', icon: 'move', make: (env) => new MoveTool(env) },
+  { id: 'rect', label: 'Rechteckige Masse', icon: 'rect', make: (env) => new RectTool(env) },
+  { id: 'circle', label: 'Kreisförmige Masse', icon: 'circle', make: (env) => new CircleTool(env) },
+  { id: 'beam', label: 'Balken (biegbar)', icon: 'beam', make: (env) => new BeamTool(env) },
+  { id: 'surface', label: 'Fläche', icon: 'surface', make: (env) => new SurfaceTool(env) },
+  { id: 'spring', label: 'Feder', icon: 'spring', make: (env) => new SpringTool(env) },
+  { id: 'damper', label: 'Dämpfer', icon: 'damper', make: (env) => new LinkTool(env, 'damper') },
+  { id: 'rope', label: 'Seil', icon: 'rope', make: (env) => new LinkTool(env, 'rope') },
+  { id: 'rod', label: 'Stab', icon: 'rod', make: (env) => new LinkTool(env, 'rod') },
+  { id: 'node', label: 'Knoten', icon: 'node', make: (env) => new NodeTool(env) },
+  { id: 'load', label: 'Kraft / Moment', icon: 'load', make: (env) => new LoadTool(env) },
   { id: 'pin', label: 'Festlager', icon: 'pin', make: (env) => new SupportTool(env, 'pin_support') },
-  { id: 'fixed', label: 'Lager (fixed)', icon: 'fixed', make: (env) => new SupportTool(env, 'fixed_support') },
+  { id: 'fixed', label: 'Einspannung', icon: 'fixed', make: (env) => new SupportTool(env, 'fixed_support') },
   { id: 'roller', label: 'Loslager', icon: 'roller', make: (env) => new SupportTool(env, 'roller_support') },
-  { id: 'joint', label: 'Joint (hinge)', icon: 'joint', make: (env) => new JointTool(env, 'pin_joint') },
-  { id: 'weld', label: 'Rigid joint', icon: 'weld', make: (env) => new JointTool(env, 'fixed_joint') },
+  { id: 'joint', label: 'Gelenk', icon: 'joint', make: (env) => new JointTool(env, 'pin_joint') },
+  { id: 'weld', label: 'Starre Verbindung', icon: 'weld', make: (env) => new JointTool(env, 'fixed_joint') },
 ];
 
 export function createTools(env) {
   return new Map(TOOL_DEFS.map((def) => [def.id, def.make(env)]));
 }
 
-function fmt(x, digits = 2) {
-  return Number.isFinite(x) ? x.toFixed(digits) : '–';
-}
+const fmt = decimal;
 
 // Rectangle angle for a rectangle that starts on a surface. Floors, ceilings and walls give 0: an
 // axis-aligned rectangle looks the same and keeps width and height where the user expects them.

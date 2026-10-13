@@ -9,7 +9,7 @@ import {
 import { SceneModel } from '../../frontend/js/editor/model.js';
 import { applyProperties, propertyFields } from '../../frontend/js/editor/properties.js';
 import { beamMass, defaultSection, sectionProps } from '../../frontend/js/editor/section.js';
-import { sectionSvg } from '../../frontend/js/editor/sectionview.js';
+import { sectionDrawing } from '../../frontend/js/editor/sectiondim.js';
 import { snapPoint } from '../../frontend/js/editor/snap.js';
 import { block, close, closePoint, click, drag, sceneWith, setup } from './helpers.mjs';
 
@@ -18,7 +18,7 @@ const beams = (m) => m.scene.bodies.filter((b) => b.type === 'beam');
 test('beam tool: drag along the axis makes a beam (midpoint, angle, length, default square section)', () => {
   const { model, tools, log } = setup();
   const t = tools.get('beam');
-  assert.match(t.hint, /beam/i);
+  assert.match(t.hint, /Balken/i);
   drag(t, [0, 0], [2, 0]);
   const b = beams(model)[0];
   assert.equal(b.id, 'b1');
@@ -35,7 +35,7 @@ test('beam tool: drag along the axis makes a beam (midpoint, angle, length, defa
 
   // too short is refused; free angles with Shift
   drag(t, [0, 3], [0.05, 3]);
-  assert.match(t.error, /small/);
+  assert.match(t.error, /klein/);
   assert.equal(beams(model).length, 2);
   drag(t, [0, 3], [1, 3.3], { shift: true });
   close(beams(model)[2].angle, Math.atan2(0.3, 1), 1e-2);
@@ -49,7 +49,7 @@ test('beam tool preview: a beam band with its length', () => {
   t.down({ world: [0, 0] });
   t.move({ world: [1.5, 0] });
   assert.equal(t.preview.type, 'beam');
-  assert.match(t.preview.label, /1\.50 m beam/);
+  assert.match(t.preview.label, /Balken 1,50 m/);
 });
 
 test('a beam is a rectangle in the editor: hit, snap features along its axis, outline', () => {
@@ -95,7 +95,7 @@ test('beam form: length, section select with its dimensions in mm, mass from ste
   assert.ok(form.fields.find((f) => f.key === 'sectionType').reshape);
   assert.deepEqual(form.fields.find((f) => f.key === 'sectionType').options.map(([v]) => v), ['square', 'L', 'T', 'H', 'I']);
   assert.match(form.info[0], /EI = /);
-  assert.match(form.info[0], /Mass 39\.25/); // 7850 x 0.05^2 x 2
+  assert.match(form.info[0], /Masse 39,250/); // 7850 x 0.05^2 x 2
 
   // type changed to H: new dimensions of that type, same depth (50 mm)
   form = propertyFields(m, id, { sectionType: 'H' });
@@ -140,7 +140,7 @@ test('beam form: bad input is refused', () => {
   assert.equal(applyProperties(m, id, { ...ok, sec_a: '-3' }).ok, false);
   const t = applyProperties(m, id, { ...ok, sectionType: 'T', sec_b: '100', sec_h: '100', sec_tf: '100', sec_tw: '10' });
   assert.equal(t.ok, false);
-  assert.match(t.errors.join(), /flange thickness/);
+  assert.match(t.errors.join(), /Flanschdicke/);
   assert.deepEqual(m.body(id).params.section, { type: 'square', a: 0.05 }, 'unchanged');
 });
 
@@ -154,13 +154,13 @@ test('deleting a beam deletes what is attached to it', () => {
 });
 
 test('section drawing: one rectangle for the square, three for I / H, two for L / T', () => {
-  const count = (s) => (sectionSvg(s).match(/<rect/g) || []).length;
+  const count = (s) => (sectionDrawing(s).svg.match(/<rect/g) || []).length;
   assert.equal(count({ type: 'square', a: 0.04 }), 1);
   assert.equal(count(defaultSection('I')), 3);
   assert.equal(count(defaultSection('H')), 3);
   assert.equal(count(defaultSection('T')), 2);
   assert.equal(count(defaultSection('L')), 2);
-  assert.match(sectionSvg(defaultSection('T')), /aria-label="Cross section T"/);
+  assert.match(sectionDrawing(defaultSection('T')).svg, /aria-label="Querschnitt T mit Bemaßung"/);
 });
 
 // --- beam shape ---------------------------------------------------------------------------------------
@@ -211,9 +211,9 @@ test('beamCurve passes through the nodes; the outline is half a depth either sid
 });
 
 test('formatForce: sign shows tension / compression, units follow the size', () => {
-  assert.equal(formatForce(12.34), '+12.3 N');
+  assert.equal(formatForce(12.34), '+12,3 N');
   assert.equal(formatForce(-250), '−250 N');
-  assert.equal(formatForce(1500), '+1.50 kN');
+  assert.equal(formatForce(1500), '+1,50 kN');
   assert.equal(formatForce(-123456), '−123 kN');
 });
 
@@ -229,13 +229,13 @@ test('a load becomes harmonic: frequency and phase appear, apply stores them, co
 
   form = propertyFields(m, 'F1', { mode: 'harmonic' });
   assert.deepEqual(form.fields.map((f) => f.key), ['mode', 'fx', 'fy', 'moment', 'frequency', 'phase']);
-  assert.match(form.info[0], /6\.283 rad\/s/);
+  assert.match(form.info[0], /6,283 rad\/s/);
   assert.equal(form.fields[1].label, 'Amplitude x');
 
   const values = { mode: 'harmonic', fx: '0', fy: '10', moment: '0', frequency: '2.5', phase: '90' };
   assert.equal(applyProperties(m, 'F1', values).ok, true);
   assert.deepEqual(m.find('F1').obj.params, { force: [0, 10], moment: 0, mode: 'harmonic', frequency: 2.5, phase: 1.570796327 }); // stored rounded to 1e-9
-  assert.match(propertyFields(m, 'F1').title, /Harmonic/);
+  assert.match(propertyFields(m, 'F1').title, /Harmonische/);
 
   assert.equal(applyProperties(m, 'F1', { ...values, frequency: '0' }).ok, false);
   assert.equal(applyProperties(m, 'F1', { ...values, mode: 'constant' }).ok, true);

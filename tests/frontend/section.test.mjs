@@ -71,14 +71,14 @@ test('T and L are not symmetric: the centroid is on the side of the material', (
 
 test('sectionError names what does not fit', () => {
   assert.equal(sectionError({ type: 'square', a: 0.05 }), null);
-  assert.match(sectionError({ type: 'square', a: 0 }), /Side a/);
-  assert.match(sectionError({ type: 'I', b: 0.1, h: 0.02, tf: 0.02, tw: 0.01 }), /flanges/);
-  assert.match(sectionError({ type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.2 }), /web/);
-  assert.match(sectionError({ type: 'T', b: 0.1, h: 0.1, tf: 0.1, tw: 0.01 }), /flange thickness/);
-  assert.match(sectionError({ type: 'L', b: 0.01, h: 0.1, t: 0.02 }), /foot/);
-  assert.match(sectionError({ type: 'round', a: 1 }), /unknown/);
-  assert.match(sectionError({ type: 'L', b: 0.1, h: 0.1 }), /Thickness t/);
-  assert.throws(() => sectionProps({ type: 'T', b: 0.1, h: 0.1, tf: 0.1, tw: 0.01 }), /flange thickness/);
+  assert.match(sectionError({ type: 'square', a: 0 }), /Seite a/);
+  assert.match(sectionError({ type: 'I', b: 0.1, h: 0.02, tf: 0.02, tw: 0.01 }), /Flansche/);
+  assert.match(sectionError({ type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.2 }), /Stegdicke/);
+  assert.match(sectionError({ type: 'T', b: 0.1, h: 0.1, tf: 0.1, tw: 0.01 }), /Flanschdicke/);
+  assert.match(sectionError({ type: 'L', b: 0.01, h: 0.1, t: 0.02 }), /Fußbreite/);
+  assert.match(sectionError({ type: 'round', a: 1 }), /unbekannt/);
+  assert.match(sectionError({ type: 'L', b: 0.1, h: 0.1 }), /Dicke t/);
+  assert.throws(() => sectionProps({ type: 'T', b: 0.1, h: 0.1, tf: 0.1, tw: 0.01 }), /Flanschdicke/);
 });
 
 test('defaultSection of every type is valid and has the requested depth', () => {
@@ -89,11 +89,11 @@ test('defaultSection of every type is valid and has the requested depth', () => 
     close(sectionProps(defaultSection(type, 0.1)).depth, 0.1, 1e-6, type);
     close(sectionProps(defaultSection(type, 0.01)).depth, 0.01, 1e-6, type);
   }
-  assert.throws(() => defaultSection('round'), /unknown/);
+  assert.throws(() => defaultSection('round'), /unbekannt/);
 });
 
 test('beamMass is density x area x length; text description', () => {
   close(beamMass({ type: 'square', a: 0.02 }, 2), DENSITY * 0.0004 * 2, 1e-12);
-  assert.equal(describeSection({ type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.006 }), 'I 100 x 200 x 10 x 6 mm');
-  assert.equal(describeSection({ type: 'square', a: 0.0125 }), 'Square 12.5 mm');
+  assert.equal(describeSection({ type: 'I', b: 0.1, h: 0.2, tf: 0.01, tw: 0.006 }), 'I 100 × 200 × 10 × 6 mm');
+  assert.equal(describeSection({ type: 'square', a: 0.0125 }), 'Quadrat 12,5 mm');
 });

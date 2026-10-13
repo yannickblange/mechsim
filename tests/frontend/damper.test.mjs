@@ -12,9 +12,9 @@ const hung = () => sceneWith({ bodies: [block('m1', 0, 0.5, 0.4, 0.2)] });
 test('damper tool: two clicks, ends on the ground and on a mass, default c', () => {
   const { model, tools, log } = setup(hung());
   const t = tools.get('damper');
-  assert.match(t.hint, /first end of the damper/);
+  assert.match(t.hint, /erste Ende anklicken \(Dämpfer\)/);
   click(t, [0, 1.5]);
-  assert.match(t.preview.label, /damper/);
+  assert.match(t.preview.label, /Dämpfer/);
   click(t, [0, 0.6]); // top edge of the block
   assert.deepEqual(model.scene.elements[0], {
     id: 'c1', type: 'damper', a: { body: null, point: [0, 1.5] }, b: { body: 'm1', point: [0, 0.1] }, params: { c: 10 },
@@ -29,11 +29,11 @@ test('damper tool: refuses two ground ends, the same mass, and too short', () =>
   const t = tools.get('damper');
   click(t, [0, 1.5]);
   click(t, [1, 1.5]);
-  assert.match(t.error, /at least one end on a mass/);
+  assert.match(t.error, /Mindestens ein Ende muss an einer Masse/);
   t.key('Escape');
   click(t, [-0.2, 0.5]);
   click(t, [0.2, 0.5]);
-  assert.match(t.error, /same mass/);
+  assert.match(t.error, /derselben Masse/);
   assert.equal(model.scene.elements.length, 0);
 });
 
@@ -84,11 +84,11 @@ test('properties: damping c >= 0', () => {
   m.addDamper({ a: { body: null, point: [0, 2] }, b: { body: 'm1', point: [0, 0.1] }, c: 4 });
   const form = propertyFields(m, 'c1');
   assert.deepEqual(form.fields.map((f) => [f.key, f.unit, f.value]), [['c', 'N·s/m', 4]]);
-  assert.match(form.title, /Damper/);
+  assert.match(form.title, /Dämpfer/);
   assert.equal(applyProperties(m, 'c1', { c: '12,5' }).ok, true);
   assert.deepEqual(m.find('c1').obj.params, { c: 12.5 });
   const bad = applyProperties(m, 'c1', { c: '-1' });
   assert.equal(bad.ok, false);
-  assert.match(bad.errors[0], /at least 0/);
+  assert.match(bad.errors[0], /mindestens 0/);
   assert.equal(applyProperties(m, 'c1', { c: '0' }).ok, true, 'c = 0 is allowed');
 });

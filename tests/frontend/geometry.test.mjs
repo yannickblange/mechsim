@@ -117,8 +117,8 @@ test('tidy removes floating point noise', () => {
 test('slugify produces names the server accepts', () => {
   assert.equal(slugify('My first layout!'), 'My_first_layout');
   assert.equal(slugify('  ../../etc/passwd '), 'etc_passwd');
-  assert.equal(slugify('Ünïcode ß'), 'n_code');
-  assert.equal(slugify('   '), 'layout');
+  assert.equal(slugify('Übung für Größe ß'), 'Uebung_fuer_Groesse_ss');
+  assert.equal(slugify('   '), 'aufbau');
   assert.equal(slugify('a'.repeat(100)).length, 64);
   assert.match(slugify('ok-name_1'), /^[A-Za-z0-9_-]+$/);
 });

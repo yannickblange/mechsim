@@ -1,6 +1,6 @@
 {
   "version": "0.2",
-  "name": "Clamped beam with spring-hung weight",
+  "name": "Eingespannter Balken mit federnd aufgehängtem Gewicht",
   "description": "Beam clamped to a wall by a fixed Lager (x, y and rotation locked). A weight oscillates on a spring below the tip, and a constant force pushes down on the tip, so the Lager reaction (Fx, Fy, M) varies in time.",
   "gravity": [
     0,

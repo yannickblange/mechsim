@@ -56,6 +56,15 @@ frame), so fast vibrations are not aliased by the 60 Hz display. The panels can 
 The default colour scheme is a white board with black lines, a grey grid and blue forces; the round **moon button** in the bottom-right corner
 switches to a dark one (remembered in the browser).
 
+## German UI and dimensioned cross sections (v0.6)
+
+Everything visible in the browser is German (buttons, hints, property forms, graphs, scene names; decimal comma, typed numbers accept comma or dot).
+Technical ids such as `m1` or `s1` and the scene files' descriptions stay as they are, and so do the messages of the server (it rejects a bad scene in English).
+The German names of the example scenes are in `frontend/js/scene-names.js`, the number format in `frontend/js/format.js`.
+
+The cross-section form of beams and elastic Stabs shows the section as a **dimensioned drawing** (outline, extension lines, arrows, neutral axis z, centroid):
+every dimension (b, h, tf, tw, t, a, in mm) is typed into a field that sits on its own dimension line.
+
 ## Playing a simulation (v0.5)
 
 Play / pause, step and reset are icon buttons (Space plays and pauses). The **time bar** shows `t / t_max`: drag it to jump to a time (the run pauses

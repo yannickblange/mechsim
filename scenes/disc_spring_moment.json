@@ -1,6 +1,6 @@
 {
   "version": "0.2",
-  "name": "Disc on a Festlager with spring and moment",
+  "name": "Scheibe am Festlager mit Feder und Moment",
   "description": "Disc pinned at its centre. A spring from the ceiling to its rim (ghost = relaxed state, shorter than installed, so it starts in tension) and a constant clockwise moment. Small oscillations have omega = sqrt(2 k / m).",
   "gravity": [
     0,

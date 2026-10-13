@@ -23,7 +23,7 @@ test('play, step and reset are icon buttons with accessible names', () => {
 test('the time bar is a range input next to an editable t_max', () => {
   assert.match(tag('timeline'), /type="range"/);
   assert.match(tag('t-max'), /type="number"/);
-  assert.match(tag('t-max'), /aria-label="End time/);
+  assert.match(tag('t-max'), /aria-label="Endzeit/);
   assert.match(html, /<output id="time"/);
   assert.ok(html.indexOf('id="timeline"') < html.indexOf('id="t-max"'));
 });

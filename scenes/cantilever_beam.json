@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Cantilever beam with a tip mass",
+  "name": "Kragträger mit Endmasse",
   "description": "A thin steel strip (2 m long, 10 mm square, E = 210 GPa) clamped at the left end, with a 1 kg block at its tip. It sags under the weights and then swings (undamped) about the static deflection of about 0.2 m: the strip bends as an Euler-Bernoulli beam, the tip follows delta(t) = delta_static (1 - cos(omega t)) with omega = sqrt(3 E I / (L^3 (M + 0.24 m))) = 6.9 rad/s. The stress shown is the linear-elastic value (yielding is not modelled). Right-click the block for its displacement graph.",
   "gravity": [
     0,

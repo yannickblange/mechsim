@@ -1,6 +1,6 @@
 {
   "version": "0.2",
-  "name": "Pendulum hit by an impulse",
+  "name": "Pendel mit Kraftstoß",
   "description": "Rod hanging from a Festlager on a ceiling surface. A horizontal impulse of 1.5 N s at its lower end sets it swinging at t = 0; the velocity jump respects the pin.",
   "gravity": [
     0,

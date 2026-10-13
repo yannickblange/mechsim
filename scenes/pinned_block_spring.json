@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "name": "Pinned block with spring",
+  "name": "Gelagerter Block mit Feder",
   "description": "Block on a Festlager at its lower left corner, held up by a spring at its upper right corner.",
   "gravity": [0, -9.81],
   "solver": { "dt": 0.001 },

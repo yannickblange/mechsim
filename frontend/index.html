@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MechSim</title>
   <link rel="stylesheet" href="/css/main.css">
   <script>
-    /* Apply the remembered colour scheme before the first paint (no white flash in dark mode). */
+    /* Das gespeicherte Farbschema vor dem ersten Zeichnen setzen (kein weißes Aufblitzen im Dunkelmodus). */
     try { document.documentElement.dataset.theme = localStorage.getItem('mechsim.theme') === 'dark' ? 'dark' : 'light'; } catch (e) {}
   </script>
 </head>
@@ -17,55 +17,55 @@
     <h1 class="app-name">MechSim</h1>
 
     <label class="field">
-      <span>Scene</span>
-      <select id="scene-select" aria-label="Scene"></select>
+      <span>Szene</span>
+      <select id="scene-select" aria-label="Szene"></select>
     </label>
 
-    <button id="btn-new" type="button" title="Start an empty layout">New</button>
-    <button id="btn-edit" type="button" aria-pressed="false" title="Edit the layout / return to the simulation">Edit</button>
+    <button id="btn-new" type="button" title="Einen leeren Aufbau beginnen">Neu</button>
+    <button id="btn-edit" type="button" aria-pressed="false" title="Den Aufbau bearbeiten / zurück zur Simulation">Bearbeiten</button>
 
     <div class="edit-controls" id="edit-controls" hidden>
-      <input id="scene-name" type="text" placeholder="Layout name" aria-label="Layout name" maxlength="64" autocomplete="off">
-      <button id="btn-save" type="button" title="Save as one of My layouts">Save</button>
-      <button id="btn-undo" type="button" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button>
-      <button id="btn-redo" type="button" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">↷</button>
+      <input id="scene-name" type="text" placeholder="Name des Aufbaus" aria-label="Name des Aufbaus" maxlength="64" autocomplete="off">
+      <button id="btn-save" type="button" title="Als einen der eigenen Aufbauten speichern">Speichern</button>
+      <button id="btn-undo" type="button" title="Rückgängig (Strg/Cmd+Z)" aria-label="Rückgängig">↶</button>
+      <button id="btn-redo" type="button" title="Wiederholen (Strg/Cmd+Umschalt+Z)" aria-label="Wiederholen">↷</button>
     </div>
 
-    <div class="transport" role="group" aria-label="Simulation controls">
-      <button id="btn-play" class="icon-btn" type="button" data-state="play" title="Play (Space)" aria-label="Play">
+    <div class="transport" role="group" aria-label="Simulationssteuerung">
+      <button id="btn-play" class="icon-btn" type="button" data-state="play" title="Start (Leertaste)" aria-label="Start">
         <svg class="ico ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
         <svg class="ico ico-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
       </button>
-      <button id="btn-step" class="icon-btn" type="button" title="Step one frame" aria-label="Step one frame">
+      <button id="btn-step" class="icon-btn" type="button" title="Einen Schritt weiter" aria-label="Einen Schritt weiter">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5v13l9-6.5zM16.5 5H19v14h-2.5z"/></svg>
       </button>
-      <button id="btn-reset" class="icon-btn" type="button" title="Back to t = 0" aria-label="Reset to t = 0">
+      <button id="btn-reset" class="icon-btn" type="button" title="Zurück auf t = 0" aria-label="Auf t = 0 zurücksetzen">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h2.5v14H5zM18.5 5.5v13L9 12z"/></svg>
       </button>
 
       <div class="timeline">
-        <input id="timeline" type="range" min="0" max="1000" step="1" value="0" aria-label="Simulation time" title="Drag to jump to a time">
-        <span class="clock"><output id="time" for="timeline">0.00</output> /</span>
-        <input id="t-max" type="number" min="0.1" max="600" step="any" value="10" inputmode="decimal" aria-label="End time t_max in seconds" title="End time t_max: the simulation stops here">
+        <input id="timeline" type="range" min="0" max="1000" step="1" value="0" aria-label="Simulationszeit" title="Ziehen, um zu einer Zeit zu springen">
+        <span class="clock"><output id="time" for="timeline">0,000</output> /</span>
+        <input id="t-max" type="number" min="0.1" max="600" step="any" value="10" inputmode="decimal" aria-label="Endzeit t_max in Sekunden" title="Endzeit t_max: hier hält die Simulation an">
         <span class="clock">s</span>
       </div>
     </div>
 
-    <label class="field" title="Simulation speed">
+    <label class="field" title="Simulationsgeschwindigkeit">
       <svg class="ico ico-speed" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6v12l8.5-6zM12.5 6v12L21 12z"/></svg>
-      <select id="speed" aria-label="Simulation speed">
-        <option value="0.1">0.1×</option>
-        <option value="0.25">0.25×</option>
-        <option value="0.5">0.5×</option>
+      <select id="speed" aria-label="Simulationsgeschwindigkeit">
+        <option value="0.1">0,1×</option>
+        <option value="0.25">0,25×</option>
+        <option value="0.5">0,5×</option>
         <option value="1" selected>1×</option>
         <option value="2">2×</option>
       </select>
     </label>
 
     <label class="field" id="bend-field" hidden>
-      <span>Bending</span>
-      <select id="bend-scale" aria-label="Show the bending of beams larger (display only)">
-        <option value="1" selected>true scale</option>
+      <span>Biegung</span>
+      <select id="bend-scale" aria-label="Biegung der Balken vergrößert darstellen (nur Anzeige)">
+        <option value="1" selected>maßstäblich</option>
         <option value="10">× 10</option>
         <option value="50">× 50</option>
         <option value="200">× 200</option>
@@ -75,9 +75,9 @@
   </header>
 
   <main class="stage">
-    <canvas id="view" aria-label="Simulation view"></canvas>
+    <canvas id="view" aria-label="Simulationsansicht"></canvas>
     <div id="error" class="error" role="alert" hidden></div>
-    <button id="btn-theme" class="theme-fab" type="button" aria-pressed="false" title="Dark mode" aria-label="Dark mode">
+    <button id="btn-theme" class="theme-fab" type="button" aria-pressed="false" title="Dunkelmodus" aria-label="Dunkelmodus">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.8.8 0 0 0-1.1-.9A10 10 0 1 0 21.4 15.7a.8.8 0 0 0-.9-1.1z"/></svg>
     </button>
   </main>
@@ -85,10 +85,10 @@
   <footer class="statusbar">
     <span>E<sub>kin</sub> = <output id="e-kin">–</output> J</span>
     <span>E<sub>pot</sub> = <output id="e-pot">–</output> J</span>
-    <span>E<sub>total</sub> = <output id="e-total">–</output> J</span>
+    <span>E<sub>ges</sub> = <output id="e-total">–</output> J</span>
     <span class="spacer"></span>
     <span id="mode">–</span>
-    <span id="conn" data-connected="false">Disconnected</span>
+    <span id="conn" data-connected="false">Getrennt</span>
   </footer>
 
   <script type="module" src="/js/main.js"></script>

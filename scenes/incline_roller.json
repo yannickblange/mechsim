@@ -1,6 +1,6 @@
 {
   "version": "0.2",
-  "name": "Block on an incline (Loslager)",
+  "name": "Block auf der schiefen Ebene (Loslager)",
   "description": "Block on a 30 degree incline held by two Loslager at its lower corners (frictionless, they slide along the surface and keep the block from tipping) and a spring whose relaxed length (ghost) is shorter than its installed length, so it starts in tension.",
   "gravity": [
     0,

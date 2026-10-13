@@ -100,10 +100,10 @@ test('niceTicks: 1, 2, 5 steps that cover the range', () => {
 });
 
 test('formatTick uses the decimals the step needs; units switch to mm for small motion', () => {
-  assert.equal(formatTick(0.4, 0.2), '0.4');
+  assert.equal(formatTick(0.4, 0.2), '0,4');
   assert.equal(formatTick(5, 5), '5');
-  assert.equal(formatTick(0.0002, 0.0001), '0.0002');
-  assert.equal(formatTick(1e-12, 0.1), '0.0');
+  assert.equal(formatTick(0.0002, 0.0001), '0,0002');
+  assert.equal(formatTick(1e-12, 0.1), '0,0');
   assert.deepEqual(lengthUnit(0.004), { name: 'mm', factor: 1000 });
   assert.deepEqual(lengthUnit(0.3), { name: 'm', factor: 1 });
   assert.deepEqual(lengthUnit(0), { name: 'm', factor: 1 });

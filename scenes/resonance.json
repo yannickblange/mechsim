@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Resonanz: forced vibration at resonance (eta = 1, zeta = 0.02)",
+  "name": "Resonanz: erzwungene Schwingung bei η = 1, ζ = 0,02",
   "description": "The same block, spring and damper as in forced_vibration, but the force F(t) = 2 N sin(2 pi 1.0 Hz t) now hits the natural frequency (eta = 1) and the damping is very small (zeta = 0.02). The magnification factor is V = 1/(2 zeta) = 25: the steady-state amplitude is 1.27 m, 25 times the static deflection F0/k = 0.051 m. Starting at rest, the swing grows with every period, x_max(t) = 1.27 m (1 - exp(-zeta omega0 t)), time constant 1/(zeta omega0) = 8.0 s, until the block nearly sweeps the whole space between the walls. With zeta = 0 the amplitude would grow without bound (F0 t / (2 m omega0)). Run to t_max = 30 s; right-click the mass for its displacement graph.",
   "t_max": 30,
   "gravity": [

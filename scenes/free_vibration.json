@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Freie Schwingung: damped free vibration",
+  "name": "Freie Schwingung: gedämpft",
   "description": "The same block with a damper (c = 1.257 N s/m, damping ratio zeta = 0.1) next to the spring. Released from rest 0.3 m from the equilibrium, it oscillates at the damped frequency omega_d = omega0 sqrt(1 - zeta^2) with an amplitude that decays like exp(-zeta omega0 t): each swing is exp(-2 pi zeta / sqrt(1 - zeta^2)) = 0.53 times the one before. Right-click the mass for its displacement graph.",
   "gravity": [
     0,

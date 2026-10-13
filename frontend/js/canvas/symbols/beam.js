@@ -1,5 +1,6 @@
 // beam.js - bendable beam: the deformed shape from the poses of its nodes, as the band the section
 // occupies (its depth, with L and T sections reaching further to one side of the centroid axis).
+import { decimal } from '../../format.js';
 import { sectionProps } from '../../editor/section.js';
 
 const SUBDIVISIONS = 6; // points per segment of the smooth curve
@@ -128,8 +129,8 @@ export function drawBeam(ctx, cam, spec, entry, theme) {
   ctx.font = '11px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   const top = outline.reduce((a, b) => (b[1] < a[1] ? b : a));
-  const lines = [spec.id + (k !== 1 ? `  (bending ×${k})` : '')];
-  if (entry.stress > 0) lines.push(`σ max ${(entry.stress / 1e6).toFixed(entry.stress >= 1e7 ? 0 : 1)} MPa`);
+  const lines = [spec.id + (k !== 1 ? `  (Biegung ×${k})` : '')];
+  if (entry.stress > 0) lines.push(`σ max ${decimal(entry.stress / 1e6, entry.stress >= 1e7 ? 0 : 1)} MPa`);
   lines.forEach((text, i) => ctx.fillText(text, top[0] + 6, top[1] - 10 - 13 * (lines.length - 1 - i)));
   ctx.restore();
 }

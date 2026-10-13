@@ -1,5 +1,6 @@
 // panel.js - the displacement graphs: one floating, draggable, resizable panel per mass. DOM glue;
 // the data comes from recorder.js and the maths from plot.js.
+import { decimal } from '../format.js';
 import { envelope, extent, formatTick, lengthUnit, lowerBound, niceTicks } from './plot.js';
 
 const el = (tag, className, attrs = {}) => {
@@ -14,12 +15,12 @@ const DEG = 180 / Math.PI;
 // What a panel can show. `series` pick fields of Recorder.displacement(); length series are shown in
 // mm or m, rotations in degrees.
 export const GRAPH_MODES = {
-  xy: { label: 'Displacement x, y', quantity: 'length', series: [['x', 'ux', 'plot1'], ['y', 'uy', 'plot2']] },
-  mag: { label: 'Displacement |u|', quantity: 'length', series: [['|u|', 'umag', 'plot1']] },
-  rot: { label: 'Rotation φ', quantity: 'angle', series: [['φ', 'rot', 'plot3']] },
+  xy: { label: 'Verschiebung x, y', quantity: 'length', series: [['x', 'ux', 'plot1'], ['y', 'uy', 'plot2']] },
+  mag: { label: 'Verschiebung |u|', quantity: 'length', series: [['|u|', 'umag', 'plot1']] },
+  rot: { label: 'Drehung φ', quantity: 'angle', series: [['φ', 'rot', 'plot3']] },
 };
 
-export const GRAPH_WINDOWS = { all: ['Whole run', Infinity], s5: ['Last 5 s', 5], s20: ['Last 20 s', 20] };
+export const GRAPH_WINDOWS = { all: ['Ganzer Lauf', Infinity], s5: ['Letzte 5 s', 5], s20: ['Letzte 20 s', 20] };
 
 const MARGIN = { left: 50, right: 10, top: 10, bottom: 24 };
 
@@ -82,7 +83,7 @@ function draw(canvas, model, theme, hoverT) {
   if (!model) {
     ctx.fillStyle = theme.muted;
     ctx.textAlign = 'center';
-    ctx.fillText('No data yet - press Play.', w / 2, h / 2);
+    ctx.fillText('Noch keine Daten – Start drücken.', w / 2, h / 2);
     return;
   }
   const sx = (t) => plot.x + ((t - model.t0) / (model.t1 - model.t0)) * plot.w;
@@ -155,7 +156,7 @@ function draw(canvas, model, theme, hoverT) {
     ctx.lineTo(x, plot.y + plot.h);
     ctx.stroke();
     ctx.setLineDash([]);
-    const lines = [`t = ${model.t[i].toFixed(3)} s`, ...model.series.map((s) => `${s.label} = ${s.values[i].toFixed(Math.abs(s.values[i]) < 10 ? 3 : 1)} ${model.unit.name}`)];
+    const lines = [`t = ${decimal(model.t[i], 3)} s`, ...model.series.map((s) => `${s.label} = ${decimal(s.values[i], Math.abs(s.values[i]) < 10 ? 3 : 1)} ${model.unit.name}`)];
     const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 12;
     const bx = x + 8 + bw > plot.x + plot.w ? x - 8 - bw : x + 8;
     ctx.fillStyle = theme.labelBg;
@@ -186,17 +187,17 @@ class GraphPanel {
     this.window = 'all';
     this.hoverT = null;
     this.drawnVersion = -1;
-    this.root = el('section', 'graph', { role: 'figure', 'aria-label': `Displacement graph of ${id}` });
+    this.root = el('section', 'graph', { role: 'figure', 'aria-label': `Verschiebungsdiagramm von ${id}` });
     const head = el('header', 'graph-head');
     this.title = el('span', 'graph-title');
     this.title.textContent = id;
-    this.modeSelect = el('select', 'graph-mode', { 'aria-label': 'Quantity' });
+    this.modeSelect = el('select', 'graph-mode', { 'aria-label': 'Größe' });
     for (const [key, m] of Object.entries(GRAPH_MODES)) this.modeSelect.append(new Option(m.label, key));
-    this.windowSelect = el('select', 'graph-window', { 'aria-label': 'Time window' });
+    this.windowSelect = el('select', 'graph-window', { 'aria-label': 'Zeitfenster' });
     for (const [key, [label]] of Object.entries(GRAPH_WINDOWS)) this.windowSelect.append(new Option(label, key));
-    const save = el('button', 'graph-btn', { type: 'button', title: 'Save the recorded data as CSV' });
+    const save = el('button', 'graph-btn', { type: 'button', title: 'Aufgezeichnete Daten als CSV speichern' });
     save.textContent = 'CSV';
-    const close = el('button', 'graph-btn graph-close', { type: 'button', 'aria-label': `Close the graph of ${id}`, title: 'Close' });
+    const close = el('button', 'graph-btn graph-close', { type: 'button', 'aria-label': `Diagramm von ${id} schließen`, title: 'Schließen' });
     close.textContent = '×';
     head.append(this.title, this.modeSelect, this.windowSelect, save, close);
     this.canvas = el('canvas', 'graph-canvas');

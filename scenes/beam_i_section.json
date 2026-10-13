@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "I beam on two supports",
+  "name": "I-Träger auf zwei Lagern",
   "description": "A 4 m steel I beam (b = 55, h = 120, tf = 6.3, tw = 4.4 mm; about an IPE 120) on a Festlager and a Loslager, loaded by a 5 kN force at mid-span. A force that is applied suddenly makes an elastic beam swing about its static deflection; the beam's viscous damping (8 / s: every mode decays like exp(-4 t)) lets it settle there within about a second: F L^3 / 48 E I + 5 q L^4 / 384 E I = 11.8 mm + 0.5 mm (the picture shows the bending 50 times as large; choose 'true scale' in the toolbar; set the damping to 0 in the beam's properties to see it swing for ever). Right-click the beam and pick another cross section (H, T, L, square) to see how much stiffer or softer it gets; the graph shows the mid-span displacement.",
   "gravity": [
     0,

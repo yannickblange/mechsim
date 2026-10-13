@@ -19,6 +19,8 @@ import { Renderer } from './canvas/renderer.js';
 import { Editor } from './editor/editor.js';
 import { SceneModel } from './editor/model.js';
 import { slugify } from './editor/names.js';
+import { decimal } from './format.js';
+import { sceneLabel } from './scene-names.js';
 import { applyTheme, currentTheme, otherTheme } from './theme.js';
 import { Recorder } from './graphs/recorder.js';
 import { GraphManager } from './graphs/panel.js';
@@ -73,9 +75,7 @@ let seekLast = 0;
 let userScenes = [];
 let editOrigin = null; // { source, name } of the scene being edited; null for a new layout
 
-function fmt(x, digits = 3) {
-  return Number.isFinite(x) ? x.toFixed(digits) : '–';
-}
+const fmt = (x, digits = 3) => decimal(x, digits);
 
 function showError(message) {
   ui.error.textContent = message || '';
@@ -98,7 +98,7 @@ function updateTimeline(t, editing) {
 
 function updatePlayButton(editing) {
   const again = !editing && state.finished && !state.running;
-  const label = state.running ? 'Pause (Space)' : again ? 'Play again from t = 0 (Space)' : 'Play (Space)';
+  const label = state.running ? 'Pause (Leertaste)' : again ? 'Noch einmal ab t = 0 (Leertaste)' : 'Start (Leertaste)';
   ui.play.dataset.state = state.running ? 'pause' : 'play';
   ui.play.title = label;
   ui.play.setAttribute('aria-label', label);
@@ -119,10 +119,10 @@ function updateUi() {
   ui.step.disabled = editing || state.running || !state.scene || state.finished;
   ui.reset.disabled = editing || !state.scene || !state.connected;
   ui.play.disabled = !state.connected || (!editing && !state.scene);
-  ui.mode.textContent = editing ? 'Editing' : state.mode ? `Engine: ${state.mode}` : '–';
-  ui.conn.textContent = state.connected ? 'Connected' : 'Disconnected';
+  ui.mode.textContent = editing ? 'Bearbeiten' : state.mode ? `Rechenkern: ${state.mode === 'native' ? 'nativ' : state.mode}` : '–';
+  ui.conn.textContent = state.connected ? 'Verbunden' : 'Getrennt';
   ui.conn.dataset.connected = String(state.connected);
-  ui.edit.textContent = editing ? 'Done' : 'Edit';
+  ui.edit.textContent = editing ? 'Fertig' : 'Bearbeiten';
   ui.edit.setAttribute('aria-pressed', String(editing));
   ui.editControls.hidden = !editing;
   // the bending selector only matters when there is a beam (in the scene being edited or shown)
@@ -131,7 +131,7 @@ function updateUi() {
   if (ui.bend.value !== String(renderer.bendScale)) ui.bend.value = String(renderer.bendScale);
   const dark = currentTheme() === 'dark';
   ui.theme.setAttribute('aria-pressed', String(dark));
-  ui.theme.title = dark ? 'Light mode' : 'Dark mode';
+  ui.theme.title = dark ? 'Hellmodus' : 'Dunkelmodus';
   ui.theme.setAttribute('aria-label', ui.theme.title);
   ui.undo.disabled = !model.canUndo;
   ui.redo.disabled = !model.canRedo;
@@ -175,13 +175,13 @@ function openContextMenu(event) {
   menu.setAttribute('role', 'menu');
   const title = document.createElement('div');
   title.className = 'ctx-title';
-  title.textContent = ids.length === 1 ? ids[0] : 'Masses here';
+  title.textContent = ids.length === 1 ? ids[0] : 'Massen hier';
   menu.append(title);
   for (const id of ids) {
     const item = document.createElement('button');
     item.type = 'button';
     item.setAttribute('role', 'menuitem');
-    item.textContent = ids.length === 1 ? 'Displacement graph' : `Displacement graph of ${id}`;
+    item.textContent = ids.length === 1 ? 'Verschiebungsdiagramm' : `Verschiebungsdiagramm von ${id}`;
     item.addEventListener('click', () => {
       graphs.open(id);
       closeContextMenu();
@@ -212,15 +212,15 @@ function fillSceneSelect(examples, mine, current) {
   const group = (label, source, names) => {
     const g = document.createElement('optgroup');
     g.label = label;
-    g.append(...names.map((n) => new Option(n.replaceAll('_', ' '), keyOf(source, n))));
+    g.append(...names.map((n) => new Option(source === 'example' ? sceneLabel(n) : n.replaceAll('_', ' '), keyOf(source, n))));
     return g;
   };
-  const groups = [group('Examples', 'example', examples)];
-  if (mine.length) groups.push(group('My layouts', 'user', mine));
+  const groups = [group('Beispiele', 'example', examples)];
+  if (mine.length) groups.push(group('Meine Aufbauten', 'user', mine));
   if (current && current.source === 'draft') {
     const g = document.createElement('optgroup');
-    g.label = 'Not saved';
-    g.append(new Option(`${current.name} (unsaved)`, keyOf('draft', current.name)));
+    g.label = 'Nicht gespeichert';
+    g.append(new Option(`${current.name} (ungespeichert)`, keyOf('draft', current.name)));
     groups.push(g);
   }
   ui.sceneSelect.replaceChildren(...groups);
@@ -246,7 +246,7 @@ async function selectScene(value) {
   const [source, ...rest] = value.split(':');
   const name = rest.join(':');
   if (source === 'draft') return;
-  if (state.editing && model.dirty && !window.confirm('Discard the unsaved changes of this layout?')) {
+  if (state.editing && model.dirty && !window.confirm('Die ungespeicherten Änderungen dieses Aufbaus verwerfen?')) {
     ui.sceneSelect.value = keyOf(state.sceneSource, state.sceneName);
     return;
   }
@@ -261,7 +261,7 @@ async function selectScene(value) {
       renderer.setScene(scene);
     }
   } catch (err) {
-    state.lastError = `Could not load scene "${name}": ${err.message}`;
+    state.lastError = `Die Szene „${name}“ konnte nicht geladen werden: ${err.message}`;
     updateUi();
   }
 }
@@ -305,7 +305,7 @@ async function leaveEdit({ play = false } = {}) {
     await refreshSceneList();
     if (play) api.send('play');
   } catch (err) {
-    state.lastError = `This layout cannot run: ${err.message}`;
+    state.lastError = `Dieser Aufbau lässt sich nicht simulieren: ${err.message}`;
     state.notify();
   }
 }
@@ -313,7 +313,7 @@ async function leaveEdit({ play = false } = {}) {
 async function saveLayout() {
   const typed = ui.sceneName.value.trim();
   if (!typed) {
-    state.lastError = 'Enter a name for the layout first.';
+    state.lastError = 'Bitte zuerst einen Namen für den Aufbau eingeben.';
     state.notify();
     ui.sceneName.focus();
     return;
@@ -330,13 +330,13 @@ async function saveLayout() {
     await refreshSceneList();
     state.notify();
   } catch (err) {
-    state.lastError = `Could not save "${name}": ${err.message}`;
+    state.lastError = `„${name}“ konnte nicht gespeichert werden: ${err.message}`;
     state.notify();
   }
 }
 
 function newLayout() {
-  if (state.editing && model.dirty && !window.confirm('Discard the unsaved changes of this layout?')) return;
+  if (state.editing && model.dirty && !window.confirm('Die ungespeicherten Änderungen dieses Aufbaus verwerfen?')) return;
   if (state.editing) {
     model.load(SceneModel.emptyScene());
     editOrigin = null;
@@ -365,7 +365,7 @@ async function init() {
       ui.sceneSelect.value = keyOf('example', groups.scenes[0]);
     }
   } catch (err) {
-    state.lastError = `Server not reachable: ${err.message}`;
+    state.lastError = `Server nicht erreichbar: ${err.message}`;
   }
 
   api.connect(

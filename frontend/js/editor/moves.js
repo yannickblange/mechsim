@@ -145,11 +145,11 @@ export function linkProblem(scene, link) {
   const a = link.a;
   const b = link.b;
   const massEnd = (e) => e.body !== null || e.node;
-  if (!massEnd(a) && !massEnd(b)) return 'Needs at least one end on a mass.';
-  if (a.body !== null && a.body === b.body) return 'Both ends are on the same mass.';
+  if (!massEnd(a) && !massEnd(b)) return 'Mindestens ein Ende muss an einer Masse sitzen.';
+  if (a.body !== null && a.body === b.body) return 'Beide Enden sitzen an derselben Masse.';
   const pa = anchorWorld(scene, a);
   const pb = anchorWorld(scene, b);
-  if (!pa || !pb || dist(pa, pb) < 0.05) return 'The ends are too close together.';
+  if (!pa || !pb || dist(pa, pb) < 0.05) return 'Die Enden liegen zu dicht beieinander.';
   return null;
 }
 

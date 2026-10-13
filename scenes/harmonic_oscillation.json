@@ -1,6 +1,6 @@
 {
   "version": "0.4",
-  "name": "Harmonische Schwingung: undamped mass-spring oscillator",
+  "name": "Harmonische Schwingung: ungedämpfter Feder-Masse-Schwinger",
   "description": "A 1 kg block on rollers, a spring (k = 4 pi^2 N/m) to the wall, no damping. Released from rest 0.3 m from its equilibrium it oscillates harmonically: x(t) = 0.3 m cos(omega0 t) with omega0 = sqrt(k/m) = 2 pi rad/s, period T = 1 s, forever. Right-click the mass for its displacement graph.",
   "gravity": [
     0,

@@ -1,3 +1,5 @@
+import { comma } from '../format.js';
+
 // section.js - cross sections of bars and beams: square, L, T, H, I (v0.4). Pure.
 //
 // Mirrors native/engine/core/section.cpp (a test compares both). Seen along the member axis, "up" is
@@ -15,15 +17,15 @@ export const E_MODULUS = 210e9; // Pa
 export const DENSITY = 7850; // kg / m^3
 
 export const SECTION_TYPES = ['square', 'L', 'T', 'H', 'I'];
-export const SECTION_LABELS = { square: 'Square', L: 'L', T: 'T', H: 'H', I: 'I' };
+export const SECTION_LABELS = { square: 'Quadrat', L: 'L', T: 'T', H: 'H', I: 'I' };
 
 // [key, label] of the dimensions of each type, in m.
 export const SECTION_FIELDS = {
-  square: [['a', 'Side a']],
-  L: [['b', 'Foot width b'], ['h', 'Leg height h'], ['t', 'Thickness t']],
-  T: [['b', 'Flange width b'], ['h', 'Height h'], ['tf', 'Flange thickness tf'], ['tw', 'Stem width tw']],
-  H: [['b', 'Flange length b'], ['h', 'Height h'], ['tf', 'Flange thickness tf'], ['tw', 'Web thickness tw']],
-  I: [['b', 'Flange width b'], ['h', 'Height h'], ['tf', 'Flange thickness tf'], ['tw', 'Web thickness tw']],
+  square: [['a', 'Seite a']],
+  L: [['b', 'Fußbreite b'], ['h', 'Schenkelhöhe h'], ['t', 'Dicke t']],
+  T: [['b', 'Flanschbreite b'], ['h', 'Höhe h'], ['tf', 'Flanschdicke tf'], ['tw', 'Stegdicke tw']],
+  H: [['b', 'Flanschlänge b'], ['h', 'Höhe h'], ['tf', 'Flanschdicke tf'], ['tw', 'Stegdicke tw']],
+  I: [['b', 'Flanschbreite b'], ['h', 'Höhe h'], ['tf', 'Flanschdicke tf'], ['tw', 'Stegdicke tw']],
 };
 
 // Dimensions of a reference section of each type, with the depth (extent "up") given below.
@@ -40,7 +42,7 @@ const round6 = (x) => Math.round(x * 1e6) / 1e6;
 
 // A section of `type` whose depth is `depth` (all dimensions scaled from the reference section).
 export function defaultSection(type, depth = REFERENCE_DEPTH[type]) {
-  if (!REFERENCE[type]) throw new Error(`unknown section type "${type}"`);
+  if (!REFERENCE[type]) throw new Error(`unbekannter Querschnittstyp „${type}“`);
   const k = depth / REFERENCE_DEPTH[type];
   const section = { type };
   for (const [key, value] of Object.entries(REFERENCE[type])) section[key] = round6(value * k);
@@ -49,19 +51,19 @@ export function defaultSection(type, depth = REFERENCE_DEPTH[type]) {
 
 // Why a section cannot exist, or null. Mirrors section.cpp.
 export function sectionError(s) {
-  if (!s || !SECTION_FIELDS[s.type]) return `unknown section type "${s && s.type}"`;
+  if (!s || !SECTION_FIELDS[s.type]) return `unbekannter Querschnittstyp „${s && s.type}“`;
   for (const [key, label] of SECTION_FIELDS[s.type]) {
-    if (!(Number(s[key]) > 0)) return `${label} must be greater than 0`;
+    if (!(Number(s[key]) > 0)) return `${label} muss größer als 0 sein`;
   }
   if (s.type === 'I' || s.type === 'H') {
-    if (!(2 * s.tf < s.h)) return 'the flanges (2 tf) must be thinner than the height h';
-    if (!(s.tw < s.b)) return 'the web thickness tw must be smaller than the width b';
+    if (!(2 * s.tf < s.h)) return 'die Flansche (2 tf) müssen dünner sein als die Höhe h';
+    if (!(s.tw < s.b)) return 'die Stegdicke tw muss kleiner sein als die Breite b';
   } else if (s.type === 'T') {
-    if (!(s.tf < s.h)) return 'the flange thickness tf must be smaller than the height h';
-    if (!(s.tw < s.b)) return 'the stem width tw must be smaller than the flange width b';
+    if (!(s.tf < s.h)) return 'die Flanschdicke tf muss kleiner sein als die Höhe h';
+    if (!(s.tw < s.b)) return 'die Stegdicke tw muss kleiner sein als die Flanschbreite b';
   } else if (s.type === 'L') {
-    if (!(s.t < s.b)) return 'the thickness t must be smaller than the foot width b';
-    if (!(s.t < s.h)) return 'the thickness t must be smaller than the leg height h';
+    if (!(s.t < s.b)) return 'die Dicke t muss kleiner sein als die Fußbreite b';
+    if (!(s.t < s.h)) return 'die Dicke t muss kleiner sein als die Schenkelhöhe h';
   }
   return null;
 }
@@ -159,9 +161,9 @@ export function sectionWidth(s) {
 // Mass of a beam of the given length when its mass is not set explicitly: density x area x length.
 export const beamMass = (section, length) => DENSITY * sectionProps(section).area * length;
 
-// Compact text for property popups: "I 100 x 200 x 10 x 6 mm".
+// Compact text for property popups: "I 100 × 200 × 10 × 6 mm".
 export function describeSection(s) {
-  const mm = (v) => String(Math.round(v * 1e4) / 10);
+  const mm = (v) => comma(Math.round(v * 1e4) / 10);
   const dims = SECTION_FIELDS[s.type].map(([key]) => mm(s[key]));
-  return `${SECTION_LABELS[s.type]} ${dims.join(' x ')} mm`;
+  return `${SECTION_LABELS[s.type]} ${dims.join(' × ')} mm`;
 }

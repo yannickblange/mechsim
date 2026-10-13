@@ -1,6 +1,6 @@
 {
   "version": "0.3",
-  "name": "Mass caught by a rope",
+  "name": "Masse, vom Seil gefangen",
   "description": "A mass falls on a rope hung from a Festlager in free space. The rope is slack at first (it carries no force and never pushes), snaps taut inelastically and then swings the mass.",
   "gravity": [
     0,

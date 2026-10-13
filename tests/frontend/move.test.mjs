@@ -115,9 +115,9 @@ test('contactOffset on a sloped surface moves along its normal', () => {
 test('linkProblem', () => {
   const s = sceneWith({ bodies: [block('a', 0, 0, 0.4, 0.2), block('b', 1, 0, 0.4, 0.2)] });
   const L = (a, b) => linkProblem(s, { a, b });
-  assert.match(L({ body: null, point: [0, 0] }, { body: null, point: [1, 1] }), /at least one end/);
-  assert.match(L({ body: 'a', point: [0, 0] }, { body: 'a', point: [0.1, 0] }), /same mass/);
-  assert.match(L({ body: null, point: [0, 0] }, { body: 'a', point: [0.01, 0] }), /too close/);
+  assert.match(L({ body: null, point: [0, 0] }, { body: null, point: [1, 1] }), /Mindestens ein Ende/);
+  assert.match(L({ body: 'a', point: [0, 0] }, { body: 'a', point: [0.1, 0] }), /derselben Masse/);
+  assert.match(L({ body: null, point: [0, 0] }, { body: 'a', point: [0.01, 0] }), /zu dicht/);
   assert.equal(L({ body: 'a', point: [0, 0] }, { body: 'b', point: [0, 0] }), null);
 });
 
@@ -253,7 +253,7 @@ test('move: an end that would make the link invalid goes back (and says why)', (
   const t = tools.get('move');
   t.down({ world: [1, 0.6] });
   t.move({ world: [3, 3] }); // free space: a Stab is not pinned to empty space
-  assert.match(t.error, /ends on a mass, a node or a Festlager/);
+  assert.match(t.error, /endet an einer Masse, einem Knoten oder einem Festlager/);
   assert.deepEqual(model.scene.constraints[0].b, { body: 'a', point: [0, 0.1] }, 'shown unchanged while dragging');
   t.up({ world: [3, 3] });
   assert.deepEqual(model.scene.constraints[0].b, { body: 'a', point: [0, 0.1] });
