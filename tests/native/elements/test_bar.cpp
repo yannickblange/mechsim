@@ -315,3 +315,74 @@ TEST_CASE("bar input checks: segments, damping, imperfection, mass", "[bar]") {
     CHECK_THROWS_WITH(load(scene({{"section", sec}, {"mass", 0.0}})), ContainsSubstring("mass"));
     CHECK_THROWS_WITH(load(scene(json::object())), ContainsSubstring("bar 'B'") && ContainsSubstring("section"));
 }
+
+// --- v0.7: an Einspannung on a node clamps the Stab that ends there -----------------------------------------
+
+namespace {
+
+// Like column(), but the foot is a node N0 with an Einspannung (`clamp`) or a Festlager (not clamped): Euler's
+// case "clamped - pinned, top held sideways" (K = 0.699) against the pinned column.
+json footedColumn(double L, double P, bool clamp, json extra = json::object()) {
+    json bar = {{"id", "B"}, {"type", "bar"}, {"a", at("N0")}, {"b", at("N")},
+                {"params", {{"section", {{"type", "square"}, {"a", 0.02}}}}}};
+    bar["params"]["damping"] = 8.0;
+    bar["params"].update(extra);
+    json foot = node("N0", 0.0, 0.0, 1.0);
+    json top = node("N", 0.0, L, 1.0);
+    foot["params"]["damping"] = top["params"]["damping"] = 8.0;
+    json support = {{"id", "E"}, {"type", clamp ? "fixed_support" : "pin_support"}, {"body", "N0"}, {"point", {0.0, 0.0}},
+                    {"surface", nullptr}, {"params", {{"angle", 0.0}}}};
+    json wall = {{"id", "W"}, {"type", "roller_support"}, {"body", "N"}, {"point", {0.0, 0.0}}, {"surface", nullptr},
+                 {"params", {{"angle", kPi / 2.0}}}};
+    json load = {{"id", "F"}, {"type", "load"}, {"body", "N"}, {"point", {0.0, 0.0}}, {"params", {{"force", {0.0, -P}}}}};
+    return sceneOf({foot, top}, json::array({bar, load}), json::array({support, wall}), 0.0);
+}
+
+}  // namespace
+
+TEST_CASE("clamped - pinned column: Euler load 20.19 E I / L^2 (K = 0.699), the pinned one buckles far below it", "[bar][buckling][clamp]") {
+    const double L = 2.0, I = std::pow(0.02, 4) / 12.0;
+    const double PcrPinned = kPi * kPi * kE * I / (L * L);
+    const double PcrClamped = PcrPinned / (0.6991546 * 0.6991546);  // 2.046 x
+    CHECK_THAT(PcrClamped / PcrPinned, WithinRel(2.0457, 1e-3));
+
+    auto reported = load(footedColumn(L, 0.0, true));
+    CHECK_THAT(frameElement(*reported, "B")["pcr"].get<double>(), WithinRel(PcrClamped, 1e-6));
+    auto hinged = load(footedColumn(L, 0.0, false));  // a Festlager does not clamp
+    CHECK_THAT(frameElement(*hinged, "B")["pcr"].get<double>(), WithinRel(PcrPinned, 1e-12));
+
+    // 1.5 x the pinned Euler load: a pinned foot buckles, the clamped one carries it (73 % of its Euler load)
+    auto pinned = load(footedColumn(L, 1.5 * PcrPinned, false));
+    auto clamped = load(footedColumn(L, 1.5 * PcrPinned, true));
+    // 1.1 x the clamped Euler load: now it buckles too
+    auto over = load(footedColumn(L, 1.1 * PcrClamped, true));
+    for (int i = 0; i < 8000; ++i) {
+        pinned->step(1e-3);
+        clamped->step(1e-3);
+        over->step(1e-3);
+    }
+    CHECK(deflection(*pinned) > 0.15 * L);
+    CHECK(deflection(*clamped) < 0.02 * L);
+    CHECK(deflection(*over) > 0.15 * L);
+    // the foot does not turn, and the support carries a moment only while the column bends
+    CHECK_THAT(clamped->bodies[0].phi, WithinAbs(0.0, 1e-6));
+    CHECK_THAT(over->bodies[0].phi, WithinAbs(0.0, 1e-4));
+    CHECK(std::abs(over->bodies[0].phi - frameElement(*over, "B")["nodes"][1][2].get<double>()) > 0.01);
+}
+
+TEST_CASE("a clamped Stab end is a cantilever: a sideways load P at the free top deflects it by P L^3 / 3 E I", "[bar][bending][clamp]") {
+    const double L = 1.0, a = 0.02, I = std::pow(a, 4) / 12.0, P = 20.0;
+    // foot clamped, the top free (no wall): a node with a sideways force
+    json bar = {{"id", "B"}, {"type", "bar"}, {"a", at("N0")}, {"b", at("N")},
+                {"params", {{"section", {{"type", "square"}, {"a", a}}}, {"damping", 8.0}, {"segments", 8}}}};
+    json foot = node("N0", 0.0, 0.0), top = node("N", 0.0, L);
+    foot["params"]["damping"] = top["params"]["damping"] = 8.0;
+    json support = {{"id", "E"}, {"type", "fixed_support"}, {"body", "N0"}, {"point", {0.0, 0.0}}, {"surface", nullptr}, {"params", {{"angle", 0.0}}}};
+    json force = {{"id", "F"}, {"type", "load"}, {"body", "N"}, {"point", {0.0, 0.0}}, {"params", {{"force", {P, 0.0}}}}};
+    auto w = load(sceneOf({foot, top}, json::array({bar, force}), json::array({support}), 0.0));
+    for (int i = 0; i < 6000; ++i) w->step(1e-3);
+    CHECK_THAT(w->bodies[1].pos.x, WithinRel(P * L * L * L / (3.0 * kE * I), 0.02));
+    // the clamping moment P L
+    const json r = w->frame()["constraints"][0];
+    CHECK_THAT(std::abs(r["reaction"][2].get<double>()), WithinRel(P * L, 0.02));
+}

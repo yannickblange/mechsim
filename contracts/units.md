@@ -85,6 +85,9 @@
   fraction of the length. Frame: `p1`, `p2`, `force` (the normal force of the element that carries the most, tension positive), `stress`
   (largest normal stress, axial plus bending; with one segment |force| / A), `nodes` (`[x, y, phi]` from end a to end b, the bent shape) and
   `pcr` (the Euler load): the bar has buckled when `-force` reaches `pcr`.
+- **Clamped bar ends (v0.7).** The ends of a bar are pinned, except an end on a `node` that carries a `fixed_support` (Einspannung): that end is
+  clamped (it keeps the rotation of the node, so it carries a moment; the support's `reaction[2]`). Frame `pcr` is then the Euler load of the matching
+  case: `pi^2 E I / (K L)^2`, K = 1 pinned - pinned, 0.6992 one end clamped, 0.5 both. No new scene fields.
 - **Damping** (`params.damping` of `node`, `beam` and `bar`, 1/s): viscous damping rate alpha, force `-alpha m v` and torque `-alpha J omega` on every node
   (a bar: its internal nodes). Every mode decays like `exp(-alpha t / 2)`; a load applied suddenly settles at its static response instead of
   swinging for ever. It acts on rigid-body motion too. Default 0 in the engine; the editor gives new beams and elastic Stabs 5 / s.

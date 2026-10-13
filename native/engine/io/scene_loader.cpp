@@ -69,14 +69,15 @@ auto callFactory(Fn fn, const json& spec, const World& world, const std::string&
     }
 }
 
-void loadElement(const json& rawSpec, const BeamPlans& beams, World& world, std::set<std::string>& ids) {
+void loadElement(const json& rawSpec, const BeamPlans& beams, const std::set<std::string>& clampedNodes, World& world,
+                 std::set<std::string>& ids) {
     const json spec = remapBeamAnchors(rawSpec, beams);  // attachments on a beam go to its nodes
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
     const std::string type = spec.at("type").get<std::string>();
     if (type == "bar") {  // v0.4b: an elastic Stab is a chain of beam elements and hidden nodes
         try {
-            addBar(spec, world);
+            addBar(spec, world, clampedNodes);
         } catch (const std::exception& e) {
             throw std::runtime_error(id + ": " + e.what());
         }
@@ -125,7 +126,20 @@ std::unique_ptr<World> build(const json& scene) {
         }
     }
     if (scene.contains("elements")) {
-        for (const json& spec : scene["elements"]) loadElement(spec, beams, *world, ids);
+        // v0.7: an Einspannung (fixed_support) on a node clamps the elastic Stabs that end there (they hinge otherwise)
+        std::set<std::string> nodeIds, clampedNodes;
+        for (const json& spec : scene.at("bodies")) {
+            if (spec.at("type").get<std::string>() == "node") nodeIds.insert(spec.at("id").get<std::string>());
+        }
+        if (scene.contains("constraints")) {
+            for (const json& spec : scene["constraints"]) {
+                if (spec.value("type", "") == "fixed_support" && spec.contains("body") && spec["body"].is_string() &&
+                    nodeIds.count(spec["body"].get<std::string>()) > 0) {
+                    clampedNodes.insert(spec["body"].get<std::string>());
+                }
+            }
+        }
+        for (const json& spec : scene["elements"]) loadElement(spec, beams, clampedNodes, *world, ids);
     }
     if (scene.contains("constraints")) {
         for (const json& spec : scene["constraints"]) loadConstraint(spec, beams, *world, ids);

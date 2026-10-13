@@ -4,8 +4,8 @@
 // Event shape: { world: [x, y], shift: boolean }. down() returns true if the tool used the click
 // (the canvas must then not start panning). Every tool also has move(), up(), key(name), cancel().
 import {
-  add, dist, dot, length, normalizeAngle, rotate, roundTo, snapSegmentEnd, sub, surfaceAngle, tidy,
-  worldToLocal,
+  add, dist, dot, length, normalizeAngle, rotate, roundTo, snapDirection, snapDirectionTo, snapOntoSurfaceAtAngles,
+  snapSegmentEnd, sub, supportAngleAt, surfaceAngle, tidy, worldToLocal,
 } from './geometry.js';
 import { decimal } from '../format.js';
 import { FORCE_M_PER_N, hitTest, anchorWorld, moveTarget } from './hit.js';
@@ -14,7 +14,7 @@ import {
   replaceLoad, replaceSupport,
 } from './moves.js';
 import { SUPPORT_LABELS, describeSupport, pickSupportPoint, surfaceUnder } from './placement.js';
-import { SNAP_TOLERANCE_PX, bodiesAt, gridStepFor, snapPoint, surfaceNear } from './snap.js';
+import { SNAP_TOLERANCE_PX, bodiesAt, gridStepFor, snapPoint, surfaceAtPoint, surfaceNear } from './snap.js';
 
 export const MIN_DRAG_PX = 6; // below this a press-release counts as a click
 export const MIN_SIZE_M = 0.05;
@@ -25,6 +25,15 @@ class Tool {
     this.env = env; // { model, getScale(), select(sel) }
     this.error = null;
     this.marker = null; // snap marker { point, kind } for the UI
+    this.shift = false; // Shift is held: nothing snaps (the grid, features, surfaces, angles, lengths)
+    // every pointer event tells the tool whether Shift is down (the methods are the subclass's own here)
+    for (const name of ['down', 'move', 'up']) {
+      const own = this[name];
+      this[name] = (e, ...rest) => {
+        this.shift = Boolean(e && e.shift);
+        return own.call(this, e, ...rest);
+      };
+    }
   }
 
   get scale() { return this.env.getScale(); }
@@ -32,7 +41,7 @@ class Tool {
   get step() { return gridStepFor(this.scale); }
 
   snap(world, opts = {}) {
-    return snapPoint(world, this.scene, { scale: this.scale, ...opts });
+    return snapPoint(world, this.scene, { scale: this.scale, free: this.shift, ...opts });
   }
 
   down() { return false; }
@@ -196,6 +205,7 @@ export class CircleTool extends TwoPointTool {
   }
 
   constrainEnd(p1, world) {
+    if (this.shift) return world;
     const r = Math.max(this.step, roundTo(dist(p1, world), this.step));
     const dir = sub(world, p1);
     const len = length(dir);
@@ -225,8 +235,8 @@ export class SurfaceTool extends TwoPointTool {
       : 'Ziehen, um eine feste Fläche zu zeichnen.';
   }
 
-  constrainEnd(p1, world, e) {
-    if (e && e.shift) return this.snap(world, { surfaces: true, bodies: false }).point;
+  constrainEnd(p1, world) {
+    if (this.shift) return world;
     return snapSegmentEnd(p1, world, { step: this.step });
   }
 
@@ -277,7 +287,28 @@ export class SpringTool extends Tool {
       point: s.body ? s.local : s.point,
       world: s.point,
       kind: s.kind,
+      surface: s.surface,
     };
+  }
+
+  // The second end, placed at `world`. A spring that starts on a surface (or ends on one) is held at 0, 30, 45, 60,
+  // 90 degrees to that surface (Shift: free, nothing snaps).
+  secondEnd(world) {
+    const first = this.a;
+    const surfaceOf = (id) => this.scene.surfaces.find((s) => s.id === id);
+    if (!this.shift && first && first.surface && surfaceOf(first.surface)) {
+      // along the allowed ray from the first end: points of masses on it, no grid or feature snap that would leave it
+      const on = snapDirectionTo(first.world, world, surfaceAngle(surfaceOf(first.surface)));
+      const s = this.snap(on, { interior: true, bodies: false, grid: false, free: false });
+      return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind, surface: null };
+    }
+    const b = this.anchorFrom(world);
+    const surface = b.surface && surfaceOf(b.surface);
+    if (!this.shift && first && first.body !== null && surface && b.kind === 'surface') {
+      const point = snapOntoSurfaceAtAngles(first.world, b.world, surface);
+      if (point) return { ...b, point, world: point };
+    }
+    return b;
   }
 
   get geometry() {
@@ -294,6 +325,7 @@ export class SpringTool extends Tool {
     const u = sub(g.b, g.a);
     const axis = [u[0] / g.length, u[1] / g.length];
     const rest = Math.max(0, dot(sub(world, g.a), axis));
+    if (this.shift) return rest;
     if (Math.abs(rest - g.length) * this.scale <= 8) return g.length;
     return Math.max(0, roundTo(rest, this.step));
   }
@@ -314,7 +346,7 @@ export class SpringTool extends Tool {
   }
 
   setB(world) {
-    const b = this.anchorFrom(world);
+    const b = this.secondEnd(world);
     if (this.a.body === null && b.body === null) {
       this.error = 'Eine Feder braucht mindestens ein Ende an einer Masse.';
       return;
@@ -342,9 +374,9 @@ export class SpringTool extends Tool {
       this.marker = null;
       return;
     }
-    const s = this.snap(e.world, { interior: true, surfaces: true, pins: true });
-    this.cursor = s.point;
-    this.marker = { point: s.point, kind: s.kind };
+    const s = this.stage === 1 ? this.secondEnd(e.world) : this.anchorFrom(e.world);
+    this.cursor = s.world;
+    this.marker = { point: s.world, kind: s.kind };
   }
 
   up(e) {
@@ -501,7 +533,7 @@ export class SupportTool extends Tool {
       return this.type === 'roller_support'
         ? 'Jetzt die Fläche anklicken, auf der das Loslager rollt. Es gleitet an ihr entlang und passt sich ihrem Winkel an.'
         : `Jetzt die Fläche anklicken, auf der es sitzt (${name}): Es passt sich ihrem Winkel an und überbrückt den Abstand. `
-          + 'Woanders klicken für ein Lager ohne Fläche.';
+          + 'Im freien Raum klicken: die Richtung vom Punkt zum Klick bestimmt die Drehung (rastet bei 0, 30, 45, 60, 90°; Umschalt = frei).';
     }
     if (this.type === 'roller_support') return 'Einen Punkt einer Masse anklicken, dann die Fläche, auf der es rollt.';
     const free = this.type === 'pin_support' ? ' Im freien Raum klicken, um ein Festlager zu setzen, an dem Seile, Stäbe und Federn angreifen können.' : '';
@@ -510,12 +542,24 @@ export class SupportTool extends Tool {
 
   // What a click at `world` would do right now.
   place(world) {
-    if (!this.first) return pickSupportPoint(this.scene, this.type, world, this.scale);
-    const surface = surfaceUnder(this.scene, world, this.scale);
+    if (!this.first) return pickSupportPoint(this.scene, this.type, world, this.scale, { free: this.shift });
+    // Shift: no adapting to a surface (a Loslager needs one anyway)
+    const surface = this.shift && this.type !== 'roller_support' ? null : surfaceUnder(this.scene, world, this.scale);
     if (!surface && this.type === 'roller_support') {
       return { error: 'Ein Loslager braucht eine Fläche: eine anklicken.', point: this.first.point };
     }
-    return { ...describeSupport(this.scene, this.first, surface), point: this.first.point, kind: this.first.kind, surfaceId: surface && surface.id };
+    const placed = { ...describeSupport(this.scene, this.first, surface), point: this.first.point, kind: this.first.kind, surfaceId: surface && surface.id };
+    if (!surface) placed.angle = this.freeAngle(world); // not on a surface: the click only turns the support
+    return placed;
+  }
+
+  // Rotation of a support from the click in free space: the symbol points from its point towards the click
+  // (angle 0 = ground below), snapped to 0, 30, 45, 60, 90 degrees unless Shift is held.
+  freeAngle(world) {
+    const d = sub(world, this.first.point);
+    if (length(d) * this.scale < MIN_DRAG_PX) return 0;
+    const direction = this.shift ? Math.atan2(d[1], d[0]) : snapDirection(d[0], d[1]);
+    return tidy(normalizeAngle(direction + Math.PI / 2));
   }
 
   move(e) {
@@ -622,7 +666,7 @@ export class LinkTool extends Tool {
 
   // A Stab never pins itself to empty space: its free ends become nodes (made when the Stab is created).
   anchorFrom(world) {
-    const s = this.snap(world, { interior: true, surfaces: this.kind !== 'rod', pins: true });
+    const s = this.snap(world, { interior: true, surfaces: true, pins: true });
     const node = this.kind === 'rod' && !s.body && s.kind !== 'pin';
     return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind, node };
   }
@@ -747,14 +791,27 @@ export class BeamTool extends TwoPointTool {
 
   snapStart(world) { return this.snap(world, { surfaces: true, pins: true }); }
 
-  constrainEnd(p1, world, e) {
-    if (e && e.shift) return this.snap(world, { surfaces: true, bodies: false }).point;
+  // The end sticks to a surface it is near (and then the beam is clamped there); otherwise the angle snaps.
+  constrainEnd(p1, world) {
+    if (this.shift) return world;
+    const onSurface = this.snap(world, { surfaces: true, bodies: false });
+    if (onSurface.surface) return onSurface.point;
     return snapSegmentEnd(p1, world, { step: this.step });
   }
 
-  commit(p1, p2) {
+  // A beam end that sits on a surface is fest eingespannt (Einspannung) there.
+  commit(p1, p2, start) {
     if (dist(p1, p2) < MIN_BEAM_M) return false;
-    this.env.created('body', this.env.model.addBeam({ start: p1, end: p2 }));
+    const clamps = [];
+    const consider = (which, point, other) => {
+      const surface = which === 'start' && start && start.surface
+        ? this.scene.surfaces.find((s) => s.id === start.surface)
+        : surfaceAtPoint(this.scene, point);
+      if (surface) clamps.push({ end: which, surface: surface.id, angle: supportAngleAt(surface, point, other) });
+    };
+    consider('start', p1, p2);
+    consider('end', p2, p1);
+    this.env.created('body', this.env.model.addBeam({ start: p1, end: p2, clamps }));
     return true;
   }
 
@@ -854,7 +911,7 @@ export class MoveTool extends Tool {
   get tol() { return SNAP_TOLERANCE_PX / this.scale; }
 
   get hint() {
-    if (this.drag) return 'Loslassen, um es hier abzulegen. Esc bricht ab. Umschalt gedrückt halten schaltet das Raster aus.';
+    if (this.drag) return 'Loslassen, um es hier abzulegen. Esc bricht ab. Umschalt gedrückt halten schaltet jedes Einrasten aus.';
     return 'Eine Masse, Fläche oder ein Festlager ziehen, um sie zu verschieben. Ein Lager oder eine Last ziehen, um sie neu zu setzen, '
       + 'oder das Ende einer Feder, eines Seils oder Stabs, um es woanders anzubringen.';
   }
@@ -919,7 +976,7 @@ export class MoveTool extends Tool {
       const body = base.bodies.find((b) => b.id === t.id);
       const target = this.snapTo(add(body.position, raw), e);
       let delta = sub(target, body.position);
-      delta = add(delta, contactOffset(base, t.id, delta, this.tol)); // lands exactly on a nearby surface
+      if (!e.shift) delta = add(delta, contactOffset(base, t.id, delta, this.tol)); // lands exactly on a nearby surface
       tx.update((scene) => moveBodies(scene, d.group, delta, this.tol));
     } else if (t.type === 'surface') {
       const s = base.surfaces.find((x) => x.id === t.id);
@@ -927,7 +984,7 @@ export class MoveTool extends Tool {
       tx.update((scene) => moveSurface(scene, t.id, delta, this.tol));
     } else if (t.type === 'pin') {
       const pin = base.constraints.find((c) => c.id === t.id);
-      const target = snapPoint(add(pin.point, raw), base, { scale: this.scale, bodies: false, surfaces: true, grid: !e.shift }).point;
+      const target = snapPoint(add(pin.point, raw), base, { scale: this.scale, bodies: false, surfaces: true, free: e.shift }).point;
       const delta = sub(target, pin.point);
       tx.update((scene) => movePin(scene, t.id, delta, this.tol));
     } else if (t.type === 'end') {
@@ -939,7 +996,7 @@ export class MoveTool extends Tool {
 
   dragEnd(e, d) {
     const { target: t, base, tx } = d;
-    const s = snapPoint(e.world, base, { scale: this.scale, interior: true, surfaces: true, pins: true, grid: !e.shift });
+    const s = snapPoint(e.world, base, { scale: this.scale, interior: true, surfaces: true, pins: true, free: e.shift });
     const anchor = { body: s.body, point: s.body ? s.local : s.point };
     const test = JSON.parse(JSON.stringify(base));
     reattachEnd(test, t.id, t.end, anchor);
@@ -962,7 +1019,7 @@ export class MoveTool extends Tool {
     const { target: t, base, tx } = d;
     if (t.type === 'support') {
       const old = base.constraints.find((c) => c.id === t.id);
-      const pt = pickSupportPoint(base, old.type, e.world, this.scale);
+      const pt = pickSupportPoint(base, old.type, e.world, this.scale, { free: e.shift });
       this.marker = { point: pt.point, kind: pt.error || pt.free ? 'invalid' : pt.kind };
       if (pt.error || pt.free) {
         this.error = pt.error || 'Ein Lager muss an einer Masse sitzen.';
@@ -976,7 +1033,7 @@ export class MoveTool extends Tool {
       if (!surface) placement.angle = old.params.angle || 0;
       tx.update((scene) => replaceSupport(scene, t.id, placement));
     } else {
-      const s = snapPoint(e.world, base, { scale: this.scale, interior: true });
+      const s = snapPoint(e.world, base, { scale: this.scale, interior: true, free: e.shift });
       this.marker = { point: s.point, kind: s.body ? s.kind : 'invalid' };
       if (!s.body) {
         this.error = 'Eine Last muss an einer Masse angreifen.';

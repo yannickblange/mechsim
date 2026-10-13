@@ -2,7 +2,9 @@
 //
 // A chain of corotational Euler-Bernoulli elements. The nodes of a chain are bodies (x, y, phi), or -
 // at the two ends of an elastic Stab - anchors (a point of a body or of the ground) that are hinged: the
-// end rotation is not a variable of the system but is condensed out (the end carries no moment).
+// end rotation is not a variable of the system but is condensed out (the end carries no moment). An end of a
+// Stab on a node that has an Einspannung (v0.7) is clamped instead: its section rotates with the node, whose
+// rotation the support fixes, so the end carries a moment.
 #pragma once
 
 #include <vector>
@@ -39,6 +41,7 @@ public:
     double EI = 0;                 // N m^2
     double endWeight = 0;          // kg, bar: half of the mass of the end segments hangs on the anchors
     double installedLength = 0;    // m, bar: distance between the anchors as installed (for the Euler load)
+    double bucklingFactor = 1.0;   // bar: effective length factor K of the end conditions (1 hinged, 0.699 one end clamped, 0.5 both)
 
     const char* type() const override { return kind == Kind::Bar ? "bar" : "beam_fe"; }
     bool hidden() const override { return kind == Kind::Beam; }
@@ -47,7 +50,7 @@ public:
     // Beam: merged into the frame entry of the beam body: "nodes" ([x, y, phi] per node), "moments" (bending
     // moment at every node, sagging positive), "axial" (normal force per segment), "stress" (largest normal
     // stress, Pa), "A", "I", "EA", "EI". Bar: "p1", "p2", "force" (the normal force of the segment that carries the most, tension positive),
-    // "stress", "nodes", "pcr" (Euler load pi^2 E I / L^2 of the pinned bar).
+    // "stress", "nodes", "pcr" (Euler load pi^2 E I / (K L)^2 of the Euler case that fits the end conditions, laterally held).
     void writeFrame(const World& world, nlohmann::json& out) const override;
 
     // State of one segment: elongation (with the bowing of the curve), chord, end rotations against the

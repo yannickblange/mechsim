@@ -176,6 +176,16 @@ unstable and the column goes to the post-buckled shape of Euler's elastica under
 deflection is `k L / K(k)` (`K` the complete elliptic integral of the first kind): 0.37 L for `P = 1.3 P_cr`. Both are checked in
 `tests/native/elements/test_bar.cpp` and `tests/validation/test_v04_physics.py`.
 
+*Clamped ends* (v0.7). An end of an elastic Stab on a **node that has an Einspannung** (`fixed_support`) is clamped, not pinned: its section
+rotation is the rotation `phi` of the node, which the support holds at `phi0`, so the end rotation against the chord is
+`theta = phi - phi0 - dbeta` (`dbeta` the chord rotation) and the end carries a moment, the reaction `M` of the support. An end on any other body
+(a block, a beam, the ground, a node with a Festlager or none) stays pinned. The loader decides from the scene alone, so a saved scene needs
+nothing new. The Euler load follows Euler's cases (the ends held sideways): `P_cr = pi^2 E I / (K L)^2` with `K = 1` pinned - pinned, `0.6992`
+clamped - pinned (`P_cr = 20.19 E I / L^2`, 2.046 x the pinned one) and `0.5` clamped - clamped; the frame's `pcr` reports the one that fits the ends.
+A clamped end does not help a free end: a cantilever (clamped, top free) buckles at a quarter of the pinned load (`K = 2`), which the frame does not
+report (it has no way to know that the top is free). Checked: `tests/native/elements/test_bar.cpp` (clamped - pinned column buckles at `P_cr` of
+case 3, not at the pinned one; the cantilever deflects `P L^3 / 3 E I`) and `tests/validation/test_v07_physics.py` (the Knick Fall).
+
 A truss of such members is not exactly the direct stiffness method of `mechsim.analysis.truss`: a heavy slender member sags, and a sagging member is
 softer than `E A / L` (its chord shortens by `8 w^2 / 3 L`, micrometres, as much as the load deforms a stiff truss). Statically determinate members
 are not affected; the redundant ones of the example `truss_elastic` shift by a few ten per cent of the largest force. With `segments = 1` or light

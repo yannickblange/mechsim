@@ -1,5 +1,5 @@
 // hit.js - what is under the pointer? Used for selection and for right-click properties.
-import { FORCE_M_PER_N } from '../canvas/symbols/load.js';
+import { FORCE_M_PER_N, arrowLengthPx } from '../canvas/symbols/load.js';
 import { ropePolyline } from '../canvas/symbols/rope.js';
 import {
   bodyArea, bodyToWorld, closestOnSegment, dist, pointInBody,
@@ -73,9 +73,21 @@ function nodeAtPoint(scene, world, radius) {
   return [...scene.bodies].reverse().find((b) => b.type === 'node' && dist(b.position, world) <= radius) || null;
 }
 
+// The arrow of a load as it is drawn: from its application point to the tip (the drawing caps its length in px
+// whatever the force, so a huge force does not cover the whole scene), or null without a force.
+export function loadArrow(scene, load, scale) {
+  const p = attachedPoint(scene, load);
+  const f = load.params.force || [0, 0];
+  const mag = Math.hypot(f[0], f[1]);
+  if (!p || mag < 1e-12) return null;
+  const len = arrowLengthPx(mag, scale) / scale;
+  return { p, tip: [p[0] + (f[0] / mag) * len, p[1] + (f[1] / mag) * len] };
+}
+
 // Returns { kind: "surface" | "body" | "element" | "constraint", id } or null.
-// Small things win over big things: supports, joints and pins, loads, nodes, springs / ropes / rods,
-// then bodies, then surfaces.
+// Small things win over big things: supports, joints and pins, the ends of loads (where they act, the arrow
+// head), nodes, springs / ropes / rods, the shafts of load arrows, then bodies, then surfaces. A long arrow
+// along a Stab therefore does not keep the Stab from being clicked.
 export function hitTest(scene, world, scale) {
   const px = (n) => n / scale;
 
@@ -84,15 +96,16 @@ export function hitTest(scene, world, scale) {
     const p = attachedPoint(scene, c);
     if (p && dist(p, world) <= px(HIT_PX.support)) return { kind: 'constraint', id: c.id };
   }
+  const shafts = [];
   for (const e of [...scene.elements].reverse()) {
     if (e.type !== 'load') continue;
     const p = attachedPoint(scene, e);
     if (!p) continue;
-    const f = e.params.force || [0, 0];
-    const tip = [p[0] + f[0] * FORCE_M_PER_N, p[1] + f[1] * FORCE_M_PER_N];
-    const nearArrow = closestOnSegment(world, p, tip).dist <= px(HIT_PX.load);
+    const arrow = loadArrow(scene, e, scale);
     const nearMoment = (e.params.moment || 0) !== 0 && dist(p, world) <= px(HIT_PX.load + 12);
-    if (nearArrow || nearMoment || dist(p, world) <= px(HIT_PX.load)) return { kind: 'element', id: e.id };
+    const atEnds = dist(p, world) <= px(HIT_PX.load) || (arrow && dist(arrow.tip, world) <= px(HIT_PX.load));
+    if (nearMoment || atEnds) return { kind: 'element', id: e.id };
+    if (arrow && closestOnSegment(world, arrow.p, arrow.tip).dist <= px(HIT_PX.spring)) shafts.push(e.id);
   }
   const node = nodeAtPoint(scene, world, px(HIT_PX.end));
   if (node) return { kind: 'body', id: node.id };
@@ -104,6 +117,7 @@ export function hitTest(scene, world, scale) {
     const ends = linkEnds(scene, obj);
     if (ends && lineDistance(world, ends, obj, scene) <= px(HIT_PX.spring)) return { kind, id: obj.id };
   }
+  if (shafts.length) return { kind: 'element', id: shafts[0] };
   const bodies = scene.bodies.filter((b) => pointInBody(b, world));
   if (bodies.length) {
     bodies.sort((p, q) => bodyArea(p) - bodyArea(q)); // the smaller body is on top of the larger

@@ -225,7 +225,8 @@ export class Editor {
     const tool = this.tool;
     this.hint.hidden = !this.enabled;
     this.hint.dataset.error = String(Boolean(tool.error));
-    this.hint.textContent = tool.error || tool.hint;
+    // Shift works in every tool: nothing snaps (grid, points, surfaces, angles) while it is held
+    this.hint.textContent = tool.error || (this.toolId === 'select' ? tool.hint : `${tool.hint} Umschalt gedrückt: kein Einrasten.`);
   }
 
   // --- right-click properties -------------------------------------------------------------------

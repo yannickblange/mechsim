@@ -191,17 +191,17 @@ test('move: a mass and what is attached to it; one undo step', () => {
   assert.deepEqual(model.body('m').position, [1, 0.5]);
 });
 
-test('move: a mass lands exactly on a nearby surface; Shift only turns the grid off', () => {
+test('move: a mass lands exactly on a nearby surface; Shift turns the grid and the landing off', () => {
   const start = () => setup(sceneWith({ surfaces: [floor], bodies: [block('m', 1, 0.5, 0.4, 0.2)] }));
   let { model, tools } = start();
   drag(tools.get('move'), [1, 0.5], [1, 0.12], { shift: true });
-  close(model.body('m').position[1], 0.1, 1e-9);
+  close(model.body('m').position[1], 0.12, 1e-9);
   ({ model, tools } = start());
   drag(tools.get('move'), [1, 0.5], [1.33, 0.12]);
   closePoint(model.body('m').position, [1.35, 0.1], 1e-9);
   ({ model, tools } = start());
   drag(tools.get('move'), [1, 0.5], [1.33, 0.12], { shift: true });
-  closePoint(model.body('m').position, [1.33, 0.1], 1e-9);
+  closePoint(model.body('m').position, [1.33, 0.12], 1e-9);
 });
 
 test('move: masses joined by a joint move together', () => {

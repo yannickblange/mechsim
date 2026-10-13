@@ -16,13 +16,13 @@ export const SURFACE_PICK_PX = 1.5 * SNAP_TOLERANCE_PX;
 //   { error, point }                                  cannot be placed here
 //   { body, point, local, kind }                      a point of a mass (snapped like everywhere)
 //   { free: true, point, kind, surface, angle }       Festlager in free space (needs no second click)
-export function pickSupportPoint(scene, type, world, scale) {
-  const s = snapPoint(world, scene, { scale, interior: true, surfaces: true, pins: true });
+export function pickSupportPoint(scene, type, world, scale, { free = false } = {}) {
+  const s = snapPoint(world, scene, { scale, interior: true, surfaces: true, pins: true, free });
   if (s.body) return { body: s.body, point: s.point, local: s.local, kind: s.kind };
   if (type !== 'pin_support') return { error: 'Zuerst einen Punkt einer Masse anklicken.', point: s.point };
   if (s.kind === 'pin') return { error: 'Hier ist schon ein Festlager.', point: s.point };
-  // Festlager in free space: on a surface it adopts it, on the side the pointer is on.
-  const surface = surfaceNear(s.point, scene.surfaces, scale);
+  // Festlager in free space: on a surface it adopts it, on the side the pointer is on (Shift: it does not).
+  const surface = free ? null : surfaceNear(s.point, scene.surfaces, scale);
   return {
     free: true, point: s.point, kind: s.kind, surface: surface ? surface.id : null,
     angle: surface ? supportAngleAt(surface, world, world) : 0,

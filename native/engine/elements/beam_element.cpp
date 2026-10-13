@@ -171,7 +171,8 @@ void BeamElement::writeFrame(const World& world, nlohmann::json& out) const {
         out["force"] = extremeN;
         out["stress"] = sigma;
         out["nodes"] = std::move(nodes);
-        out["pcr"] = kPi * kPi * EI / (installedLength * installedLength);  // Euler load of the pinned bar
+        const double Le = bucklingFactor * installedLength;  // effective length of the Euler case
+        out["pcr"] = kPi * kPi * EI / (Le * Le);
         return;
     }
     json moments = json::array();

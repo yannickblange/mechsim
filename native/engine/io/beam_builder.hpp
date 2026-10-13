@@ -10,6 +10,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -38,7 +39,8 @@ void addBeam(const nlohmann::json& spec, const BeamPlan& plan, World& world);
 // hinged at both ends, with `segments` elements (default 4; 1 = a massless pure axial bar), hidden internal nodes
 // that carry its mass (default 7850 kg/m^3 x A x L, or params.mass) and an initial bow of params.imperfection x L
 // (default 1e-5: a seed for the instability that does not disturb the statics of a truss) so that a compressed bar can buckle. `spec` has its anchors already remapped to beam nodes.
-void addBar(const nlohmann::json& spec, World& world);
+// An end on a body whose id is in `clampedBodies` (a node with an Einspannung, v0.7) is clamped instead of hinged.
+void addBar(const nlohmann::json& spec, World& world, const std::set<std::string>& clampedBodies = {});
 
 // Copy of an element / constraint spec in which every anchor on a beam is replaced by an anchor on
 // the node of that beam (body id "<beam>#<k>", offset from the node as the local point).

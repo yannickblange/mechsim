@@ -399,7 +399,9 @@ test('Festlager and fixed Lager without a surface: second click elsewhere', () =
   const { model, tools } = setup(sceneWith({ bodies: [block('m1', 0.5, 0.1, 0.4, 0.2)] }));
   clickSupport(tools.get('pin'), [0.5, 0.1], [3, 3]);
   clickSupport(tools.get('fixed'), [0.3, 0.1], [3, 3]);
-  assert.deepEqual(model.scene.constraints.map((c) => [c.type, c.surface, c.params.angle]), [['pin_support', null, 0], ['fixed_support', null, 0]]);
+  // no surface: the click only turns the support towards it (snapped to 45 degrees: 45 + 90)
+  const angles = model.scene.constraints.map((c) => [c.type, c.surface, Math.round((c.params.angle * 180) / Math.PI)]);
+  assert.deepEqual(angles, [['pin_support', null, 135], ['fixed_support', null, 135]]);
 });
 
 test('supports: the angle follows the surface and the side the point is on', () => {

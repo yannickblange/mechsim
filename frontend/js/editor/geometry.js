@@ -69,6 +69,39 @@ export function snapSegmentEnd(p1, raw, { step = 0.05, anglesDeg = SNAP_ANGLES_D
   return tidyPoint([p1[0] + snappedLen * Math.cos(angle), p1[1] + snappedLen * Math.sin(angle)]);
 }
 
+// `raw` moved onto the ray from p1 whose direction is the nearest allowed angle, measured from `baseAngle`
+// (so 0, 30, 45, 60, 90 degrees to a surface); the distance from p1 stays as it is.
+export function snapDirectionTo(p1, raw, baseAngle = 0, anglesDeg = SNAP_ANGLES_DEG) {
+  const d = sub(raw, p1);
+  const len = length(d);
+  if (len < 1e-9) return [...p1];
+  const angle = baseAngle + snapDirection(...rotate(d, -baseAngle), anglesDeg);
+  return tidyPoint([p1[0] + len * Math.cos(angle), p1[1] + len * Math.sin(angle)]);
+}
+
+// The point of the surface line (within the segment) that is hit by a ray from p1 at an allowed angle to the
+// surface, the one closest to `raw`; null if no such ray meets the surface. Parallel rays never do.
+export function snapOntoSurfaceAtAngles(p1, raw, surface, anglesDeg = SNAP_ANGLES_DEG) {
+  const base = surfaceAngle(surface);
+  const t = [Math.cos(base), Math.sin(base)];
+  let best = null;
+  for (const a of snapAngles(anglesDeg)) {
+    const angle = base + a;
+    const r = [Math.cos(angle), Math.sin(angle)];
+    const denom = cross(r, t);
+    if (Math.abs(denom) < 1e-9) continue; // parallel to the surface
+    // p1 + s r = p2 + u t  =>  s = cross(p2 - p1, t) / cross(r, t)
+    const s = cross(sub(surface.p1, p1), t) / denom;
+    if (s <= 0) continue;
+    const hit = [p1[0] + s * r[0], p1[1] + s * r[1]];
+    const onSeg = closestOnSegment(hit, surface.p1, surface.p2);
+    if (onSeg.dist > 1e-6) continue;
+    const d = dist(hit, raw);
+    if (!best || d < best.d) best = { d, point: tidyPoint(hit) };
+  }
+  return best && best.point;
+}
+
 // --- segments -------------------------------------------------------------------------------
 
 // Closest point on segment a-b to p: { point, t (0..1), dist }.

@@ -27,14 +27,22 @@ export function gridStepFor(pxPerMetre) {
 //   interior       report points inside a body as body points, kind "inside" (default false)
 //   surfaces       snap to surfaces (default false)
 //   grid           snap to the grid (default true)
+//   free           no snapping at all (Shift held): the point is exactly where the pointer is; a mass under
+//                  it is still found (with `interior`) so that something can be attached to it
 //   exclude        body ids to ignore
 export function snapPoint(world, scene, opts = {}) {
   const {
     scale = 200, bodies = true, interior = false, surfaces = false, grid = true, exclude = [], pins = false,
+    free: unsnapped = false,
   } = opts;
   const tol = SNAP_TOLERANCE_PX / scale;
   const step = gridStepFor(scale);
   const candidates = (scene.bodies || []).filter((b) => !exclude.includes(b.id));
+
+  if (unsnapped) {
+    const body = interior ? [...candidates].reverse().find((b) => pointInBody(b, world)) : null;
+    return body ? bodyHit(body, world, 'inside') : free(world, 'free');
+  }
 
   if (pins) {
     const pin = freePins(scene).find((c) => dist(c.point, world) <= tol);
@@ -122,6 +130,14 @@ function snapToSurface(world, surfaces, tol) {
     if (hit.dist <= tol && (!line || hit.dist < line.dist)) line = { dist: hit.dist, point: hit.point, surface: s.id };
   }
   return line && result(tidyPoint(line.point), 'surface', line.surface);
+}
+
+// The surface a point lies on (within `tol` m), or null: where a snapped end sits exactly on a surface.
+export function surfaceAtPoint(scene, point, tol = 1e-3) {
+  for (const s of scene.surfaces || []) {
+    if (closestOnSegment(point, s.p1, s.p2).dist <= tol) return s;
+  }
+  return null;
 }
 
 // The surface (if any) closest to `world` within the snap tolerance. Used by supports.

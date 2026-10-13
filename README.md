@@ -56,6 +56,15 @@ frame), so fast vibrations are not aliased by the 60 Hz display. The panels can 
 The default colour scheme is a white board with black lines, a grey grid and blue forces; the round **moon button** in the bottom-right corner
 switches to a dark one (remembered in the browser).
 
+## Supports, snapping and clamped Stabs (v0.7)
+
+- An **Einspannung** on a node clamps the elastic Stab that ends there (it was pinned before): the Eulerknickfall with a clamped foot buckles at
+  `P_cr = pi^2 E I / (0.699 L)^2`. Beams drawn onto a surface get an Einspannung there; a Stab standing alone on a surface gets one when it is made elastic.
+- **Festlager** and Einspannung: first a point of a mass, then a surface (as before) **or a click in free space, which only turns the support**.
+- A spring that starts on a surface is held at 0, 30, 45, 60, 90 degrees to it.
+- **Shift** held while placing: nothing snaps (grid, points, surfaces, angles, lengths).
+- A long load arrow no longer hides the Stab under it when you click.
+
 ## German UI and dimensioned cross sections (v0.6)
 
 Everything visible in the browser is German (buttons, hints, property forms, graphs, scene names; decimal comma, typed numbers accept comma or dot).

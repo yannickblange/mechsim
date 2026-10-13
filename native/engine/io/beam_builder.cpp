@@ -180,7 +180,7 @@ void addBeam(const json& spec, const BeamPlan& plan, World& world) {
     world.beams.push_back(std::move(g));
 }
 
-void addBar(const json& spec, World& world) {
+void addBar(const json& spec, World& world, const std::set<std::string>& clampedBodies) {
     const std::string id = spec.at("id").get<std::string>();
     const std::string what = "bar '" + id + "'";
     const Anchor a = parseAnchorSpec(what, spec.at("a"), world, true);
@@ -190,6 +190,9 @@ void addBar(const json& spec, World& world) {
     const Vec2 pA = world.anchorWorld(a), pB = world.anchorWorld(b);
     const double L0 = length(pB - pA);
     if (L0 < 1e-6) throw std::runtime_error(what + ": the ends coincide");
+    // an end on a node with an Einspannung is clamped: its section turns with the node, which cannot rotate
+    auto clamped = [&](const Anchor& e) { return e.body != GROUND && clampedBodies.count(world.bodies[e.body].id) > 0; };
+    const bool clampA = clamped(a), clampB = clamped(b);
 
     const json& params = spec.at("params");
     if (!params.contains("section")) throw std::runtime_error(what + ": 'section' is required");
@@ -225,6 +228,7 @@ void addBar(const json& spec, World& world) {
     fe->EA = kYoungModulus * section.area;
     fe->EI = kYoungModulus * section.inertia;
     fe->installedLength = L0;
+    fe->bucklingFactor = clampA && clampB ? 0.5 : (clampA || clampB) ? 0.6991546 : 1.0;  // pi / 4.4934 for clamped - pinned
 
     const Vec2 u = (pB - pA) / L0;
     const Vec2 nrm = perp(u);
@@ -260,15 +264,18 @@ void addBar(const json& spec, World& world) {
 
     for (int k = 0; k < segments; ++k) {
         BeamElement::Segment seg;
-        if (k == 0) seg.a = {a.body, a.point, true};
+        if (k == 0) seg.a = {a.body, a.point, !clampA};
         else seg.a = {inner[k - 1], {0.0, 0.0}, false};
-        if (k == segments - 1) seg.b = {b.body, b.point, true};
+        if (k == segments - 1) seg.b = {b.body, b.point, !clampB};
         else seg.b = {inner[k], {0.0, 0.0}, false};
         const Vec2 d = points[k + 1] - points[k];
         seg.L0 = length(d);
         seg.u0 = d / seg.L0;
         seg.phi0_a = angles[k];
         seg.phi0_b = angles[k + 1];
+        // a clamped end starts unstressed: its section is at the rotation the node has now
+        if (k == 0 && clampA) seg.phi0_a = world.bodies[a.body].phi;
+        if (k == segments - 1 && clampB) seg.phi0_b = world.bodies[b.body].phi;
         fe->segments.push_back(seg);
     }
     world.elements.push_back(std::move(fe));

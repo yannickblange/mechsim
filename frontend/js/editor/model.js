@@ -1,8 +1,9 @@
 // model.js - the scene being edited: creation, editing, deletion (with cascades), undo / redo.
 // Holds a plain scene object (contracts/scene.schema.json, version 0.4) and never touches the DOM.
-import { dist, nextId, roundTo, sub, tidy, tidyPoint } from './geometry.js';
+import { bodyToWorld, dist, nextId, roundTo, sub, supportAngleAt, tidy, tidyPoint } from './geometry.js';
 import { normalizeRopes } from './moves.js';
 import { defaultSection } from './section.js';
+import { surfaceAtPoint } from './snap.js';
 
 export const DEFAULT_MASS = 1.0;
 export const DEFAULT_SPRING_K = 100.0;
@@ -195,8 +196,9 @@ export class SceneModel {
   }
 
   // Bendable beam from the start to the end of its axis; the default cross section is a square whose
-  // side follows the length (L / 40, between 10 and 100 mm).
-  addBeam({ start, end, section, mass }) {
+  // side follows the length (L / 40, between 10 and 100 mm). `clamps`: [{ end: "start" | "end", surface, angle }]
+  // are the ends that sit on a surface: each gets an Einspannung (fixed_support) there.
+  addBeam({ start, end, section, mass, clamps = [] }) {
     return this.#edit((s) => {
       const id = nextId('b', this.allIds());
       const L = dist(start, end);
@@ -208,6 +210,9 @@ export class SceneModel {
         id, type: 'beam', position: tidyPoint([(start[0] + end[0]) / 2, (start[1] + end[1]) / 2]),
         angle: tidy(Math.atan2(d[1], d[0])), params,
       });
+      for (const c of clamps) { // the beam lies along its local x axis, the start at -L/2
+        pushSupport(s, 'fixed_support', { body: id, point: [c.end === 'start' ? -L / 2 : L / 2, 0], surface: c.surface, angle: c.angle });
+      }
       return id;
     });
   }
@@ -298,6 +303,7 @@ export class SceneModel {
         stab.type = 'bar';
         stab.params = { section: clone(section), damping: DEFAULT_ELEMENT_DAMPING, ...params };
         s.elements.push(stab);
+        if (found.obj.type === 'rod') clampStandingEnds(s, stab);
       } else {
         stab.type = 'rod';
         stab.params = {};
@@ -377,13 +383,7 @@ export class SceneModel {
   // type: pin_support | fixed_support | roller_support. angle: see supportAngle() in geometry.js.
   addSupport(type, { body, point, surface = null, angle = 0 }) {
     if (!SUPPORT_TYPES[type]) throw new Error(`unknown support type "${type}"`);
-    return this.#edit((s) => {
-      const id = nextId(SUPPORT_TYPES[type], this.allIds());
-      s.constraints.push({
-        id, type, body, point: tidyPoint(point), surface, params: { angle: tidy(angle) },
-      });
-      return id;
-    });
+    return this.#edit((s) => pushSupport(s, type, { body, point, surface, angle }));
   }
 
   // --- editing --------------------------------------------------------------------------------
@@ -493,6 +493,37 @@ export class SceneModel {
       return removed;
     });
   }
+}
+
+// An elastic Stab that stands on a surface is fest eingespannt there: an end whose Knoten lies on a surface, has no
+// support yet and is the end of this Stab only (a Knoten that joins several members is a Fachwerk joint) gets an
+// Einspannung. The engine then clamps the end (the bar keeps the rotation of its node, which the support holds).
+function clampStandingEnds(scene, stab) {
+  for (const [mine, other] of [[stab.a, stab.b], [stab.b, stab.a]]) {
+    const node = mine.body && scene.bodies.find((b) => b.id === mine.body && b.type === 'node');
+    if (!node || scene.constraints.some((c) => c.body === node.id && SUPPORT_TYPES[c.type])) continue;
+    const joined = [...scene.elements, ...scene.constraints]
+      .some((o) => o.id !== stab.id && ((o.a && o.a.body === node.id) || (o.b && o.b.body === node.id)));
+    const surface = surfaceAtPoint(scene, node.position);
+    if (joined || !surface) continue;
+    const far = other.body === null ? other.point : bodyToWorld(scene.bodies.find((b) => b.id === other.body), other.point);
+    pushSupport(scene, 'fixed_support', {
+      body: node.id, point: [0, 0], surface: surface.id, angle: supportAngleAt(surface, node.position, far),
+    });
+  }
+}
+
+// A support (inside a model edit); returns its id.
+// A point carries one support: a Festlager or Einspannung there replaces whatever support the point has (they lock the
+// same motion twice, which the engine cannot solve); two Loslager on different surfaces may share a point.
+function pushSupport(scene, type, { body, point, surface = null, angle = 0 }) {
+  const here = (c) => SUPPORT_TYPES[c.type] && c.body === body && body !== null && dist(c.point, tidyPoint(point)) < 1e-6;
+  const lockXY = (t) => t !== 'roller_support';
+  scene.constraints = scene.constraints.filter((c) => !(here(c) && (lockXY(type) || lockXY(c.type))));
+  const allIds = [...scene.surfaces, ...scene.bodies, ...scene.elements, ...scene.constraints].map((o) => o.id);
+  const id = nextId(SUPPORT_TYPES[type], allIds);
+  scene.constraints.push({ id, type, body, point: tidyPoint(point), surface, params: { angle: tidy(angle) } });
+  return id;
 }
 
 // A node at a world point: the one that is there, or a new one (inside a model edit).

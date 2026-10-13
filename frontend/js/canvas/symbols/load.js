@@ -20,11 +20,14 @@ function arrowHead(ctx, tipX, tipY, dirX, dirY) {
   ctx.fill();
 }
 
+// Length of the force arrow on the screen, px (the drawing and the editor's hit test use the same).
+export const arrowLengthPx = (mag, scale) => Math.min(MAX_ARROW_PX, Math.max(MIN_ARROW_PX, mag * FORCE_M_PER_N * scale));
+
 // Force arrow with its tail at the application point. Returns the tip (screen) or null.
 function drawForce(ctx, cam, p, vector, impulse, theme) {
   const mag = Math.hypot(vector[0], vector[1]);
   if (mag < 1e-12) return null;
-  const px = Math.min(MAX_ARROW_PX, Math.max(MIN_ARROW_PX, mag * FORCE_M_PER_N * cam.scale));
+  const px = arrowLengthPx(mag, cam.scale);
   const dirX = vector[0] / mag;
   const dirY = -vector[1] / mag; // screen y points down
   const tipX = p[0] + dirX * px;

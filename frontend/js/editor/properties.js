@@ -130,6 +130,17 @@ function linkForm(model, link, draft) {
   };
 }
 
+// Ends of a Stab that are clamped: an end on a Knoten that has an Einspannung (the engine clamps an elastic Stab
+// there; a rigid one is not affected). K: effective length factor of Euler's cases (hinged both 1, one end clamped
+// 0.699, both 0.5; the ends held sideways).
+function clampedEnds(model, stab) {
+  const clamped = (end) => end.body !== null
+    && model.scene.bodies.some((b) => b.id === end.body && b.type === 'node')
+    && model.scene.constraints.some((c) => c.type === 'fixed_support' && c.body === end.body);
+  return [clamped(stab.a), clamped(stab.b)].filter(Boolean).length;
+}
+const EULER_K = [1, 0.6991546, 0.5];
+
 const DEFAULT_SEGMENTS = 4; // of an elastic Stab
 const DEFAULT_BOW = 0.00001; // initial bow of an elastic Stab, as a fraction of its length (a seed for buckling)
 
@@ -143,13 +154,18 @@ function stabForm(model, stab, draft) {
   const fields = sectionFields(section || defaultSection('square'), { allowRigid: true, rigid: !section });
   if (section) {
     const p = sectionProps(section);
-    const pcr = (Math.PI ** 2 * p.EI) / (Math.max(d, 1e-9) ** 2);
+    const clamps = clampedEnds(model, stab);
+    const K = EULER_K[clamps];
+    const pcr = (Math.PI ** 2 * p.EI) / ((K * Math.max(d, 1e-9)) ** 2);
     const slender = d / Math.sqrt(p.inertia / p.area);
     const params = stab.type === 'bar' ? stab.params : {};
     info.length = 0;
-    info.push(`Länge ${fixed(d)} m. Elastischer Stahlstab, an beiden Enden gelenkig gelagert: Dehnsteifigkeit E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m.`);
+    info.push(`Länge ${fixed(d)} m. Elastischer Stahlstab, an den Enden gelenkig (an einer Einspannung fest eingespannt): Dehnsteifigkeit E A / L = ${fixed(p.EA / Math.max(d, 1e-9) / 1e6, 2)} MN/m.`);
     info.push(sectionInfo(section));
-    info.push(`Er knickt in der Ebene aus, wenn die Druckkraft die Eulersche Knicklast π² E I / L² = ${fixedForce(pcr)} erreicht (Schlankheit L / i = ${fixed(slender, 0)}); `
+    const ends = ['beide Enden gelenkig (Eulerfall 2)', 'ein Ende fest eingespannt, das andere seitlich gehalten (Eulerfall 3)',
+      'beide Enden fest eingespannt (Eulerfall 4)'][clamps];
+    info.push(`Er knickt in der Ebene aus, wenn die Druckkraft die Eulersche Knicklast π² E I / (K L)² = ${fixedForce(pcr)} erreicht `
+      + `(${ends}, K = ${fixed(K, 2)}; Schlankheit L / i = ${fixed(slender, 0)}); `
       + 'die Kraftanzeige nennt den Prozentsatz, solange er gedrückt wird. Er biegt sich unter seinem Eigengewicht durch.');
     const massMode = draft.massMode || (params.mass === undefined ? 'steel' : 'given');
     fields.push(num('segments', 'Elemente', '', params.segments ?? DEFAULT_SEGMENTS, { min: 1, max: 16, integer: true }));
