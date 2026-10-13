@@ -60,7 +60,8 @@ def test_a_rod_reports_compression_as_negative_force():
         "version": "0.3", "gravity": [0, 0], "solver": {"dt": 0.001},
         "bodies": [{"id": "m", "type": "block", "position": [1, 0], "params": {"mass": 1, "width": 0.2, "height": 0.2}}],
         "elements": [{"id": "F", "type": "load", "body": "m", "point": [0, 0], "params": {"force": [-7, 0]}}],
-        "constraints": [{"id": "D", "type": "rod", "a": {"body": None, "point": [0, 0]}, "b": {"body": "m", "point": [0, 0]}}],
+        "constraints": [{"id": "D", "type": "rod", "a": {"body": None, "point": [0, 0]}, "b": {"body": "m", "point": [0, 0]},
+                         "params": {"hinged_b": True}}],
     }
     frame = run(scene, 300, sample=100)[-1]
     assert con(frame, "D")["force"] == pytest.approx(-7.0, abs=1e-6)
@@ -106,7 +107,7 @@ def test_rope_swing_matches_the_rod_while_taut():
             "bodies": [{"id": "m", "type": "block", "position": [math.sin(0.4), 1.5 - math.cos(0.4)],
                         "params": {"mass": 1, "width": 0.2, "height": 0.2}}],
             "constraints": [{"id": "L", "type": kind, "a": {"body": None, "point": [0, 1.5]},
-                             "b": {"body": "m", "point": [0, 0]}}],
+                             "b": {"body": "m", "point": [0, 0]}, **({"params": {"hinged_b": True}} if kind == "rod" else {})}],
         }
 
     rod, rope = run(pendulum("rod"), 3000, sample=100), run(pendulum("rope"), 3000, sample=100)

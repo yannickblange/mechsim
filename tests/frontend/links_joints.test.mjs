@@ -260,7 +260,8 @@ test('rope form: length at least the distance between the ends; equal means taut
 test('Stab, joint and free pin forms', () => {
   const { m } = wired();
   const rod = propertyFields(m, 'S1');
-  assert.deepEqual(rod.fields.map((f) => [f.key, f.value]), [['sectionType', 'rigid']]); // v0.4: a cross section is optional
+  // v0.4: a cross section is optional; v0.7b: an end on a mass is clamped (a choice of its own)
+  assert.deepEqual(rod.fields.map((f) => [f.key, f.value]), [['sectionType', 'rigid'], ['end_a', 'clamped'], ['end_b', 'clamped']]);
   assert.match(rod.info[0], /Zweikraftglied/);
   const joint = propertyFields(m, 'G1');
   assert.match(joint.title, /Gelenk/);

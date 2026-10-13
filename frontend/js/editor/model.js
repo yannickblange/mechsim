@@ -301,13 +301,29 @@ export class SceneModel {
       s.elements = s.elements.filter((e) => e.id !== id);
       if (section) {
         stab.type = 'bar';
-        stab.params = { section: clone(section), damping: DEFAULT_ELEMENT_DAMPING, ...params };
+        stab.params = { section: clone(section), damping: DEFAULT_ELEMENT_DAMPING, ...hingedParams(found.obj.params), ...params };
         s.elements.push(stab);
         if (found.obj.type === 'rod') clampStandingEnds(s, stab);
       } else {
         stab.type = 'rod';
-        stab.params = {};
+        stab.params = hingedParams(found.obj.params);
         s.constraints.push(stab);
+      }
+    });
+  }
+
+  // End conditions of a Stab (rod or bar): { a: true, b: false }: hinged (true) or clamped (false) at an end on a block
+  // or a disc. Clamped is the default and stored as no flag.
+  setStabEnds(id, hinged) {
+    const found = this.find(id);
+    if (!found || !['rod', 'bar'].includes(found.obj.type)) throw new Error(`no Stab "${id}"`);
+    return this.#edit((s) => {
+      const stab = [...s.constraints, ...s.elements].find((o) => o.id === id);
+      stab.params ||= {};
+      for (const side of ['a', 'b']) {
+        if (hinged[side] === undefined) continue;
+        if (hinged[side]) stab.params[`hinged_${side}`] = true;
+        else delete stab.params[`hinged_${side}`];
       }
     });
   }
@@ -512,6 +528,9 @@ function clampStandingEnds(scene, stab) {
     });
   }
 }
+
+// The end-condition flags of a Stab's params (they stay when a rigid Stab becomes elastic and back).
+const hingedParams = (params = {}) => Object.fromEntries(['hinged_a', 'hinged_b'].filter((k) => params[k]).map((k) => [k, true]));
 
 // A support (inside a model edit); returns its id.
 // A point carries one support: a Festlager or Einspannung there replaces whatever support the point has (they lock the

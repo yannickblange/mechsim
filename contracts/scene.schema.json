@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "mechsim/scene.schema.json",
-  "title": "MechSim scene v0.5",
-  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads; v0.4b lets elastic bars bend and buckle and adds viscous damping; v0.5 adds the optional end time t_max. Version 0.1 to 0.3 scenes remain valid.",
+  "title": "MechSim scene v0.7b",
+  "description": "v0.2 added surfaces, discs, loads (force and moment), fixed and roller supports; v0.3 adds rope, rod (Stab), pin and fixed joints, Festlager in free space and (v0.3c) the damper; v0.4 adds nodes (Knoten) and elastic bars for Fachwerke, bendable beams, cross sections (square, L, T, H, I; one Young's modulus for all) and harmonic loads; v0.4b lets elastic bars bend and buckle and adds viscous damping; v0.5 adds the optional end time t_max; v0.7b clamps Stab ends on blocks and discs (hinged_a / hinged_b). Version 0.1 to 0.3 scenes remain valid.",
   "type": "object",
   "required": ["version", "bodies"],
   "additionalProperties": false,
@@ -305,7 +305,9 @@
           "default": 0.00001,
           "description": "Initial bow (a half sine, stress-free) as a fraction of the length: a seed for buckling (a perfectly straight column would only buckle when round-off grows). The default 1e-5 does not disturb the statics of a truss; 1e-3 is a typical real imperfection and magnifies the deflection of a column below its Euler load by 1 / (1 - P / Pcr). 0 = straight."
         },
-        "damping": { "$ref": "#/$defs/dampingRate" }
+        "damping": { "$ref": "#/$defs/dampingRate" },
+        "hinged_a": { "$ref": "#/$defs/endCondition" },
+        "hinged_b": { "$ref": "#/$defs/endCondition" }
       }
     },
     "damperParams": {
@@ -415,7 +417,7 @@
           "then": {
             "required": ["a", "b"],
             "not": { "anyOf": [{ "required": ["body"] }, { "required": ["point"] }, { "required": ["surface"] }] },
-            "properties": { "params": { "$ref": "#/$defs/noParams" } }
+            "properties": { "params": { "$ref": "#/$defs/rodParams" } }
           }
         },
         {
@@ -431,6 +433,19 @@
           }
         }
       ]
+    },
+    "endCondition": {
+      "type": "boolean",
+      "default": false,
+      "description": "v0.7b. A Stab end on a block or a disc is clamped there (an Einspannung: the Stab keeps its angle to the mass, so the Stab is a rigid arm of the mass); true makes the end a pin (Gelenk) instead. Ends on nodes, beams and the ground are always pins (a node with an Einspannung clamps an elastic Stab)."
+    },
+    "rodParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hinged_a": { "$ref": "#/$defs/endCondition" },
+        "hinged_b": { "$ref": "#/$defs/endCondition" }
+      }
     },
     "ropeParams": {
       "type": "object",

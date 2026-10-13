@@ -292,3 +292,57 @@ test('Stab form: making a Stab elastic with the property form clamps the foot th
   assert.equal(m.scene.elements.find((e) => e.id === id).type, 'bar');
   assert.deepEqual(supports(m).map((c) => [c.type, c.surface]), [['fixed_support', 'floor']]);
 });
+
+// --- v0.7b: a Stab on a block or a disc is clamped there ------------------------------------------------------
+
+import { massEnds, stabClamps } from '../../frontend/js/editor/ends.js';
+import { disc } from './helpers.mjs';
+
+const kreis = () => {
+  const m = new SceneModel(sceneWith({ bodies: [disc('m1', 0, 1, 0.9)] }));
+  m.addGroundPin({ point: [-2, 1] }); // (a Festlager in free space, unused)
+  const rod = m.addRod({ a: { body: 'm1', point: [0.9, 0] }, b: { node: true, point: [2, 1] } });
+  return { m, rod };
+};
+
+test('stabClamps / massEnds: ends on blocks and discs are clamped, nodes and the ground are pins', () => {
+  const { m, rod } = kreis();
+  const stab = m.find(rod).obj;
+  assert.deepEqual(stabClamps(m.scene, stab), [true, false]);
+  assert.deepEqual(massEnds(m.scene, stab), ['a']);
+  stab.params = { hinged_a: true };
+  assert.deepEqual(stabClamps(m.scene, stab), [false, false]);
+  // an elastic Stab is also clamped at a node with an Einspannung; a rigid one is not
+  const b = m.scene.bodies.find((x) => x.type === 'node').id;
+  m.addSupport('fixed_support', { body: b, point: [0, 0] });
+  assert.deepEqual(stabClamps(m.scene, { ...stab, type: 'bar' }), [false, true]);
+  assert.deepEqual(stabClamps(m.scene, stab), [false, false]);
+});
+
+test('Stab form: the end condition of an end on a mass can be chosen, and is kept when the Stab becomes elastic', () => {
+  const { m, rod } = kreis();
+  const form = propertyFields(m, rod);
+  const end = form.fields.find((f) => f.key === 'end_a');
+  assert.equal(end.value, 'clamped');
+  assert.equal(form.fields.some((f) => f.key === 'end_b'), false); // the node end is always a pin
+  assert.match(form.info.join(' '), /starrer Arm/);
+
+  assert.equal(applyProperties(m, rod, { sectionType: 'rigid', end_a: 'hinged' }).ok, true);
+  assert.deepEqual(m.find(rod).obj.params, { hinged_a: true });
+  m.setStabSection(rod, { type: 'square', a: 0.02 }); // elastic: the flag stays
+  assert.equal(m.find(rod).obj.params.hinged_a, true);
+  assert.equal(propertyFields(m, rod).fields.find((f) => f.key === 'end_a').value, 'hinged');
+  assert.equal(applyProperties(m, rod, { sectionType: 'square', sec_a: '20', segments: 4, massMode: 'steel', damping: 5, bow: '0,02', end_a: 'clamped' }).ok, true);
+  assert.equal(m.find(rod).obj.params.hinged_a, undefined);
+  m.setStabSection(rod, null);
+  assert.deepEqual(m.find(rod).obj.params, {}); // back to rigid and clamped
+});
+
+test('the Euler load counts a Stab clamped to a mass', () => {
+  const m = new SceneModel(sceneWith({ bodies: [block('m', 0, 0, 0.4, 0.2)] }));
+  const id = m.addRod({ a: { body: 'm', point: [0, 0.1] }, b: { node: true, point: [0, 2.1] } });
+  m.setStabSection(id, { type: 'square', a: 0.04 });
+  assert.match(propertyFields(m, id).info.join(' '), /Eulerfall 3/);
+  m.setStabEnds(id, { a: true });
+  assert.match(propertyFields(m, id).info.join(' '), /gelenkig \(Eulerfall 2\)/);
+});

@@ -655,8 +655,8 @@ export class LinkTool extends Tool {
   get hint() {
     if (this.kind === 'rod') {
       return this.a
-        ? 'Das zweite Ende anklicken: eine Masse, ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten).'
-        : 'Das erste Ende anklicken: eine Masse, ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten). Stäbe in Knoten verbinden ergibt ein Fachwerk.';
+        ? 'Das zweite Ende anklicken: eine Masse (dort fest eingespannt), ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten).'
+        : 'Das erste Ende anklicken: eine Masse (dort fest eingespannt), ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten). Stäbe in Knoten verbinden ergibt ein Fachwerk.';
     }
     if (this.a) return 'Das zweite Ende anklicken (oder nach dem Ziehen vom ersten Ende loslassen).';
     const extra = this.kind === 'rope' ? ' Es dehnt sich nie; in den Eigenschaften eine größere Länge eintragen, damit es durchhängt.'

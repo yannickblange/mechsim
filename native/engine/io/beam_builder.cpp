@@ -190,9 +190,16 @@ void addBar(const json& spec, World& world, const std::set<std::string>& clamped
     const Vec2 pA = world.anchorWorld(a), pB = world.anchorWorld(b);
     const double L0 = length(pB - pA);
     if (L0 < 1e-6) throw std::runtime_error(what + ": the ends coincide");
-    // an end on a node with an Einspannung is clamped: its section turns with the node, which cannot rotate
-    auto clamped = [&](const Anchor& e) { return e.body != GROUND && clampedBodies.count(world.bodies[e.body].id) > 0; };
-    const bool clampA = clamped(a), clampB = clamped(b);
+    // an end on a node with an Einspannung is clamped: its section turns with the node, which cannot rotate. So is an end
+    // on a block or a disc (the Stab is welded to the mass) unless params.hinged_a / hinged_b make it a pin (v0.7b)
+    const json& stabParams = spec.at("params");
+    auto clamped = [&](const Anchor& e, const char* hinged) {
+        if (e.body == GROUND) return false;
+        const Body& body = world.bodies[e.body];
+        if (clampedBodies.count(body.id) > 0) return true;
+        return (body.type == "block" || body.type == "disc") && !stabParams.value(hinged, false);
+    };
+    const bool clampA = clamped(a, "hinged_a"), clampB = clamped(b, "hinged_b");
 
     const json& params = spec.at("params");
     if (!params.contains("section")) throw std::runtime_error(what + ": 'section' is required");

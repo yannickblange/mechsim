@@ -15,6 +15,11 @@ namespace ms {
 // Rope ("Seil"): |pb - pa| <= L, tension only. Infinitely strong: it never stretches. When it
 // becomes taut the outward velocity is removed (inelastic).
 // Both: C = L - |pb - pa|, so the multiplier is the axial force, tension positive.
+//
+// A rod whose end sits on a block or a disc is clamped there (v0.7b, an Einspannung: the Stab keeps its angle to the
+// mass; `params.hinged_a` / `hinged_b` = true keep the end pinned). The rod is then a rigid arm of that mass, and its
+// other end sticks to the arm's tip: the two equations of a pin joint between that end and the point of the mass the
+// tip started at (rod clamped at both ends: a weld, 3 equations). Its force is the part of the joint force along the rod.
 class Link : public Constraint, public Unilateral {
 public:
     enum class Kind { Rope, Rod };
@@ -25,9 +30,11 @@ public:
     double length = 0.0;   // m
     bool active = true;    // rods are always active
     double force = 0.0;    // axial force of the last solve, tension positive
+    bool clampA = false;   // rod: the end a / b is clamped to its mass (set by makeRod)
+    bool clampB = false;
 
     const char* type() const override { return kind == Kind::Rope ? "rope" : "rod"; }
-    int dim() const override { return active ? 1 : 0; }
+    int dim() const override { return !active ? 0 : weld_ ? 3 : arm_ ? 2 : 1; }
     void initialize(const World& world) override;
     void fill(const World& world, double* G, int cols, double* gamma) const override;
     void setMultipliers(const double* lambda) override;
@@ -39,8 +46,20 @@ public:
     bool shouldRelease(const double* lambda) const override;
     void release() override { active = false; force = 0.0; }
 
+    // clamped rod (set by makeRod): the arm body M (a clamped end), the point it carries (`lever`, in the frame of M, where the far
+    // end was at the start) and the far anchor; a weld additionally keeps the angle of the far body to M.
+    bool arm_ = false, weld_ = false;
+    bool armIsA_ = true;
+    Anchor far_;
+    Vec2 lever_;
+    double relAngle0_ = 0.0;
+    double moment_ = 0.0;
+    Vec2 armForce_;  // joint force on M
+    BodyIndex armBody() const { return armIsA_ ? a.body : b.body; }
+
 private:
     bool pending_ = false;  // velocities still have to be projected (first step)
+    void fillArm(const World& world, double* G, int cols, double* gamma) const;
 };
 
 // spec: {"id", "type": "rope" | "rod", "a": anchor, "b": anchor, "params": {"length"?}}

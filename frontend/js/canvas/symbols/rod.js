@@ -52,13 +52,18 @@ export function strokeStab(ctx, cam, entry, theme, elastic) {
   ctx.globalAlpha = 1;
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = colour;
-  ctx.fillStyle = theme.background;
-  for (const [x, y] of [[ax, ay], [bx, by]]) {
+  [[ax, ay], [bx, by]].forEach(([x, y], i) => {
     ctx.beginPath();
-    ctx.arc(x, y, HINGE, 0, 2 * Math.PI);
+    if (entry.clamps && entry.clamps[i]) { // fest eingespannt: a filled square instead of the hinge circle
+      ctx.rect(x - HINGE, y - HINGE, 2 * HINGE, 2 * HINGE);
+      ctx.fillStyle = colour;
+    } else {
+      ctx.arc(x, y, HINGE, 0, 2 * Math.PI);
+      ctx.fillStyle = theme.background;
+    }
     ctx.fill();
     ctx.stroke();
-  }
+  });
 
   if (Math.abs(force) >= MIN_FORCE && Math.hypot(bx - ax, by - ay) > 40) {
     const len = Math.hypot(bx - ax, by - ay);

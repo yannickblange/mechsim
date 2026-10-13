@@ -1,5 +1,6 @@
 // test_link.cpp - v0.3 rope (tension only, infinitely strong) and rod / Stab (push and pull).
 #include <cmath>
+#include <vector>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -7,6 +8,7 @@
 
 #include "bodies/block.hpp"
 #include "constraints/link.hpp"
+#include "constraints/pin_support.hpp"
 #include "core/world.hpp"
 #include "elements/load.hpp"
 
@@ -27,7 +29,9 @@ ms::Body block(const char* id, ms::Vec2 pos, double mass = 1.0) {
     return b;
 }
 
+// The rods of these tests are pinned at both ends (v0.7b: a rod on a block or a disc is clamped unless it says hinged).
 json linkSpec(const char* type, json a, json b, json params = json::object()) {
+    if (std::string(type) == "rod") params.update({{"hinged_a", true}, {"hinged_b", true}});
     return {{"id", "L1"}, {"type", type}, {"a", a}, {"b", b}, {"params", params}};
 }
 
@@ -230,4 +234,88 @@ TEST_CASE("link factories reject bad input and name the id", "[link]") {
     REQUIRE_THROWS_WITH(make(ground(0, 0), json{{"point", {0, 0}}}), ContainsSubstring("L9"));
     REQUIRE_NOTHROW(make(ground(0, 0), onBody("a")));
     REQUIRE_NOTHROW(make(onBody("a"), onBody("b"), {{"length", 5.0}}));
+}
+
+// --- v0.7b: a rod on a block or a disc is clamped there ---------------------------------------------------------
+
+namespace {
+
+json clampedRod(json a, json b, json params = json::object()) {
+    return {{"id", "C1"}, {"type", "rod"}, {"a", a}, {"b", b}, {"params", params}};
+}
+
+}  // namespace
+
+TEST_CASE("a rod clamped to a block is a rigid arm: the block swings as a physical pendulum on it", "[link][rod][clamp]") {
+    const double L = 1.0, theta0 = 0.05, m = 1.0;
+    ms::World w;
+    ms::Body b = block("m", {L * std::sin(theta0), -L * std::cos(theta0)}, m);
+    b.phi = theta0;  // the arm points from the pin to the centre, so the block is turned with it
+    w.bodies.push_back(b);
+    auto rod = ms::makeRod(clampedRod(ground(0, 0), onBody("m")), w);
+    REQUIRE(rod->dim() == 2);  // the far end stays at its lever on the block: two equations
+    w.constraints.push_back(std::move(rod));
+    w.initialize();
+    REQUIRE(w.constraintRows() == 2);
+
+    const double J = m * (0.04 + 0.04) / 12.0;
+    const double T = 2.0 * 3.14159265358979 * std::sqrt((J + m * L * L) / (m * kG * L));  // physical pendulum about the pin
+    double prev = w.bodies[0].phi;
+    std::vector<double> crossings;
+    for (int i = 1; i < 9000 && crossings.size() < 3; ++i) {
+        w.step(1e-3);
+        const double now = w.bodies[0].phi;
+        if (prev > 0.0 && now <= 0.0) crossings.push_back(i * 1e-3 - 1e-3 * now / (now - prev));
+        prev = now;
+    }
+    REQUIRE(crossings.size() == 3);
+    REQUIRE_THAT(0.5 * (crossings[2] - crossings[0]), WithinRel(T, 0.005));
+    // the block keeps its angle to the arm: the arm direction (pin -> centre) and the block's rotation agree
+    const ms::Vec2 c = w.bodies[0].pos;
+    REQUIRE_THAT(std::atan2(c.y, c.x) + 3.14159265358979 / 2.0, WithinAbs(w.bodies[0].phi, 2e-3));
+}
+
+TEST_CASE("a hinged end on a block keeps the old pin: the block does not turn with the rod", "[link][rod][clamp]") {
+    ms::World w;
+    ms::Body b = block("m", {std::sin(0.05), -std::cos(0.05)});
+    w.bodies.push_back(b);
+    auto rod = ms::makeRod(clampedRod(ground(0, 0), onBody("m"), {{"hinged_b", true}}), w);
+    REQUIRE(rod->dim() == 1);
+    w.constraints.push_back(std::move(rod));
+    w.initialize();
+    for (int i = 0; i < 1500; ++i) w.step(1e-3);
+    REQUIRE_THAT(w.bodies[0].phi, WithinAbs(0.0, 1e-9));  // no torque: a point mass on a rod
+}
+
+TEST_CASE("a clamped rod carries the weight: the force along it, the moment stays with the clamp", "[link][rod][clamp]") {
+    ms::World w;
+    w.bodies.push_back(block("m", {0.0, -1.0}, 2.0));
+    auto rod = ms::makeRod(clampedRod(ground(0, 0), onBody("m")), w);
+    w.constraints.push_back(std::move(rod));
+    w.initialize();
+    for (int i = 0; i < 500; ++i) w.step(1e-3);
+    const json f = w.frame()["constraints"][0];
+    REQUIRE_THAT(f["force"].get<double>(), WithinAbs(2.0 * kG, 1e-5));  // tension
+    REQUIRE_THAT(f["reaction"][1].get<double>(), WithinAbs(2.0 * kG, 1e-5));  // on the block: up
+    REQUIRE_THAT(f["reaction"][0].get<double>(), WithinAbs(0.0, 1e-6));
+}
+
+TEST_CASE("a rod clamped at both ends welds two blocks (3 equations): they keep their pose to each other", "[link][rod][clamp]") {
+    ms::World w;
+    w.bodies.push_back(block("a", {0.0, 0.0}, 1.0));
+    w.bodies.push_back(block("b", {1.0, 0.0}, 1.0));
+    auto weld = ms::makeRod(clampedRod(onBody("a", 0.1, 0.0), onBody("b", -0.1, 0.0)), w);
+    REQUIRE(weld->dim() == 3);
+    w.constraints.push_back(std::move(weld));
+    // a hangs on a pin at its centre: the pair swings as one rigid body
+    w.constraints.push_back(ms::makePinSupport({{"id", "P"}, {"type", "pin_support"}, {"body", "a"}, {"point", {0, 0}},
+                                                {"surface", nullptr}, {"params", {{"angle", 0.0}}}}, w));
+    w.initialize();
+    REQUIRE(w.constraintRows() == 5);
+    for (int i = 0; i < 2000; ++i) w.step(1e-3);
+    const ms::Body& a = w.bodies[0];
+    const ms::Body& b = w.bodies[1];
+    REQUIRE_THAT(b.phi - a.phi, WithinAbs(0.0, 1e-6));  // the welded relative angle
+    REQUIRE_THAT(ms::length(b.pos - a.pos), WithinAbs(1.0, 3e-3));  // Baumgarte drift of the swing
+    REQUIRE(std::abs(a.phi) > 0.5);  // it did swing down
 }

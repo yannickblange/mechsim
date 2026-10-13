@@ -158,7 +158,7 @@ TEST_CASE("free-space Festlager: no constraint, reports its point, rod hangs fro
     w.constraints.push_back(std::move(pin));
     w.constraints.push_back(ms::makeRod({{"id", "R"}, {"type", "rod"},
                                          {"a", {{"body", nullptr}, {"point", {1.0, 2.0}}}},
-                                         {"b", {{"body", "m"}, {"point", {0, 0.5}}}}}, w));
+                                         {"b", {{"body", "m"}, {"point", {0, 0.5}}}}, {"params", {{"hinged_b", true}}}}, w));
     w.initialize();
     REQUIRE(w.constraintRows() == 1);
     for (int i = 0; i < 500; ++i) w.step(1e-3);

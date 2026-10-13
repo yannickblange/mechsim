@@ -64,6 +64,8 @@ switches to a dark one (remembered in the browser).
 - A spring that starts on a surface is held at 0, 30, 45, 60, 90 degrees to it.
 - **Shift** held while placing: nothing snaps (grid, points, surfaces, angles, lengths).
 - A long load arrow no longer hides the Stab under it when you click.
+- **A Stab on a block or a disc is clamped there** (v0.7b): it is a rigid arm of the mass and turns with it (drawn with a square at the end). In the Stab's properties,
+  *Anschluss Ende* chooses *Gelenk* instead (a block hung from two Stabs needs it). Ends on nodes, beams and the ground are pins.
 
 ## German UI and dimensioned cross sections (v0.6)
 

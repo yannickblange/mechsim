@@ -85,6 +85,9 @@
   fraction of the length. Frame: `p1`, `p2`, `force` (the normal force of the element that carries the most, tension positive), `stress`
   (largest normal stress, axial plus bending; with one segment |force| / A), `nodes` (`[x, y, phi]` from end a to end b, the bent shape) and
   `pcr` (the Euler load): the bar has buckled when `-force` reaches `pcr`.
+- **Stab ends on masses (v0.7b).** A `rod` or `bar` end on a `block` or `disc` is clamped there (an Einspannung: the Stab is a rigid arm of the mass and
+  turns with it); `params.hinged_a` / `hinged_b` = true make the end a pin as before v0.7b. Rod frame `force` / `reaction` are unchanged (axial force,
+  tension positive; force on end b). Two clamped rods from the ground to one block over-determine it: use `hinged_*` for a block hanging from Stabs.
 - **Clamped bar ends (v0.7).** The ends of a bar are pinned, except an end on a `node` that carries a `fixed_support` (Einspannung): that end is
   clamped (it keeps the rotation of the node, so it carries a moment; the support's `reaction[2]`). Frame `pcr` is then the Euler load of the matching
   case: `pi^2 E I / (K L)^2`, K = 1 pinned - pinned, 0.6992 one end clamped, 0.5 both. No new scene fields.

@@ -112,6 +112,25 @@ taut:
 **Velocity projection**: `M Δv = Gᵀ Λ, G (v + Δv) = 0`, the same system as an impulse with `J = 0`
 (`projectVelocities`).
 
+### Stab clamped to a mass (rod), v0.7b
+
+A rod whose end is on a **block or a disc** is clamped there (an Einspannung: the Stab keeps its angle to the mass), unless `params.hinged_a` /
+`hinged_b` is true. The rigid Stab is then a rigid arm of the mass M, and the other end F (a node, the ground, another mass) sticks to the arm's tip:
+the tip is the point of M where F started, `q = R(-phi_M0)(p_F0 - x_M0)`, and the constraint is the pin joint between M (lever `q`) and F
+
+```
+C = (x_M + R(phi_M) q) - p_F          rows [ I  perp(r_M) | -I  -perp(r_F) ]      gamma_0 = w_M^2 r_M - w_F^2 r_F
+```
+
+(2 equations instead of the one of the distance constraint; `gamma = gamma_0 - 2 alpha Cdot - beta^2 C` as always). Clamped at both ends (two masses) it is a weld:
+the third equation is the joint's `phi_M - phi_F - dphi_0`. The multiplier is the force on M; the frame reports the part along the rod as `force`
+(tension positive) and the force on end b as `reaction`. A Stab between the ground and a block is then a Festlager at a point of the (extended)
+block; **two clamped rods from the ground to one block over-determine it** (it cannot move at all): the engine reports a singular system, and
+`hinged_*` is the way to hang a block from two Stabs. Ends on nodes, beams and the ground stay pins (a node with an Einspannung clamps an elastic Stab, v0.7).
+An elastic Stab on a block or disc is clamped in the same way: its section there has the rotation of the mass, and the Euler load uses `K = 0.699 / 0.5`.
+Checked: `tests/native/constraints/test_link.cpp` (physical pendulum on a clamped rod, the weld, hinged unchanged),
+`tests/validation/test_v07b_physics.py` (Kreis Feder).
+
 ### Gelenk and rigid joint (pin_joint, fixed_joint), v0.3
 
 Between bodies a and b with local points `p_a`, `p_b`, `r = R(φ) p`:
