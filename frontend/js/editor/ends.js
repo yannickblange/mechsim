@@ -67,3 +67,30 @@ export function standingEnds(scene, stab, { joined: allowJoined = false } = {}) 
     return [{ side, node, surface, far }];
   });
 }
+
+// Which end the exaggerated bending is measured from (see exaggerate in canvas/symbols/beam.js): the clamped end of a cantilever, whose other
+// end is free. Everything else (both ends held, both clamped, nothing clamped) is measured from the chord. 'first' | 'last' | null.
+const heldBody = (scene, bodyId) => (scene.constraints || []).some((c) => SUPPORT_TYPES.includes(c.type) && c.body === bodyId);
+
+export function stabBendRef(scene, stab) {
+  if (stab.type !== 'bar') return null;
+  const clamps = stabClamps(scene, stab);
+  const ends = [stab.a, stab.b];
+  const mine = [0, 1].filter((i) => clamps[i] && ends[i].body !== null && hasEinspannung(scene, ends[i].body)); // a node held by an Einspannung
+  if (mine.length !== 1) return null;
+  const other = ends[1 - mine[0]];
+  if (other.body === null || heldBody(scene, other.body)) return null; // the other end is held: it stays on the chord
+  return mine[0] === 0 ? 'first' : 'last';
+}
+
+// A bendable beam with an Einspannung at one end only (a support at its end point) and nothing else holding it.
+export function beamBendRef(scene, beam) {
+  const half = beam.params.length / 2;
+  const tol = 1e-3 * beam.params.length;
+  const supports = (scene.constraints || []).filter((c) => SUPPORT_TYPES.includes(c.type) && c.body === beam.id);
+  const at = (c, x) => Math.abs(c.point[0] - x) < tol && Math.abs(c.point[1]) < tol;
+  const clamped = (x) => supports.some((c) => c.type === 'fixed_support' && at(c, x));
+  const first = clamped(-half), last = clamped(half);
+  if (first === last || supports.length !== 1) return null;
+  return first ? 'first' : 'last';
+}

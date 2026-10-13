@@ -23,16 +23,23 @@ export function beamNodes(spec, entry) {
   return [[entry.x - half * c, entry.y - half * s, entry.phi], [entry.x + half * c, entry.y + half * s, entry.phi]];
 }
 
-// Bending shown `k` times as large: every node's offset from the chord (first to last node) and its
-// rotation against the chord are multiplied by k; the rigid motion of the beam is untouched.
-export function exaggerate(nodes, k) {
+// Bending shown `k` times as large: every node's offset from a reference line and its rotation against it are multiplied by k; the rigid
+// motion is untouched. The reference is the chord (first to last node) - right when both ends stay put - or, for a cantilever (`ref` 'first' or
+// 'last': the clamped end, the other end free), the axis leaving the clamped end in the direction of its section: the free end then moves k times
+// as far, instead of bulging against a chord that itself has turned.
+export function exaggerate(nodes, k, ref = null) {
   if (k === 1 || nodes.length < 3) return nodes;
-  const [x0, y0] = nodes[0];
+  const root = ref === 'first' ? nodes[0] : ref === 'last' ? nodes[nodes.length - 1] : null;
+  const [x0, y0] = root || nodes[0];
   const last = nodes[nodes.length - 1];
-  const len = Math.hypot(last[0] - x0, last[1] - y0) || 1;
-  const ux = (last[0] - x0) / len;
-  const uy = (last[1] - y0) / len;
-  const beta = Math.atan2(uy, ux);
+  let beta;
+  if (root) {
+    beta = root[2];
+  } else {
+    beta = Math.atan2(last[1] - y0, last[0] - x0);
+  }
+  const ux = Math.cos(beta);
+  const uy = Math.sin(beta);
   return nodes.map(([x, y, phi]) => {
     const dx = x - x0;
     const dy = y - y0;
@@ -80,7 +87,7 @@ export function beamOutline(curve, yTop, yBottom) {
 export function drawBeam(ctx, cam, spec, entry, theme) {
   const { yTop, yBottom } = sectionProps(spec.params.section);
   const k = cam.bendScale || 1;
-  const nodes = exaggerate(beamNodes(spec, entry), k);
+  const nodes = exaggerate(beamNodes(spec, entry), k, entry.bendRef);
   const curve = beamCurve(nodes);
   const outline = beamOutline(curve, yTop, yBottom).map((p) => cam.toScreen(p));
 

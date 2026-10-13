@@ -1,5 +1,5 @@
 // renderer.js - draws grid, constraints, elements and bodies.
-import { stabClamps } from '../editor/ends.js';
+import { beamBendRef, stabBendRef, stabClamps } from '../editor/ends.js';
 import { Camera } from './camera.js';
 import { drawGrid } from './grid.js';
 import {
@@ -185,8 +185,10 @@ export class Renderer {
         }
         continue;
       }
-      const clamps = (spec.type === 'rod' || spec.type === 'bar') && this.scene ? stabClamps(this.scene, spec) : null;
-      draw(this.ctx, this.cam, spec, clamps ? { ...entry, clamps } : entry, this.theme);
+      const stab = (spec.type === 'rod' || spec.type === 'bar') && this.scene;
+      const clamps = stab ? stabClamps(this.scene, spec) : null;
+      const bendRef = stab ? stabBendRef(this.scene, spec) : spec.type === 'beam' && this.scene ? beamBendRef(this.scene, spec) : null;
+      draw(this.ctx, this.cam, spec, { ...entry, ...(clamps ? { clamps } : {}), bendRef }, this.theme);
     }
   }
 

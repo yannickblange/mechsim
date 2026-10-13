@@ -505,3 +505,27 @@ test('a free end is free: no end condition for a Knoten that is attached to noth
   const s = n.addRod({ a: { node: true, point: [0, 0] }, b: { node: true, point: [0, 2] } });
   assert.deepEqual(clampableEnds(n.scene, n.find(s).obj).map((e) => e.side), ['a']);
 });
+
+// --- the exaggerated bending of a cantilever is measured from its clamped end ------------------------------------
+
+import { beamBendRef, stabBendRef } from '../../frontend/js/editor/ends.js';
+
+test('stabBendRef / beamBendRef: the clamped end of a cantilever, null when the other end is held or nothing is clamped', () => {
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const id = m.addRod({ a: { node: true, point: [0, 0] }, b: { node: true, point: [0, 2] } });
+  m.setStabSection(id, { type: 'square', a: 0.04 }); // elastic: the foot (end a) gets an Einspannung
+  assert.equal(stabBendRef(m.scene, m.find(id).obj), 'first');
+  m.addSupport('roller_support', { body: m.find(id).obj.b.body, point: [0, 0], surface: null, angle: Math.PI / 2 });
+  assert.equal(stabBendRef(m.scene, m.find(id).obj), null); // the top is held: measured from the chord
+  const rigid = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const r = rigid.addRod({ a: { node: true, point: [0, 1] }, b: { node: true, point: [0, 2] } });
+  assert.equal(stabBendRef(rigid.scene, rigid.find(r).obj), null);
+  // beam: Einspannung at its start
+  const b = new SceneModel(sceneWith({}));
+  const beam = b.addBeam({ start: [0, 0], end: [2, 0], clamps: [] });
+  assert.equal(beamBendRef(b.scene, b.find(beam).obj), null);
+  b.addSupport('fixed_support', { body: beam, point: [-1, 0], surface: null, angle: 0 });
+  assert.equal(beamBendRef(b.scene, b.find(beam).obj), 'first');
+  b.addSupport('pin_support', { body: beam, point: [1, 0], surface: null, angle: 0 });
+  assert.equal(beamBendRef(b.scene, b.find(beam).obj), null); // a pin at the other end
+});

@@ -73,3 +73,17 @@ round like a pendulum, although the foot was "fest eingespannt". (Chosen: option
 
 The *Anschluss* choice (v0.7b-2 / v0.7c) is only offered for an end that is **attached**: a ground Festlager, a Knoten with a Festlager or an Einspannung, or a Knoten that stands on a surface
 (`clampableEnds`). An end in free space (a new Knoten with nothing on it, or a Fachwerk joint in the air) is free: no choice, nothing is added to it. (It was offered as "Gelenk" by mistake.)
+
+### Bent clamped Stabs were drawn with an S curve (v0.7c-3)
+
+Two display faults, both in how a bent elastic Stab (or beam) is drawn; the physics was right (a 1 m, 40 mm steel cantilever with 5 kN: tip `P L^3 / 3 E I` = 37 mm static, the undamped swing reaches twice that).
+
+1. **Wrong section rotation at a clamped end.** The frame's `nodes` gave the *body* angle of the Knoten at a clamped end (0), not the rotation of the bar's section there (the axis direction, up = pi/2).
+   The drawn Hermite curve therefore left the foot sideways: a kink at the foot, visible even at true scale. Engine fix in `BeamElement::writeFrame`: `atan2(u0) + (phi - phi0)`
+   (`tests/native/elements/test_bar.cpp`, cantilever).
+2. **The magnified bending was measured from the chord.** The "Biegung x N" display multiplies every node's offset from the line between the first and last node. That is right when both ends stay put
+   (pinned, propped), but for a cantilever the chord has turned with the free tip, so the exaggerated shape bulged to the *wrong* side of it (the S curve). `exaggerate(nodes, k, ref)` now measures
+   from the clamped end, in the direction of its section, when exactly one end is clamped by an Einspannung and the other end is free (`stabBendRef`, `beamBendRef` in `editor/ends.js`); the free end then
+   moves k times as far. Everything else keeps the chord.
+
+What remains is real: an undamped (damping 0) cantilever loaded suddenly keeps ringing with higher modes, so at x 50 its curve wobbles; set the damping (the editor's default for new elastic Stabs is 5 / s).

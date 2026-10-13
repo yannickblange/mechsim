@@ -144,7 +144,11 @@ void BeamElement::writeFrame(const World& world, nlohmann::json& out) const {
         const Vec2 p = endPoint(world, e);
         double phi;
         if (!e.hinge) {
-            phi = world.bodies[e.body].phi;
+            // a clamped end: the section turns with the node, from its undeformed rotation (the direction of the axis, which is not the
+            // angle of the node body: a Knoten is created with angle 0), i.e. angle(u0) + (phi - phi0). The same as the hinged formula below.
+            const Segment& seg = segments[last ? nSeg - 1 : k];
+            const double phi0 = last ? seg.phi0_b : seg.phi0_a;
+            phi = std::atan2(seg.u0.y, seg.u0.x) + (world.bodies[e.body].phi - phi0);
         } else {
             const Strain& st = strains[last ? nSeg - 1 : k];
             phi = std::atan2(st.u.y, st.u.x) + (last ? st.theta_b : st.theta_a);

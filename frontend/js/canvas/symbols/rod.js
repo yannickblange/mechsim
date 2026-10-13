@@ -18,7 +18,7 @@ export const formatForce = (f) => {
 // The path of a Stab on the screen: the bent curve of an elastic bar through its nodes, else the straight line.
 function stabPath(cam, entry) {
   if (entry.nodes && entry.nodes.length > 2) {
-    return beamCurve(exaggerate(entry.nodes, cam.bendScale || 1)).map((p) => cam.toScreen(p));
+    return beamCurve(exaggerate(entry.nodes, cam.bendScale || 1, entry.bendRef)).map((p) => cam.toScreen(p));
   }
   return [cam.toScreen(entry.p1), cam.toScreen(entry.p2)];
 }

@@ -385,4 +385,9 @@ TEST_CASE("a clamped Stab end is a cantilever: a sideways load P at the free top
     // the clamping moment P L
     const json r = w->frame()["constraints"][0];
     CHECK_THAT(std::abs(r["reaction"][2].get<double>()), WithinRel(P * L, 0.02));
+    // the frame reports the rotation of the SECTION at a clamped end (the axis direction, here up: pi/2), not the angle of the node body (0):
+    // a drawn bar would otherwise leave its foot sideways
+    const json nodes = frameElement(*w, "B")["nodes"];
+    CHECK_THAT(nodes[0][2].get<double>(), WithinAbs(kPi / 2.0, 1e-3));  // the clamped foot does not turn
+    CHECK_THAT(nodes[1][2].get<double>(), WithinAbs(kPi / 2.0, 0.02));
 }

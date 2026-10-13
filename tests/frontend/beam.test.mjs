@@ -241,3 +241,22 @@ test('a load becomes harmonic: frequency and phase appear, apply stores them, co
   assert.equal(applyProperties(m, 'F1', { ...values, mode: 'constant' }).ok, true);
   assert.deepEqual(m.find('F1').obj.params, { force: [0, 10], moment: 0, mode: 'constant' });
 });
+
+// A cantilever (clamped at one end, the other free) shown k times as bent: measured from the clamped end, the free end moves k times as far.
+// From the chord the same shape bulges the wrong way (the chord has turned with the tip).
+test('exaggerate from the clamped end: a cantilever deflects k times as far, with a smooth curve, not a bulge against the chord', () => {
+  const L = 1, delta = 0.05; // tip deflection
+  const y = (x) => delta * x * x * (3 - x) / 2; // x along the axis from the foot, deflection to the side (P L^3 / 3 E I shape)
+  const slope = (x) => delta * 3 * x * (2 - x) / 2;
+  const nodes = [0, 0.25, 0.5, 0.75, 1].map((x) => [-y(x), x, Math.PI / 2 + slope(x)]); // foot first, load to the left
+  const bent = exaggerate(nodes, 50, 'first');
+  assert.equal(bent[0][0], 0);
+  assert.ok(Math.abs(bent[4][0] - (-50 * delta)) < 5e-3, `tip ${bent[4][0]}`);
+  for (let i = 1; i < 5; i++) assert.ok(bent[i][0] < bent[i - 1][0], 'monotone: bends one way only');
+  // from the last node (the foot is the last) the same
+  const flipped = [...nodes].reverse().map(([x, yy, phi]) => [x, yy, phi]);
+  const bentLast = exaggerate(flipped, 50, 'last');
+  assert.ok(Math.abs(bentLast[0][0] - (-50 * delta)) < 5e-3);
+  // from the chord (both ends held) the free end would stay where it is: the old behaviour for pinned beams
+  assert.ok(Math.abs(exaggerate(nodes, 50)[4][0] - nodes[4][0]) < 1e-12);
+});
