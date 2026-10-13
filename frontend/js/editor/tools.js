@@ -51,6 +51,9 @@ class Tool {
   cancel() { this.error = null; }
   get preview() { return null; }
   get hint() { return ''; }
+  // an on / off choice of the tool, shown as a checkbox: { label, checked } or null; setOption(checked) changes it
+  get option() { return null; }
+  setOption() {}
 }
 
 // --- select -------------------------------------------------------------------------------------
@@ -643,8 +646,15 @@ export class LinkTool extends Tool {
   constructor(env, kind) {
     super(env);
     this.kind = kind;
+    this.clampOnSurfaces = false; // Stab: an end that lands on a surface gets an Einspannung (kept between Stabs)
     this.reset();
   }
+
+  get option() {
+    return this.kind === 'rod' ? { label: 'Enden an Flächen fest einspannen', checked: this.clampOnSurfaces } : null;
+  }
+
+  setOption(checked) { this.clampOnSurfaces = Boolean(checked); }
 
   reset() {
     this.a = null;
@@ -655,7 +665,7 @@ export class LinkTool extends Tool {
   get hint() {
     if (this.kind === 'rod') {
       return this.a
-        ? 'Das zweite Ende anklicken: eine Masse (dort fest eingespannt), ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten).'
+        ? 'Das zweite Ende anklicken: eine Masse (dort fest eingespannt), ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten); auf einer Fläche je nach Häkchen fest eingespannt.'
         : 'Das erste Ende anklicken: eine Masse (dort fest eingespannt), ein Knoten, ein Festlager – oder freier Raum (ein neuer Knoten). Stäbe in Knoten verbinden ergibt ein Fachwerk.';
     }
     if (this.a) return 'Das zweite Ende anklicken (oder nach dem Ziehen vom ersten Ende loslassen).';
@@ -708,7 +718,7 @@ export class LinkTool extends Tool {
     if (this.kind === 'damper') {
       this.env.created('element', this.env.model.addDamper(link));
     } else {
-      this.env.created('constraint', this.kind === 'rope' ? this.env.model.addRope(link) : this.env.model.addRod(link));
+      this.env.created('constraint', this.kind === 'rope' ? this.env.model.addRope(link) : this.env.model.addRod({ ...link, clampOnSurfaces: this.clampOnSurfaces }));
     }
     this.reset();
   }

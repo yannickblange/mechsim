@@ -472,6 +472,27 @@ input[type='text']:focus-visible {
   text-align: center;
 }
 
+.editor-option {
+  position: absolute;
+  left: 50%;
+  bottom: 132px; /* above the open toolbox */
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: var(--c-label-bg);
+  color: var(--c-ink);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.editor-option[hidden] {
+  display: none;
+}
+
 .editor-hint[hidden] {
   display: none;
 }

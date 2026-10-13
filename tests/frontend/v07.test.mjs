@@ -332,7 +332,7 @@ test('Stab form: the end condition of an end on a mass can be chosen, and is kep
   m.setStabSection(rod, { type: 'square', a: 0.02 }); // elastic: the flag stays
   assert.equal(m.find(rod).obj.params.hinged_a, true);
   assert.equal(propertyFields(m, rod).fields.find((f) => f.key === 'end_a').value, 'hinged');
-  assert.equal(applyProperties(m, rod, { sectionType: 'square', sec_a: '20', segments: 4, massMode: 'steel', damping: 5, bow: '0,02', end_a: 'clamped' }).ok, true);
+  assert.equal(applyProperties(m, rod, { sectionType: 'square', sec_a: '20', segments: 4, massMode: 'steel', damping: 5, bow: '0,02', end_a: 'clamped', end_b: 'hinged' }).ok, true);
   assert.equal(m.find(rod).obj.params.hinged_a, undefined);
   m.setStabSection(rod, null);
   assert.deepEqual(m.find(rod).obj.params, {}); // back to rigid and clamped
@@ -345,4 +345,133 @@ test('the Euler load counts a Stab clamped to a mass', () => {
   assert.match(propertyFields(m, id).info.join(' '), /Eulerfall 3/);
   m.setStabEnds(id, { a: true });
   assert.match(propertyFields(m, id).info.join(' '), /gelenkig \(Eulerfall 2\)/);
+});
+
+// --- an end on a Knoten can be fest eingespannt from the Stab form -------------------------------------------
+
+const mast = () => { // a Stab from a node in free space (not on any surface) to another node
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const id = m.addRod({ a: { node: true, point: [0, 1] }, b: { node: true, point: [0, 3] } });
+  return { m, id };
+};
+const SECTION = { sectionType: 'square', sec_a: '40', segments: 4, massMode: 'steel', damping: 5, bow: '0,02' };
+
+test('Stab form: a rigid Stab offers no Einspannung at a Knoten and says why; an elastic one offers it per Knoten end', () => {
+  const { m, id } = mast();
+  const rigid = propertyFields(m, id);
+  assert.equal(rigid.fields.some((f) => f.key.startsWith('end_')), false);
+  assert.match(rigid.info.join(' '), /starrer Stab ist an einem Knoten oder Festlager ein Gelenk/);
+  const elastic = propertyFields(m, id, { sectionType: 'square' });
+  assert.deepEqual(elastic.fields.filter((f) => f.key.startsWith('end_')).map((f) => [f.key, f.value]), [['end_a', 'hinged'], ['end_b', 'hinged']]);
+  assert.match(elastic.info.join(' '), /Eulerfall 2/);
+  assert.match(propertyFields(m, id, { sectionType: 'square', end_a: 'clamped' }).info.join(' '), /Eulerfall 3/);
+});
+
+test('Stab form: "Fest eingespannt" at a Knoten in free space puts an Einspannung on it, "Gelenk" removes it', () => {
+  const { m, id } = mast();
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  const [E, ...rest] = supports(m);
+  assert.equal(rest.length, 0);
+  assert.equal(E.type, 'fixed_support');
+  assert.equal(E.body, m.find(id).obj.a.body);
+  assert.equal(E.surface, null);
+  close(E.params.angle, 0, 1e-9); // the Stab is above the Knoten, like a column on a floor (angle 0)
+  assert.deepEqual(stabClamps(m.scene, m.find(id).obj), [true, false]);
+  // shown clamped in the form from now on
+  assert.equal(propertyFields(m, id).fields.find((f) => f.key === 'end_a').value, 'clamped');
+  assert.match(propertyFields(m, id).info.join(' '), /Eulerfall 3/);
+  // and released again: the Knoten stays where it is, on a Festlager
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'hinged', end_b: 'hinged' }).ok, true);
+  assert.deepEqual(supports(m).map((c) => [c.type, c.body]), [['pin_support', E.body]]);
+  assert.deepEqual(stabClamps(m.scene, m.find(id).obj), [false, false]);
+});
+
+const column = () => { // the foot of the column is a Festlager in free space on the floor: a ground anchor (as in buckling_columns)
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const pin = m.addGroundPin({ point: [0, 0], surface: 'floor', angle: 0 });
+  const id = m.addRod({ a: { body: null, point: [0, 0] }, b: { node: true, point: [0, 2] } });
+  return { m, id, pin };
+};
+
+test('Stab form: the foot on a Festlager in free space (ground) can be fest eingespannt: it becomes a Knoten with an Einspannung', () => {
+  const { m, id, pin } = column();
+  const form = propertyFields(m, id, { sectionType: 'square' });
+  assert.equal(form.fields.find((f) => f.key === 'end_a').value, 'hinged');
+  assert.match(form.fields.find((f) => f.key === 'end_a').label, /Festlager/);
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  const stab = m.find(id).obj;
+  assert.notEqual(stab.a.body, null);
+  closePoint(m.body(stab.a.body).position, [0, 0]);
+  assert.deepEqual(supports(m).map((c) => [c.id, c.type, c.body, c.surface]), [[pin, 'fixed_support', stab.a.body, 'floor']]); // the Festlager became it
+  assert.deepEqual(stabClamps(m.scene, stab), [true, false]);
+  assert.equal(propertyFields(m, id).fields.find((f) => f.key === 'end_a').value, 'clamped');
+  // and back to a pin: a Festlager on the Knoten
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'hinged', end_b: 'hinged' }).ok, true);
+  assert.deepEqual(supports(m).map((c) => [c.type, c.body]), [['pin_support', stab.a.body]]);
+});
+
+test('a ground Festlager that other members are anchored to stays; the foot gets an Einspannung of its own', () => {
+  const { m, id, pin } = column();
+  m.addSpring({ a: { body: null, point: [0, 0] }, b: { node: true, point: [1, 0.5] } });
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  const stab = m.find(id).obj;
+  assert.deepEqual(supports(m).map((c) => [c.type, c.body]).sort(), [['fixed_support', stab.a.body], ['pin_support', null]]);
+  assert.equal(supports(m).find((c) => c.id === pin).body, null);
+});
+
+test('Stab form: the foot that stands on a surface is shown clamped, and "Gelenk" makes it a Festlager instead of the automatic Einspannung', () => {
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const id = m.addRod({ a: { node: true, point: [0, 0] }, b: { node: true, point: [0, 2] } });
+  assert.equal(propertyFields(m, id, { sectionType: 'square' }).fields.find((f) => f.key === 'end_a').value, 'clamped');
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'hinged', end_b: 'hinged' }).ok, true);
+  assert.equal(m.find(id).obj.type, 'bar');
+  assert.deepEqual(supports(m).map((c) => [c.type, c.surface]), [['pin_support', 'floor']]); // the foot stays where it stands: a Festlager
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true); // already elastic
+  assert.deepEqual(supports(m).map((c) => [c.type, c.surface]), [['fixed_support', 'floor']]);
+});
+
+test('an Einspannung chosen for a Knoten with a Festlager replaces it', () => {
+  const { m, id } = mast();
+  m.addSupport('pin_support', { body: m.find(id).obj.a.body, point: [0, 0] });
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  assert.deepEqual(supports(m).map((c) => c.type), ['fixed_support']);
+});
+
+// --- the Stab tool: fest einspannen where an end lands on a surface ---------------------------------------------
+
+test('Stab tool option: an end that lands on a surface gets an Einspannung, off by default and kept between Stabs', () => {
+  const { model, tools } = setup(sceneWith({ surfaces: [floor] }));
+  const tool = tools.get('rod');
+  assert.deepEqual(tool.option, { label: 'Enden an Flächen fest einspannen', checked: false });
+  assert.equal(tools.get('rope').option, null);
+  stand(model, tools); // option off: a plain Stab, nothing clamped
+  assert.equal(supports(model).length, 0);
+
+  tool.setOption(true);
+  assert.equal(tool.option.checked, true);
+  click(tool, [-1, 0.01]); // snaps onto the floor
+  click(tool, [-1, 2]); // free space: no surface, no Einspannung
+  const rod = model.scene.constraints.find((c) => c.id === 'S2');
+  const [E, ...rest] = supports(model);
+  assert.equal(rest.length, 0);
+  assert.deepEqual([E.type, E.body, E.surface], ['fixed_support', rod.a.body, 'floor']);
+  close(E.params.angle, 0, 1e-12);
+  // elastic: the foot is clamped, as the Einspannung says
+  model.setStabSection('S2', { type: 'square', a: 0.04 });
+  assert.deepEqual(stabClamps(model.scene, model.find('S2').obj), [true, false]);
+  assert.equal(supports(model).length, 1);
+});
+
+test('Stab tool option: a Stab between two surfaces is clamped at both ends; a node that already has a support is left alone', () => {
+  const ceiling = { id: 'ceiling', p1: [3, 2], p2: [-3, 2] };
+  const { model, tools } = setup(sceneWith({ surfaces: [floor, ceiling] }));
+  const tool = tools.get('rod');
+  tool.setOption(true);
+  click(tool, [0, 0.01]);
+  click(tool, [0, 1.995]);
+  assert.deepEqual(supports(model).map((c) => c.type), ['fixed_support', 'fixed_support']);
+  // a second Stab from the same floor node (a Fachwerk joint): the node keeps its single support
+  click(tool, [0, 0.01]);
+  click(tool, [1, 1]);
+  assert.equal(supports(model).length, 2);
 });

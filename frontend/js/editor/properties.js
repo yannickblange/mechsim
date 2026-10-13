@@ -2,7 +2,7 @@
 // calls applyProperties() with what the user typed.
 import { comma, decimal } from '../format.js';
 import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
-import { massEnds, stabClamps } from './ends.js';
+import { clampableEnds, hasEinspannung, massEnds, stabClamps, standingEnds } from './ends.js';
 import { dist } from './geometry.js';
 import {
   E_MODULUS, SECTION_FIELDS, SECTION_LABELS, SECTION_TYPES, beamMass, defaultSection, describeSection,
@@ -150,16 +150,34 @@ function stabForm(model, stab, draft) {
   for (const side of massEnds(model.scene, stab)) {
     const i = side === 'a' ? 0 : 1;
     const kind = draft[`end_${side}`] || (clamped[i] ? 'clamped' : 'hinged');
+    clamped[i] = kind === 'clamped';
     fields.push(select(`end_${side}`, `Anschluss Ende ${side.toUpperCase()} (${stab[side].body})`, kind,
-      [['clamped', 'Fest eingespannt'], ['hinged', 'Gelenk']]));
+      [['clamped', 'Fest eingespannt'], ['hinged', 'Gelenk']], { reshape: true })); // the Euler load follows
   }
   if (massEnds(model.scene, stab).length) {
     info.push('An einer Masse ist das Stabende fest eingespannt: der Stab ist ein starrer Arm der Masse und dreht mit ihr (Einspannung). '
       + '„Gelenk“ macht das Ende zu einem Gelenk, das sich frei dreht.');
   }
+  // an end on a Knoten or the ground: an elastic Stab is clamped there by an Einspannung on the Knoten (a rigid one is a pin)
+  const knots = clampableEnds(model.scene, stab);
+  if (section && knots.length) {
+    const standing = stab.type === 'rod' ? standingEnds(model.scene, stab).map((e) => e.side) : []; // clamped on becoming elastic
+    for (const { side, node } of knots) {
+      const i = side === 'a' ? 0 : 1;
+      const kind = draft[`end_${side}`] || (node && (hasEinspannung(model.scene, node.id) || standing.includes(side)) ? 'clamped' : 'hinged');
+      clamped[i] = kind === 'clamped';
+      fields.push(select(`end_${side}`, `Anschluss Ende ${side.toUpperCase()} (${node ? node.id : 'Festlager'})`, kind,
+        [['clamped', 'Fest eingespannt'], ['hinged', 'Gelenk']], { reshape: true }));
+    }
+    info.push('„Fest eingespannt“ setzt eine Einspannung an das Stabende: der Stab behält dort seinen Winkel und nimmt ein Moment auf (Kragarm, Stütze). '
+      + 'Sie gehört zum Knoten; weitere Stäbe an diesem Knoten sind dann ebenfalls dort eingespannt. „Gelenk“ macht daraus ein Festlager.');
+  } else if (!section && knots.length) {
+    info.push('Ein starrer Stab ist an einem Knoten oder Festlager ein Gelenk. Für ein fest eingespanntes Ende (Kragarm, Stütze) den Querschnitt wählen: '
+      + 'dann lässt sich der Anschluss am Knoten einstellen.');
+  }
   if (section) {
     const p = sectionProps(section);
-    const clamps = stabClamps(model.scene, stab).filter(Boolean).length;
+    const clamps = clamped.filter(Boolean).length;
     const K = EULER_K[clamps];
     const pcr = (Math.PI ** 2 * p.EI) / ((K * Math.max(d, 1e-9)) ** 2);
     const slender = d / Math.sqrt(p.inertia / p.area);
@@ -187,11 +205,26 @@ function stabForm(model, stab, draft) {
   return { title: `${section ? 'Stab (elastisch)' : 'Stab'} ${stab.id}`, info, fields, section };
 }
 
-// The end conditions typed into a Stab form ("clamped" | "hinged" per end on a mass).
+// The end conditions typed into a Stab form ("clamped" | "hinged" per end). An end on a mass is a flag of the Stab (setEnds);
+// an end on a Knoten or the ground is an Einspannung on the Knoten (setNodeEnds, after the Stab has become elastic: that adds its own).
+function endChoices(model, id, parsed, ends) {
+  const stab = model.find(id).obj;
+  const sides = ends(model.scene, stab).map((e) => e.side || e);
+  const choice = {};
+  for (const side of sides) if (parsed[`end_${side}`] !== undefined) choice[side] = parsed[`end_${side}`];
+  return choice;
+}
+
 function setEnds(model, id, parsed) {
-  const hinged = {};
-  for (const side of ['a', 'b']) if (parsed[`end_${side}`] !== undefined) hinged[side] = parsed[`end_${side}`] === 'hinged';
+  const choice = endChoices(model, id, parsed, massEnds);
+  const hinged = Object.fromEntries(Object.entries(choice).map(([side, kind]) => [side, kind === 'hinged']));
   if (Object.keys(hinged).length) model.setStabEnds(id, hinged);
+}
+
+function setNodeEnds(model, id, parsed) {
+  const choice = endChoices(model, id, parsed, clampableEnds);
+  const clamped = Object.fromEntries(Object.entries(choice).map(([side, kind]) => [side, kind === 'clamped']));
+  if (Object.keys(clamped).length) model.setStabClamps(id, clamped);
 }
 
 // What the submitted form says about an elastic Stab beyond its section (the bar parameters), for a Stab of length d.
@@ -358,7 +391,7 @@ export function applyProperties(model, id, values) {
   const errors = [];
   for (const f of form.fields) {
     if (f.type === 'select') {
-      parsed[f.key] = String(values[f.key]);
+      parsed[f.key] = String(values[f.key] ?? f.value); // not given: unchanged
       if (!f.options.some(([v]) => v === parsed[f.key])) errors.push(`${f.label}: unbekannte Auswahl`);
       continue;
     }
@@ -397,6 +430,7 @@ export function applyProperties(model, id, values) {
     if (section) {
       const extra = stabParams(parsed, installedLength(model, found.obj));
       model.setStabSection(id, section, Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)));
+      setNodeEnds(model, id, parsed);
     }
   } else if (kind === 'constraint' && isJoint(found.obj)) {
     if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
@@ -418,8 +452,10 @@ export function applyProperties(model, id, values) {
   } else if (kind === 'element' && found.obj.type === 'bar') {
     setEnds(model, id, parsed);
     const section = sectionFromValues(parsed);
-    if (section) model.updateBar(id, { section, ...stabParams(parsed, installedLength(model, found.obj)) });
-    else model.setStabSection(id, null);
+    if (section) {
+      model.updateBar(id, { section, ...stabParams(parsed, installedLength(model, found.obj)) });
+      setNodeEnds(model, id, parsed);
+    } else model.setStabSection(id, null);
   } else if (kind === 'element' && 'c' in parsed) {
     model.updateElement(id, { c: parsed.c });
   } else if (kind === 'element' && 'k' in parsed) {

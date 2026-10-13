@@ -200,7 +200,7 @@ test('a Stab becomes elastic with a cross section and rigid again, keeping id an
 
   // the select was changed to I: the form is built again with default I dimensions
   form = propertyFields(model, 'S1', { sectionType: 'I' });
-  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_b', 'sec_h', 'sec_tf', 'sec_tw', 'segments', 'massMode', 'damping', 'bow']);
+  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_b', 'sec_h', 'sec_tf', 'sec_tw', 'end_a', 'end_b', 'segments', 'massMode', 'damping', 'bow']);
   assert.ok(form.section && form.section.type === 'I');
   assert.match(form.info.join(' '), /Knicklast/);
 
@@ -256,7 +256,7 @@ test('elastic Stab form: Euler load, elements, mass, damping and the bow in mm',
   assert.deepEqual(bar.params, { section: { type: 'square', a: 0.02 }, damping: 12, segments: 8, mass: 5, imperfection: 0.002 });
 
   const form = propertyFields(model, 'S1');
-  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_a', 'segments', 'massMode', 'mass', 'damping', 'bow']);
+  assert.deepEqual(form.fields.map((f) => f.key), ['sectionType', 'sec_a', 'end_a', 'end_b', 'segments', 'massMode', 'mass', 'damping', 'bow']);
   assert.equal(form.fields.find((f) => f.key === 'bow').value, 4);
   assert.equal(form.fields.find((f) => f.key === 'segments').value, 8);
   const pcr = (Math.PI ** 2 * 210e9 * 0.02 ** 4 / 12) / 4; // 6909 N

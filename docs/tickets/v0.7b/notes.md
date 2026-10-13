@@ -29,3 +29,29 @@ there is no torque on the disc at the start at all; the springs could only pull 
 - **Two clamped Stabs from the ground to one block cannot move.** That is the physics of two rigid arms on one rigid body, not a bug; the message is the engine's
   "constraint system is singular". To hang a block, set **Gelenk** at its ends.
 - Ends on beams are still pins (a Stab on a beam node); only blocks and discs ("masses") clamp.
+
+## Fix: "fest eingespannt" for the ends on a Knoten or on the ground
+
+Reported: the Stab form had no way to make one end fest eingespannt, and nothing clamped by itself. Cause: the choice existed only for ends on a block or a disc.
+An elastic Stab is clamped by the engine at a Knoten that has an Einspannung (v0.7), but the editor offered no way to put one there, and the foot of a column on a
+Festlager in free space (a ground anchor, as in `buckling_columns`) can never be clamped, because the engine pins ground ends.
+
+Editor only, no engine or schema change:
+
+- The elastic-Stab form shows **Anschluss Ende A / B** for every end on a Knoten or a ground Festlager (not for a rigid Stab: it is a pin there, the form says so). The Euler
+  load in the text follows the choice live (`reshape`).
+- *Fest eingespannt* on a Knoten puts an Einspannung on it (a Festlager there is replaced; on the surface the Knoten lies on, else free with the symbol turned away from the
+  Stab). On a ground Festlager the end becomes a Knoten at that point and the Festlager becomes the Einspannung (same id, surface, angle); if other members are anchored to that
+  Festlager it stays and the Knoten gets an Einspannung of its own. (`SceneModel.setStabClamps`, `clampEnd`.)
+- *Gelenk* turns an Einspannung there into a Festlager: the Knoten stays where it is. It also opts out of the Einspannung that a Stab standing on a surface gets when it becomes elastic.
+- Automatic behaviour is unchanged: an elastic Stab is clamped by itself only where its Knoten stands on a surface (v0.7). A ground Festlager is a pin by definition and stays one until chosen otherwise.
+- A form value that is not submitted for a select counts as unchanged.
+
+Checked: `tests/frontend/v07.test.mjs`; with the native engine, `buckling_columns` with S1's foot clamped has `pcr` 14134 N instead of 6909 N (K = 0.699) and the support reports a moment.
+
+### Stab tool: fest einspannen where an end lands on a surface
+
+The Stab tool has a checkbox **Enden an Flächen fest einspannen** (above the hint line, off by default, kept between Stabs). With it on, an end whose Knoten lands on a
+surface and has no support yet gets an Einspannung on that surface (`addRod({ clampOnSurfaces })`, one undo step); a Knoten that other Stabs share (a Fachwerk joint) is clamped too
+when the box is on, because it was asked for. Off, nothing changes: a floor node of a truss must not carry a support of its own. The Stab stays rigid; the Einspannung
+acts on it once it is made elastic (the form then shows the end as *Fest eingespannt*). Tool options are a new generic hook (`Tool.option` / `setOption`, `Editor.buildOption`).

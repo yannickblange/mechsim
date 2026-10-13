@@ -39,6 +39,7 @@ export class Editor {
 
     this.buildToolbox();
     this.buildHint();
+    this.buildOption();
     this.buildPopup();
     this.listeners = {
       key: (e) => this.onKey(e),
@@ -85,6 +86,7 @@ export class Editor {
     this.setToolboxOpen(false);
     this.toolbox.hidden = true;
     this.hint.hidden = true;
+    this.option.hidden = true;
   }
 
   // --- tools ------------------------------------------------------------------------------------
@@ -221,8 +223,29 @@ export class Editor {
     this.stage.append(this.hint);
   }
 
+  // the on / off choice of the tool (the Stab tool: fest einspannen an Flächen), a checkbox above the hint
+  buildOption() {
+    this.option = el('label', 'editor-option');
+    this.option.hidden = true;
+    this.optionBox = el('input', '', { type: 'checkbox' });
+    this.optionText = el('span');
+    this.option.append(this.optionBox, this.optionText);
+    this.optionBox.addEventListener('change', () => {
+      this.tool.setOption(this.optionBox.checked);
+      this.optionBox.blur();
+      this.updateHint();
+    });
+    this.stage.append(this.option);
+  }
+
   updateHint() {
     const tool = this.tool;
+    const choice = this.enabled ? tool.option : null;
+    this.option.hidden = !choice;
+    if (choice) {
+      this.optionText.textContent = choice.label;
+      this.optionBox.checked = choice.checked;
+    }
     this.hint.hidden = !this.enabled;
     this.hint.dataset.error = String(Boolean(tool.error));
     // Shift works in every tool: nothing snaps (grid, points, surfaces, angles) while it is held

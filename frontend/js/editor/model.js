@@ -1,6 +1,7 @@
 // model.js - the scene being edited: creation, editing, deletion (with cascades), undo / redo.
 // Holds a plain scene object (contracts/scene.schema.json, version 0.4) and never touches the DOM.
-import { bodyToWorld, dist, nextId, roundTo, sub, supportAngleAt, tidy, tidyPoint } from './geometry.js';
+import { clampableEnds, hasEinspannung, standingEnds } from './ends.js';
+import { bodyToWorld, dist, nextId, normalizeAngle, roundTo, sub, supportAngleAt, tidy, tidyPoint } from './geometry.js';
 import { normalizeRopes } from './moves.js';
 import { defaultSection } from './section.js';
 import { surfaceAtPoint } from './snap.js';
@@ -278,13 +279,16 @@ export class SceneModel {
   // Stab: massless two-force member; its length is the distance between its ends. An end given as
   // { node: true, point } is a free end: a Knoten (point mass) is made there, or the one that is
   // already there is used, so Stabs can be joined to a Fachwerk. Nothing is pinned to empty space: a
-  // fixed point is a Festlager in free space (or a support on a Knoten) that the user places.
-  addRod({ a, b }) {
+  // fixed point is a Festlager in free space (or a support on a Knoten) that the user places. `clampOnSurfaces`: an end whose
+  // Knoten lies on a surface and has no support yet gets an Einspannung there (fest eingespannt; it acts once the Stab is elastic).
+  addRod({ a, b, clampOnSurfaces = false }) {
     return this.#edit((s) => {
       const end = (e) => (e.node ? nodeAt(s, e.point) : anchor(e));
       const ends = [end(a), end(b)];
       const id = nextId('S', this.allIds());
-      s.constraints.push({ id, type: 'rod', a: ends[0], b: ends[1], params: {} });
+      const rod = { id, type: 'rod', a: ends[0], b: ends[1], params: {} };
+      s.constraints.push(rod);
+      if (clampOnSurfaces) clampStandingEnds(s, rod, { joined: true });
       return id;
     });
   }
@@ -324,6 +328,25 @@ export class SceneModel {
         if (hinged[side] === undefined) continue;
         if (hinged[side]) stab.params[`hinged_${side}`] = true;
         else delete stab.params[`hinged_${side}`];
+      }
+    });
+  }
+
+  // Clamping of the ends of a Stab on a Knoten or on the ground: { a: true, b: false }: clamped (true, an Einspannung on the Knoten; an
+  // end on the ground becomes a Knoten with one) or a pin (false: an Einspannung there becomes a Festlager, which keeps the Knoten
+  // where it is). An elastic Stab keeps the rotation of a Knoten that an Einspannung holds; a rigid one is a pin there. The
+  // Einspannung belongs to the Knoten: other Stabs that end there follow it.
+  setStabClamps(id, clamped) {
+    const found = this.find(id);
+    if (!found || !['rod', 'bar'].includes(found.obj.type)) throw new Error(`no Stab "${id}"`);
+    return this.#edit((s) => {
+      const stab = [...s.constraints, ...s.elements].find((o) => o.id === id);
+      for (const { side, node } of clampableEnds(s, stab)) {
+        if (clamped[side] === undefined) continue;
+        if (node && clamped[side] === hasEinspannung(s, node.id)) continue;
+        if (!node && !clamped[side]) continue; // a ground end is a pin already
+        if (clamped[side]) clampEnd(s, stab, side);
+        else for (const c of s.constraints) if (c.type === 'fixed_support' && c.body === node.id) c.type = 'pin_support';
       }
     });
   }
@@ -514,19 +537,37 @@ export class SceneModel {
 // An elastic Stab that stands on a surface is fest eingespannt there: an end whose Knoten lies on a surface, has no
 // support yet and is the end of this Stab only (a Knoten that joins several members is a Fachwerk joint) gets an
 // Einspannung. The engine then clamps the end (the bar keeps the rotation of its node, which the support holds).
-function clampStandingEnds(scene, stab) {
-  for (const [mine, other] of [[stab.a, stab.b], [stab.b, stab.a]]) {
-    const node = mine.body && scene.bodies.find((b) => b.id === mine.body && b.type === 'node');
-    if (!node || scene.constraints.some((c) => c.body === node.id && SUPPORT_TYPES[c.type])) continue;
-    const joined = [...scene.elements, ...scene.constraints]
-      .some((o) => o.id !== stab.id && ((o.a && o.a.body === node.id) || (o.b && o.b.body === node.id)));
-    const surface = surfaceAtPoint(scene, node.position);
-    if (joined || !surface) continue;
-    const far = other.body === null ? other.point : bodyToWorld(scene.bodies.find((b) => b.id === other.body), other.point);
+function clampStandingEnds(scene, stab, options) {
+  for (const { node, surface, far } of standingEnds(scene, stab, options)) {
     pushSupport(scene, 'fixed_support', {
       body: node.id, point: [0, 0], surface: surface.id, angle: supportAngleAt(surface, node.position, far),
     });
   }
+}
+
+// An Einspannung at the end of a Stab: on the Knoten there, or on a new Knoten that takes the place of a ground anchor (the Festlager
+// in free space at that point becomes the Einspannung, unless another member is anchored to it). The Einspannung sits on the surface
+// the Knoten lies on (the Stab on its left side), else it is free with its symbol turned away from the Stab. It replaces a Festlager
+// on the Knoten (a point carries one support).
+function clampEnd(scene, stab, side) {
+  const other = stab[side === 'a' ? 'b' : 'a'];
+  const far = other.body === null ? other.point : bodyToWorld(scene.bodies.find((b) => b.id === other.body), other.point);
+  const ground = stab[side].body === null;
+  const here = ground ? stab[side].point : scene.bodies.find((b) => b.id === stab[side].body).position;
+  if (ground) stab[side] = nodeAt(scene, here);
+  const body = stab[side].body;
+  const surface = surfaceAtPoint(scene, here);
+  const pin = ground && scene.constraints.find((c) => c.type === 'pin_support' && c.body === null && dist(c.point, here) < 1e-6);
+  const shared = pin && [...scene.elements, ...scene.constraints].some((o) => o !== stab && o !== pin
+    && [o.a, o.b].some((e) => e && e.body === null && dist(e.point, here) < 1e-6));
+  if (pin && !shared) { // the Festlager becomes the Einspannung (same id, surface and angle)
+    Object.assign(pin, { type: 'fixed_support', body, point: [0, 0] });
+    return;
+  }
+  const angle = surface
+    ? supportAngleAt(surface, here, far)
+    : normalizeAngle(Math.atan2(far[1] - here[1], far[0] - here[0]) - Math.PI / 2);
+  pushSupport(scene, 'fixed_support', { body, point: [0, 0], surface: surface ? surface.id : null, angle });
 }
 
 // The end-condition flags of a Stab's params (they stay when a rigid Stab becomes elastic and back).
