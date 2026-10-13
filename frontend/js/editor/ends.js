@@ -38,13 +38,16 @@ export function nodeEnds(scene, stab) {
   });
 }
 
-// The ends of a Stab that can be clamped by an Einspannung: on a Knoten, or on the ground (a Festlager in free space, the foot of a
-// column; `node` is null then, the clamp turns the anchor into a Knoten with an Einspannung). [{ side, node | null }]
+// The ends of a Stab that can be clamped by an Einspannung, because they are attached to the ground: a Festlager in free space (the foot
+// of a column; `node` is null then, the clamp turns the anchor into a Knoten with an Einspannung), or a Knoten with a Festlager or an
+// Einspannung, or a Knoten that stands on a surface. An end that is attached to nothing is free and has no end condition. [{ side, node | null }]
 export function clampableEnds(scene, stab) {
+  const held = (node) => (scene.constraints || []).some((c) => c.body === node.id && (c.type === 'fixed_support' || c.type === 'pin_support'))
+    || Boolean(surfaceAtPoint(scene, node.position));
   return ['a', 'b'].flatMap((side) => {
     const end = stab[side];
     if (end && end.body === null) return [{ side, node: null }];
-    return nodeEnds(scene, stab).filter((e) => e.side === side);
+    return nodeEnds(scene, stab).filter((e) => e.side === side && held(e.node));
   });
 }
 

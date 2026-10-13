@@ -295,7 +295,7 @@ test('Stab form: making a Stab elastic with the property form clamps the foot th
 
 // --- v0.7b: a Stab on a block or a disc is clamped there ------------------------------------------------------
 
-import { massEnds, stabClamps } from '../../frontend/js/editor/ends.js';
+import { clampableEnds, massEnds, stabClamps } from '../../frontend/js/editor/ends.js';
 import { disc } from './helpers.mjs';
 
 const kreis = () => {
@@ -324,7 +324,7 @@ test('Stab form: the end condition of an end on a mass can be chosen, and is kep
   const form = propertyFields(m, rod);
   const end = form.fields.find((f) => f.key === 'end_a');
   assert.equal(end.value, 'clamped');
-  assert.equal(form.fields.find((f) => f.key === 'end_b').value, 'hinged'); // the node end: a pin until an Einspannung is put on it
+  assert.equal(form.fields.some((f) => f.key === 'end_b'), false); // a free end (a node attached to nothing) has no end condition
   assert.match(form.info.join(' '), /starrer Arm/);
 
   assert.equal(applyProperties(m, rod, { sectionType: 'rigid', end_a: 'hinged' }).ok, true);
@@ -349,18 +349,19 @@ test('the Euler load counts a Stab clamped to a mass', () => {
 
 // --- an end on a Knoten can be fest eingespannt from the Stab form -------------------------------------------
 
-const mast = () => { // a Stab from a node in free space (not on any surface) to another node
+const mast = () => { // a Stab from a node in free space (not on any surface) on a Festlager (end a) to a free node (end b)
   const m = new SceneModel(sceneWith({ surfaces: [floor] }));
   const id = m.addRod({ a: { node: true, point: [0, 1] }, b: { node: true, point: [0, 3] } });
+  m.addSupport('pin_support', { body: m.find(id).obj.a.body, point: [0, 0] });
   return { m, id };
 };
 const SECTION = { sectionType: 'square', sec_a: '40', segments: 4, massMode: 'steel', damping: 5, bow: '0,02' };
 
-test('Stab form: rigid and elastic Stabs offer the end condition per Knoten end; the Euler load follows the choice', () => {
+test('Stab form: rigid and elastic Stabs offer the end condition for an attached Knoten end, a free end has none; the Euler load follows the choice', () => {
   const { m, id } = mast();
   const ends = (form) => form.fields.filter((f) => f.key.startsWith('end_')).map((f) => [f.key, f.value]);
-  assert.deepEqual(ends(propertyFields(m, id)), [['end_a', 'hinged'], ['end_b', 'hinged']]); // rigid
-  assert.deepEqual(ends(propertyFields(m, id, { sectionType: 'square' })), [['end_a', 'hinged'], ['end_b', 'hinged']]);
+  assert.deepEqual(ends(propertyFields(m, id)), [['end_a', 'hinged']]); // rigid; the free end b has no choice
+  assert.deepEqual(ends(propertyFields(m, id, { sectionType: 'square' })), [['end_a', 'hinged']]);
   assert.match(propertyFields(m, id, { sectionType: 'square' }).info.join(' '), /Eulerfall 2/);
   assert.match(propertyFields(m, id, { sectionType: 'square', end_a: 'clamped' }).info.join(' '), /Eulerfall 3/);
 });
@@ -488,4 +489,19 @@ test('Stab tool option: a Stab between two surfaces is clamped at both ends; a n
   click(tool, [0, 0.01]);
   click(tool, [1, 1]);
   assert.equal(supports(model).length, 2);
+});
+
+test('a free end is free: no end condition for a Knoten that is attached to nothing, and none is added', () => {
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const id = m.addRod({ a: { node: true, point: [0, 1] }, b: { node: true, point: [0, 3] } });
+  for (const draft of [{}, { sectionType: 'square' }]) {
+    assert.deepEqual(propertyFields(m, id, draft).fields.filter((f) => f.key.startsWith('end_')), []);
+  }
+  assert.equal(clampableEnds(m.scene, m.find(id).obj).length, 0);
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'clamped' }).ok, true); // not offered: ignored
+  assert.equal(supports(m).length, 0);
+  // a Knoten on a surface is attached; a Fachwerk joint in the air is not
+  const n = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const s = n.addRod({ a: { node: true, point: [0, 0] }, b: { node: true, point: [0, 2] } });
+  assert.deepEqual(clampableEnds(n.scene, n.find(s).obj).map((e) => e.side), ['a']);
 });

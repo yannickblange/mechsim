@@ -68,3 +68,8 @@ round like a pendulum, although the foot was "fest eingespannt". (Chosen: option
 - **Why `Stab beispiel 2` "does not bend".** Its left Stab was already elastic (40 mm square steel, 0,9 m, 500 N): `P L^3 / 3 E I` = 2,7 mm at the tip (the undamped swing reaches 2x that), tip
   rotation 0,26 degrees - correct, and invisible at true scale. The **Biegung** selector (x 10 / x 50 / x 200) that exaggerates it was only shown for scenes with a beam body; it
   now also shows when there is an elastic Stab (`main.js`, `index.html` label).
+
+### Free ends have no end condition
+
+The *Anschluss* choice (v0.7b-2 / v0.7c) is only offered for an end that is **attached**: a ground Festlager, a Knoten with a Festlager or an Einspannung, or a Knoten that stands on a surface
+(`clampableEnds`). An end in free space (a new Knoten with nothing on it, or a Fachwerk joint in the air) is free: no choice, nothing is added to it. (It was offered as "Gelenk" by mistake.)
