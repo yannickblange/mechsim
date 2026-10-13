@@ -12,6 +12,7 @@ from mechsim.scene import (
     SceneNameInvalid,
     SceneNotFound,
     check_name,
+    delete_user_scene,
     list_scenes,
     list_user_scenes,
     save_user_scene,
@@ -85,3 +86,15 @@ async def save_scene(body: SaveRequest):
     except (SceneInvalid, SceneNameInvalid) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"name": name, "source": "user"}
+
+
+@router.delete("/scenes/user/{name}")
+async def delete_scene(name: str):
+    """Delete a saved scene (user scenes only; the examples are part of the program). The file goes to user_scenes/.trash/."""
+    try:
+        delete_user_scene(name)
+    except SceneNameInvalid as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except SceneNotFound:
+        raise HTTPException(status_code=404, detail=f"unknown scene '{name}'")
+    return {"deleted": name}

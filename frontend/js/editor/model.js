@@ -11,7 +11,8 @@ export const DEFAULT_SPRING_K = 100.0;
 export const DEFAULT_DAMPING = 10.0; // N s / m
 export const DEFAULT_NODE_MASS = 1.0; // kg of a Knoten (the weight is small next to typical truss loads)
 export const DEFAULT_FREQUENCY = 1.0; // Hz of a new harmonic load
-export const DEFAULT_ELEMENT_DAMPING = 5.0; // 1/s: new beams and elastic Stabs settle (every mode decays like e^(-alpha t / 2))
+export const DEFAULT_ELEMENT_DAMPING = 5.0; // 1/s: new beams settle (every mode decays like e^(-alpha t / 2))
+export const DEFAULT_STAB_DAMPING = 8.0; // 1/s: an elastic Stab, as the I-beam example (it is stiffer and lighter than a beam: it rings longer)
 const HISTORY_LIMIT = 100;
 
 const SUPPORT_TYPES = {
@@ -305,7 +306,7 @@ export class SceneModel {
       s.elements = s.elements.filter((e) => e.id !== id);
       if (section) {
         stab.type = 'bar';
-        stab.params = { section: clone(section), damping: DEFAULT_ELEMENT_DAMPING, ...hingedParams(found.obj.params), ...params };
+        stab.params = { section: clone(section), damping: DEFAULT_STAB_DAMPING, ...hingedParams(found.obj.params), ...params };
         s.elements.push(stab);
         if (found.obj.type === 'rod') clampStandingEnds(s, stab);
       } else {

@@ -4,6 +4,7 @@ import { comma, decimal } from '../format.js';
 import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
 import { clampableEnds, hasEinspannung, massEnds, stabClamps, standingEnds } from './ends.js';
 import { dist } from './geometry.js';
+import { DEFAULT_STAB_DAMPING } from './model.js';
 import {
   E_MODULUS, SECTION_FIELDS, SECTION_LABELS, SECTION_TYPES, beamMass, defaultSection, describeSection,
   sectionError, sectionProps,
@@ -193,7 +194,7 @@ function stabForm(model, stab, draft) {
     fields.push(select('massMode', 'Masse', massMode, [['steel', 'Stahl'], ['given', 'Vorgegeben']], { reshape: true }));
     if (massMode === 'given') fields.push(num('mass', 'Masse', 'kg', round(params.mass ?? 7850 * p.area * d, 6), { minExclusive: 0 }));
     fields.push(
-      num('damping', 'Dämpfung α', '1/s', params.damping ?? 0, { min: 0 }),
+      num('damping', 'Dämpfung α', '1/s', params.damping ?? (stab.type === 'rod' ? DEFAULT_STAB_DAMPING : 0), { min: 0 }),
       num('bow', 'Vorkrümmung', 'mm', round((params.imperfection ?? DEFAULT_BOW) * d * MM, 4), { min: 0 }),
     );
     info.push('Elemente: 1 ist der reine Zugstab (masselos, kann sich nicht biegen oder knicken). Die Vorkrümmung (eine Halbsinuswelle) lässt eine gerade Stütze überhaupt erst ausknicken.');

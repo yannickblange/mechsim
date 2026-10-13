@@ -87,3 +87,14 @@ Two display faults, both in how a bent elastic Stab (or beam) is drawn; the phys
    moves k times as far. Everything else keeps the chord.
 
 What remains is real: an undamped (damping 0) cantilever loaded suddenly keeps ringing with higher modes, so at x 50 its curve wobbles; set the damping (the editor's default for new elastic Stabs is 5 / s).
+
+### Elastic Stabs settle by default; deleting saved layouts (v0.7c-4)
+
+- **Damping.** A rigid Stab made elastic in the form got damping **0** (the form's field defaulted to 0 and overrode the editor's default), so a suddenly loaded Stab rang for ever
+  (a cantilever swings between 0 and twice its static deflection). The form now offers `DEFAULT_STAB_DAMPING` = **8 / s**, the value of the I-beam example (every mode decays like
+  `e^(-8 t / 2)`; 2 % of the swing is left after 1 s). 0 can still be typed; beams keep their 5 / s; the engine default stays 0, so saved scenes behave as before: a layout that
+  already has damping 0 (`Stab bending`) needs the field set once. Mass-proportional damping is the stable choice with explicit steps (see "Damping, v0.4b").
+  Checked: `tests/validation/test_v07b_physics.py` (settles within 5 % of `P L^3 / 3 E I` after 2 s).
+- **Delete a saved layout.** A **Löschen** button next to *Neu*, shown only while a saved layout (*Meine Aufbauten*) is displayed (not in the editor); it asks first and then shows the first example.
+  `DELETE /api/scenes/user/{name}` (`delete_user_scene`): the file is moved to `user_scenes/.trash/` (not listed, take it back by moving it out) rather than erased. The examples
+  cannot be deleted (404). Checked: `tests/python/test_editor_api.py`.

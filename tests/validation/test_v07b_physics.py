@@ -122,3 +122,29 @@ def test_a_rigid_stab_on_a_festlager_is_still_a_pin_and_falls_over():
         sim.step(n=1500)
         n2 = next(b for b in sim.frame()["bodies"] if b["id"] == "N2")
     assert n2["x"] < -0.5  # swung out to the left: a pendulum, nothing keeps its angle
+
+
+def test_a_damped_elastic_stab_settles_instead_of_ringing():
+    """A 1 m, 40 mm steel cantilever loaded suddenly with 5 kN: undamped it swings 0..2x the static deflection for ever;
+    with the editor's damping of 8 / s it is within 5 % of the static deflection P L^3 / 3 E I after 2 s."""
+    scene = {
+        "version": "0.4", "gravity": [0, 0], "solver": {"dt": 0.001},
+        "bodies": [
+            {"id": "N1", "type": "node", "position": [0, 1], "angle": 0, "params": {"mass": 1.0}},
+            {"id": "N2", "type": "node", "position": [0, 0], "angle": 0, "params": {"mass": 1.0}},
+        ],
+        "elements": [
+            {"id": "S1", "type": "bar", "a": {"body": "N1", "point": [0, 0]}, "b": {"body": "N2", "point": [0, 0]},
+             "params": {"section": {"type": "square", "a": 0.04}, "damping": 8.0}},
+            {"id": "F1", "type": "load", "body": "N1", "point": [0, 0], "params": {"force": [-5000, 0], "moment": 0, "mode": "constant"}},
+        ],
+        "constraints": [{"id": "E1", "type": "fixed_support", "body": "N2", "point": [0, 0], "surface": None, "params": {"angle": 0}}],
+    }
+    static = 5000.0 * 1.0**3 / (3 * 210e9 * 0.04**4 / 12)
+    with Simulation(scene) as sim:
+        sim.step(n=2000)
+        tip = next(b for b in sim.frame()["bodies"] if b["id"] == "N1")["x"]
+        sim.step(n=300)
+        tip2 = next(b for b in sim.frame()["bodies"] if b["id"] == "N1")["x"]
+    assert -tip == pytest.approx(static, rel=0.05)
+    assert abs(tip2 - tip) < 0.02 * static  # at rest

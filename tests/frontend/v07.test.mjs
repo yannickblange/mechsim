@@ -529,3 +529,18 @@ test('stabBendRef / beamBendRef: the clamped end of a cantilever, null when the 
   b.addSupport('pin_support', { body: beam, point: [1, 0], surface: null, angle: 0 });
   assert.equal(beamBendRef(b.scene, b.find(beam).obj), null); // a pin at the other end
 });
+
+// --- an elastic Stab settles: it gets the damping of the I-beam example when it becomes elastic ----------------------
+
+test('a Stab made elastic in the form has damping 8 / s by default (not 0), and keeps what is typed', () => {
+  const m = new SceneModel(sceneWith({ surfaces: [floor] }));
+  const id = m.addRod({ a: { node: true, point: [0, 0] }, b: { node: true, point: [0, 2] } });
+  assert.equal(propertyFields(m, id, { sectionType: 'square' }).fields.find((f) => f.key === 'damping').value, 8);
+  const { sectionType, sec_a, segments, massMode, bow } = SECTION;
+  assert.equal(applyProperties(m, id, { sectionType, sec_a, segments, massMode, bow, damping: '8' }).ok, true);
+  assert.equal(m.find(id).obj.params.damping, 8);
+  assert.equal(propertyFields(m, id).fields.find((f) => f.key === 'damping').value, 8);
+  assert.equal(applyProperties(m, id, { sectionType, sec_a, segments, massMode, bow, damping: '0' }).ok, true); // 0 can still be chosen
+  assert.equal(m.find(id).obj.params.damping, 0);
+  assert.equal(propertyFields(m, id).fields.find((f) => f.key === 'damping').value, 0);
+});

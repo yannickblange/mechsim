@@ -54,6 +54,7 @@ const ui = {
   error: $('error'),
   edit: $('btn-edit'),
   newScene: $('btn-new'),
+  del: $('btn-delete'),
   editControls: $('edit-controls'),
   sceneName: $('scene-name'),
   save: $('btn-save'),
@@ -125,6 +126,7 @@ function updateUi() {
   ui.edit.textContent = editing ? 'Fertig' : 'Bearbeiten';
   ui.edit.setAttribute('aria-pressed', String(editing));
   ui.editControls.hidden = !editing;
+  ui.del.hidden = editing || state.sceneSource !== 'user' || !state.sceneName; // only a saved layout can be deleted
   // the bending selector only matters when something bends: a beam or an elastic Stab (in the scene being edited or shown)
   const shown = editing ? model.scene : state.scene;
   ui.bendField.hidden = !(shown && ((shown.bodies || []).some((b) => b.type === 'beam') || (shown.elements || []).some((e) => e.type === 'bar')));
@@ -335,6 +337,24 @@ async function saveLayout() {
   }
 }
 
+// Delete the saved layout that is shown (after asking); the first example is shown instead.
+async function deleteLayout() {
+  if (state.editing || state.sceneSource !== 'user' || !state.sceneName) return;
+  const name = state.sceneName;
+  if (!window.confirm(`Den gespeicherten Aufbau „${name.replaceAll('_', ' ')}“ löschen?`)) return;
+  try {
+    await api.deleteUserScene(name);
+    const groups = await api.listSceneGroups();
+    userScenes = groups.user_scenes || [];
+    state.lastError = null;
+    if (groups.scenes.length > 0) await selectScene(keyOf('example', groups.scenes[0]));
+    await refreshSceneList();
+  } catch (err) {
+    state.lastError = `„${name}“ konnte nicht gelöscht werden: ${err.message}`;
+  }
+  updateUi();
+}
+
 function newLayout() {
   if (state.editing && model.dirty && !window.confirm('Die ungespeicherten Änderungen dieses Aufbaus verwerfen?')) return;
   if (state.editing) {
@@ -460,6 +480,7 @@ ui.theme.addEventListener('click', () => {
   updateUi();
 });
 ui.newScene.addEventListener('click', newLayout);
+ui.del.addEventListener('click', deleteLayout);
 ui.save.addEventListener('click', saveLayout);
 ui.undo.addEventListener('click', () => model.undo());
 ui.redo.addEventListener('click', () => model.redo());

@@ -14,6 +14,7 @@ Public API:
     list_user_scenes() -> list[str]                     scenes saved by the user
     load_scene(name: str, source: str = "example") -> dict
     save_user_scene(name: str, scene: dict) -> str
+    delete_user_scene(name: str) -> None                move a saved scene to user_scenes/.trash/
     validate_scene(scene: dict) -> list[str]            schema errors, then reference errors
     scene_dt(scene: dict) -> float
 """
@@ -287,6 +288,24 @@ def save_user_scene(name: str, scene: dict[str, Any]) -> str:
     tmp.write_text(json.dumps(scene, indent=2) + "\n", encoding="utf-8")
     tmp.replace(target)  # atomic: a crash never leaves a half-written layout
     return name
+
+
+def delete_user_scene(name: str) -> None:
+    """Delete the saved scene ``name``. The file is moved to ``<user_scenes_dir>/.trash/`` (not listed, so it can be
+    taken back by hand), an older trashed scene of the same name is replaced.
+
+    Raises:
+        SceneNameInvalid: if ``name`` is not a safe file stem (no path is ever built from it).
+        SceneNotFound: if there is no such saved scene. Examples cannot be deleted.
+    """
+    check_name(name)
+    directory = user_scenes_dir()
+    source = directory / f"{name}.json"
+    if not source.is_file():
+        raise SceneNotFound(f"scene {name!r} not found in {directory}")
+    trash = directory / ".trash"
+    trash.mkdir(exist_ok=True)
+    source.replace(trash / f"{name}.json")
 
 
 def scene_dt(scene: dict[str, Any]) -> float:

@@ -116,3 +116,22 @@ def test_save_rejects_bad_names_and_bad_scenes(client, user_dir):
 def test_load_path_traversal_is_404(client):
     r = client.post("/api/scene/load", json={"name": "../scenes/single_mass_spring", "source": "user"})
     assert r.status_code == 404
+
+
+def test_delete_user_scene_moves_it_to_the_trash_and_unlists_it(client, user_dir):
+    client.post("/api/scene/save", json={"name": "gone", "scene": base()})
+    client.post("/api/scene/save", json={"name": "stays", "scene": base()})
+    r = client.delete("/api/scenes/user/gone")
+    assert r.status_code == 200 and r.json() == {"deleted": "gone"}
+    assert client.get("/api/scenes").json()["user_scenes"] == ["stays"]
+    assert not (user_dir / "gone.json").exists()
+    assert (user_dir / ".trash" / "gone.json").is_file()  # kept, not listed: it can be taken back by hand
+    assert client.post("/api/scene/load", json={"name": "gone", "source": "user"}).status_code == 404
+
+
+def test_delete_rejects_unknown_scenes_bad_names_and_never_touches_examples(client, user_dir):
+    assert client.delete("/api/scenes/user/never_saved").status_code == 404
+    assert client.delete("/api/scenes/user/..%2Fscenes%2Fsingle_mass_spring").status_code in (404, 422)
+    examples = client.get("/api/scenes").json()["scenes"]
+    assert examples and client.delete(f"/api/scenes/user/{examples[0]}").status_code == 404  # an example name is not a saved scene
+    assert client.get("/api/scenes").json()["scenes"] == examples

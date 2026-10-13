@@ -40,6 +40,11 @@ export class Api {
     return this.#request('POST', '/api/scene/save', { name, scene });
   }
 
+  // Delete the saved layout `name` (user layouts only; the server keeps the file in user_scenes/.trash/).
+  async deleteUserScene(name) {
+    return this.#request('DELETE', `/api/scenes/user/${encodeURIComponent(name)}`);
+  }
+
   // Opens the WebSocket (once) and reconnects after it closes.
   connect(onMessage, onConnectionChange) {
     if (this.socket) return;
