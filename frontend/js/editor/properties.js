@@ -158,10 +158,10 @@ function stabForm(model, stab, draft) {
     info.push('An einer Masse ist das Stabende fest eingespannt: der Stab ist ein starrer Arm der Masse und dreht mit ihr (Einspannung). '
       + '„Gelenk“ macht das Ende zu einem Gelenk, das sich frei dreht.');
   }
-  // an end on a Knoten or the ground: an elastic Stab is clamped there by an Einspannung on the Knoten (a rigid one is a pin)
+  // an end on a Knoten or the ground: clamped by an Einspannung on the Knoten (a rigid Stab then is a rigid arm of it, an elastic one bends)
   const knots = clampableEnds(model.scene, stab);
-  if (section && knots.length) {
-    const standing = stab.type === 'rod' ? standingEnds(model.scene, stab).map((e) => e.side) : []; // clamped on becoming elastic
+  if (knots.length) {
+    const standing = section && stab.type === 'rod' ? standingEnds(model.scene, stab).map((e) => e.side) : []; // clamped on becoming elastic
     for (const { side, node } of knots) {
       const i = side === 'a' ? 0 : 1;
       const kind = draft[`end_${side}`] || (node && (hasEinspannung(model.scene, node.id) || standing.includes(side)) ? 'clamped' : 'hinged');
@@ -169,11 +169,9 @@ function stabForm(model, stab, draft) {
       fields.push(select(`end_${side}`, `Anschluss Ende ${side.toUpperCase()} (${node ? node.id : 'Festlager'})`, kind,
         [['clamped', 'Fest eingespannt'], ['hinged', 'Gelenk']], { reshape: true }));
     }
-    info.push('„Fest eingespannt“ setzt eine Einspannung an das Stabende: der Stab behält dort seinen Winkel und nimmt ein Moment auf (Kragarm, Stütze). '
-      + 'Sie gehört zum Knoten; weitere Stäbe an diesem Knoten sind dann ebenfalls dort eingespannt. „Gelenk“ macht daraus ein Festlager.');
-  } else if (!section && knots.length) {
-    info.push('Ein starrer Stab ist an einem Knoten oder Festlager ein Gelenk. Für ein fest eingespanntes Ende (Kragarm, Stütze) den Querschnitt wählen: '
-      + 'dann lässt sich der Anschluss am Knoten einstellen.');
+    info.push('„Fest eingespannt“ setzt eine Einspannung an das Stabende: der Stab behält dort seinen Winkel (Kragarm, Stütze). Ein starrer Stab bleibt dabei starr '
+      + '(das andere Ende ist dann fest), ein elastischer biegt sich und nimmt ein Moment auf. '
+      + 'Die Einspannung gehört zum Knoten; weitere Stäbe an diesem Knoten sind dann ebenfalls dort eingespannt. „Gelenk“ macht daraus ein Festlager.');
   }
   if (section) {
     const p = sectionProps(section);
@@ -430,8 +428,8 @@ export function applyProperties(model, id, values) {
     if (section) {
       const extra = stabParams(parsed, installedLength(model, found.obj));
       model.setStabSection(id, section, Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)));
-      setNodeEnds(model, id, parsed);
     }
+    setNodeEnds(model, id, parsed);
   } else if (kind === 'constraint' && isJoint(found.obj)) {
     if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
   } else if (kind === 'body') {
@@ -452,10 +450,9 @@ export function applyProperties(model, id, values) {
   } else if (kind === 'element' && found.obj.type === 'bar') {
     setEnds(model, id, parsed);
     const section = sectionFromValues(parsed);
-    if (section) {
-      model.updateBar(id, { section, ...stabParams(parsed, installedLength(model, found.obj)) });
-      setNodeEnds(model, id, parsed);
-    } else model.setStabSection(id, null);
+    if (section) model.updateBar(id, { section, ...stabParams(parsed, installedLength(model, found.obj)) });
+    else model.setStabSection(id, null);
+    setNodeEnds(model, id, parsed);
   } else if (kind === 'element' && 'c' in parsed) {
     model.updateElement(id, { c: parsed.c });
   } else if (kind === 'element' && 'k' in parsed) {

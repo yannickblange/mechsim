@@ -16,7 +16,7 @@ namespace ms {
 // becomes taut the outward velocity is removed (inelastic).
 // Both: C = L - |pb - pa|, so the multiplier is the axial force, tension positive.
 //
-// A rod whose end sits on a block or a disc is clamped there (v0.7b, an Einspannung: the Stab keeps its angle to the
+// A rod whose end sits on a block or a disc, or on a node that has an Einspannung (v0.7c), is clamped there (v0.7b, an Einspannung: the Stab keeps its angle to the
 // mass; `params.hinged_a` / `hinged_b` = true keep the end pinned). The rod is then a rigid arm of that mass, and its
 // other end sticks to the arm's tip: the two equations of a pin joint between that end and the point of the mass the
 // tip started at (rod clamped at both ends: a weld, 3 equations). Its force is the part of the joint force along the rod.

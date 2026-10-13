@@ -53,5 +53,18 @@ Checked: `tests/frontend/v07.test.mjs`; with the native engine, `buckling_column
 
 The Stab tool has a checkbox **Enden an Flächen fest einspannen** (above the hint line, off by default, kept between Stabs). With it on, an end whose Knoten lands on a
 surface and has no support yet gets an Einspannung on that surface (`addRod({ clampOnSurfaces })`, one undo step); a Knoten that other Stabs share (a Fachwerk joint) is clamped too
-when the box is on, because it was asked for. Off, nothing changes: a floor node of a truss must not carry a support of its own. The Stab stays rigid; the Einspannung
-acts on it once it is made elastic (the form then shows the end as *Fest eingespannt*). Tool options are a new generic hook (`Tool.option` / `setOption`, `Editor.buildOption`).
+when the box is on, because it was asked for. Off, nothing changes: a floor node of a truss must not carry a support of its own. The Stab stays rigid; since v0.7c the Einspannung clamps it as a rigid cantilever, and it bends once the Stab is made elastic. Tool options are a new generic hook (`Tool.option` / `setOption`, `Editor.buildOption`).
+
+### v0.7c: a rigid Stab on a node with an Einspannung is a rigid cantilever; bend selector for elastic Stabs
+
+Found with the saved layouts `Stab beispiel` / `Stab beispiel 2`: a rigid Stab on a node with an Einspannung (E1) was only a pin, so under the tip load the top swung
+round like a pendulum, although the foot was "fest eingespannt". (Chosen: option B, clamp rigid Stabs in the engine; not "make it elastic" and not "only a hint".)
+
+- **Engine.** `scene_loader.cpp` finds the nodes with a `fixed_support` before it loads the elements *and* constraints and gives each rod end on such a node the internal
+  `params.node_clamped_a / _b`; `Link` (`link.cpp`) clamps that end like an end on a block (rigid arm, 2 equations; the weld if both ends). The far end of the rod is then
+  held: the Stab is a rigid cantilever, E1 reports `F` and the moment `F L`. Behaviour change: a rigid Stab on a node with an Einspannung used to be a pin. No scene
+  in `scenes/` or the tests does that; a truss whose floor node has an Einspannung and members to several free nodes now fixes those nodes (use a Festlager there).
+- **Editor.** The Stab form shows *Anschluss Ende* for every end on a Knoten or ground Festlager, rigid Stabs too; `stabClamps` (the clamp markers) counts rigid ones.
+- **Why `Stab beispiel 2` "does not bend".** Its left Stab was already elastic (40 mm square steel, 0,9 m, 500 N): `P L^3 / 3 E I` = 2,7 mm at the tip (the undamped swing reaches 2x that), tip
+  rotation 0,26 degrees - correct, and invisible at true scale. The **Biegung** selector (x 10 / x 50 / x 200) that exaggerates it was only shown for scenes with a beam body; it
+  now also shows when there is an elastic Stab (`main.js`, `index.html` label).

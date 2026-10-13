@@ -128,6 +128,11 @@ the third equation is the joint's `phi_M - phi_F - dphi_0`. The multiplier is th
 block; **two clamped rods from the ground to one block over-determine it** (it cannot move at all): the engine reports a singular system, and
 `hinged_*` is the way to hang a block from two Stabs. Ends on nodes, beams and the ground stay pins (a node with an Einspannung clamps an elastic Stab, v0.7).
 An elastic Stab on a block or disc is clamped in the same way: its section there has the rotation of the mass, and the Euler load uses `K = 0.699 / 0.5`.
+*On a node with an Einspannung (v0.7c).* A rod end on a **node that has a `fixed_support`** is clamped the same way, rigid Stabs too (the elastic ones have been since v0.7): the rod is
+a rigid arm of the node, whose rotation the support holds, so the far end is held at its lever: **a rigid cantilever** (the far end does not move, the support carries `F` and the moment `F L`; to see
+it bend, make the Stab elastic). The loader sets the internal `params.node_clamped_a / _b` of the rod from the scene, so saved scenes need nothing new; `hinged_*` does not apply to nodes (take the
+Einspannung off the node: the editor's *Gelenk* turns it into a Festlager). A Festlager on the node leaves the rod a pin. Checked: `tests/validation/test_v07b_physics.py` (`mast`).
+
 Checked: `tests/native/constraints/test_link.cpp` (physical pendulum on a clamped rod, the weld, hinged unchanged),
 `tests/validation/test_v07b_physics.py` (Kreis Feder).
 

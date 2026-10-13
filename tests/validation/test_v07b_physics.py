@@ -84,3 +84,41 @@ def test_hinged_stabs_let_the_nodes_turn_against_the_disc():
         abs(math.atan2(b["N1"]["y"] - b["m1"]["y"], b["N1"]["x"] - b["m1"]["x"]) - b["m1"]["phi"]) for b in bodies
     )
     assert worst > 0.05
+
+
+# --- v0.7c: a rigid Stab on a node with an Einspannung is a rigid cantilever -----------------------------------
+
+def mast(clamped: bool):
+    """A rigid Stab of length 1 m from a floor node to a free node with 500 N sideways; the floor node has an Einspannung
+    (clamped) or a Festlager."""
+    support = "fixed_support" if clamped else "pin_support"
+    return {
+        "version": "0.4", "gravity": [0, -9.81], "solver": {"dt": 0.001},
+        "bodies": [
+            {"id": "N1", "type": "node", "position": [0, 0], "angle": 0, "params": {"mass": 1.0}},
+            {"id": "N2", "type": "node", "position": [0, 1], "angle": 0, "params": {"mass": 1.0}},
+        ],
+        "elements": [{"id": "F1", "type": "load", "body": "N2", "point": [0, 0], "params": {"force": [-500, 0], "moment": 0, "mode": "constant"}}],
+        "constraints": [
+            {"id": "E1", "type": support, "body": "N1", "point": [0, 0], "surface": None, "params": {"angle": 0}},
+            {"id": "S1", "type": "rod", "a": {"body": "N1", "point": [0, 0]}, "b": {"body": "N2", "point": [0, 0]}, "params": {}},
+        ],
+    }
+
+
+def test_a_rigid_stab_on_an_einspannung_holds_its_tip_and_the_support_carries_the_moment():
+    with Simulation(mast(True)) as sim:
+        sim.step(n=1500)
+        f = sim.frame()
+    n2 = next(b for b in f["bodies"] if b["id"] == "N2")
+    assert n2["x"] == pytest.approx(0.0, abs=2e-3) and n2["y"] == pytest.approx(1.0, abs=2e-3)  # a rigid arm: it does not bend or swing
+    e1 = next(c for c in f["constraints"] if c["id"] == "E1")
+    assert e1["reaction"][0] == pytest.approx(500.0, abs=1.0)  # the load, sideways
+    assert e1["reaction"][2] == pytest.approx(-500.0 * 1.0, abs=2.0)  # F L: the load to the left on a 1 m arm
+
+
+def test_a_rigid_stab_on_a_festlager_is_still_a_pin_and_falls_over():
+    with Simulation(mast(False)) as sim:
+        sim.step(n=1500)
+        n2 = next(b for b in sim.frame()["bodies"] if b["id"] == "N2")
+    assert n2["x"] < -0.5  # swung out to the left: a pendulum, nothing keeps its angle

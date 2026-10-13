@@ -312,11 +312,11 @@ test('stabClamps / massEnds: ends on blocks and discs are clamped, nodes and the
   assert.deepEqual(massEnds(m.scene, stab), ['a']);
   stab.params = { hinged_a: true };
   assert.deepEqual(stabClamps(m.scene, stab), [false, false]);
-  // an elastic Stab is also clamped at a node with an Einspannung; a rigid one is not
+  // a Stab, rigid or elastic, is also clamped at a node with an Einspannung
   const b = m.scene.bodies.find((x) => x.type === 'node').id;
   m.addSupport('fixed_support', { body: b, point: [0, 0] });
   assert.deepEqual(stabClamps(m.scene, { ...stab, type: 'bar' }), [false, true]);
-  assert.deepEqual(stabClamps(m.scene, stab), [false, false]);
+  assert.deepEqual(stabClamps(m.scene, stab), [false, true]);
 });
 
 test('Stab form: the end condition of an end on a mass can be chosen, and is kept when the Stab becomes elastic', () => {
@@ -324,7 +324,7 @@ test('Stab form: the end condition of an end on a mass can be chosen, and is kep
   const form = propertyFields(m, rod);
   const end = form.fields.find((f) => f.key === 'end_a');
   assert.equal(end.value, 'clamped');
-  assert.equal(form.fields.some((f) => f.key === 'end_b'), false); // the node end is always a pin
+  assert.equal(form.fields.find((f) => f.key === 'end_b').value, 'hinged'); // the node end: a pin until an Einspannung is put on it
   assert.match(form.info.join(' '), /starrer Arm/);
 
   assert.equal(applyProperties(m, rod, { sectionType: 'rigid', end_a: 'hinged' }).ok, true);
@@ -356,15 +356,29 @@ const mast = () => { // a Stab from a node in free space (not on any surface) to
 };
 const SECTION = { sectionType: 'square', sec_a: '40', segments: 4, massMode: 'steel', damping: 5, bow: '0,02' };
 
-test('Stab form: a rigid Stab offers no Einspannung at a Knoten and says why; an elastic one offers it per Knoten end', () => {
+test('Stab form: rigid and elastic Stabs offer the end condition per Knoten end; the Euler load follows the choice', () => {
   const { m, id } = mast();
-  const rigid = propertyFields(m, id);
-  assert.equal(rigid.fields.some((f) => f.key.startsWith('end_')), false);
-  assert.match(rigid.info.join(' '), /starrer Stab ist an einem Knoten oder Festlager ein Gelenk/);
-  const elastic = propertyFields(m, id, { sectionType: 'square' });
-  assert.deepEqual(elastic.fields.filter((f) => f.key.startsWith('end_')).map((f) => [f.key, f.value]), [['end_a', 'hinged'], ['end_b', 'hinged']]);
-  assert.match(elastic.info.join(' '), /Eulerfall 2/);
+  const ends = (form) => form.fields.filter((f) => f.key.startsWith('end_')).map((f) => [f.key, f.value]);
+  assert.deepEqual(ends(propertyFields(m, id)), [['end_a', 'hinged'], ['end_b', 'hinged']]); // rigid
+  assert.deepEqual(ends(propertyFields(m, id, { sectionType: 'square' })), [['end_a', 'hinged'], ['end_b', 'hinged']]);
+  assert.match(propertyFields(m, id, { sectionType: 'square' }).info.join(' '), /Eulerfall 2/);
   assert.match(propertyFields(m, id, { sectionType: 'square', end_a: 'clamped' }).info.join(' '), /Eulerfall 3/);
+});
+
+test('Stab form: a rigid Stab can be fest eingespannt at a Knoten (an Einspannung on it) and released to a Festlager', () => {
+  const { m, id } = mast();
+  assert.equal(applyProperties(m, id, { sectionType: 'rigid', end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  assert.equal(m.find(id).obj.type, 'rod');
+  const [E, ...rest] = supports(m);
+  assert.equal(rest.length, 0);
+  assert.deepEqual([E.type, E.body], ['fixed_support', m.find(id).obj.a.body]);
+  assert.deepEqual(stabClamps(m.scene, m.find(id).obj), [true, false]);
+  assert.equal(propertyFields(m, id).fields.find((f) => f.key === 'end_a').value, 'clamped');
+  // elastic and back: the Einspannung stays with the Knoten
+  assert.equal(applyProperties(m, id, { ...SECTION, end_a: 'clamped', end_b: 'hinged' }).ok, true);
+  assert.equal(supports(m).length, 1);
+  assert.equal(applyProperties(m, id, { sectionType: 'rigid', end_a: 'hinged', end_b: 'hinged' }).ok, true);
+  assert.deepEqual(supports(m).map((c) => c.type), ['pin_support']);
 });
 
 test('Stab form: "Fest eingespannt" at a Knoten in free space puts an Einspannung on it, "Gelenk" removes it', () => {

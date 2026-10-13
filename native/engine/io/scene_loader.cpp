@@ -88,8 +88,18 @@ void loadElement(const json& rawSpec, const BeamPlans& beams, const std::set<std
     world.elements.push_back(callFactory(make, spec, world, id));
 }
 
-void loadConstraint(const json& rawSpec, const BeamPlans& beams, World& world, std::set<std::string>& ids) {
-    const json spec = remapBeamAnchors(rawSpec, beams);
+void loadConstraint(const json& rawSpec, const BeamPlans& beams, const std::set<std::string>& clampedNodes, World& world,
+                    std::set<std::string>& ids) {
+    json spec = remapBeamAnchors(rawSpec, beams);
+    if (spec.value("type", "") == "rod") {  // v0.7c: a rigid Stab is clamped at a node that has an Einspannung (like the elastic one)
+        for (const char* side : {"a", "b"}) {
+            const json& end = spec.at(side);
+            if (end.contains("body") && end["body"].is_string() && clampedNodes.count(end["body"].get<std::string>()) > 0) {
+                if (!spec.contains("params")) spec["params"] = json::object();
+                spec["params"][std::string("node_clamped_") + side] = true;
+            }
+        }
+    }
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
     const std::string type = spec.at("type").get<std::string>();
@@ -125,24 +135,25 @@ std::unique_ptr<World> build(const json& scene) {
             loadBody(spec, *world, ids);
         }
     }
-    if (scene.contains("elements")) {
-        // v0.7: an Einspannung (fixed_support) on a node clamps the elastic Stabs that end there (they hinge otherwise)
-        std::set<std::string> nodeIds, clampedNodes;
-        for (const json& spec : scene.at("bodies")) {
-            if (spec.at("type").get<std::string>() == "node") nodeIds.insert(spec.at("id").get<std::string>());
-        }
-        if (scene.contains("constraints")) {
-            for (const json& spec : scene["constraints"]) {
-                if (spec.value("type", "") == "fixed_support" && spec.contains("body") && spec["body"].is_string() &&
-                    nodeIds.count(spec["body"].get<std::string>()) > 0) {
-                    clampedNodes.insert(spec["body"].get<std::string>());
-                }
+    // v0.7: an Einspannung (fixed_support) on a node clamps the Stabs that end there: the elastic ones (they hinge otherwise) and,
+    // since v0.7c, the rigid ones (a rigid arm of the node)
+    std::set<std::string> nodeIds, clampedNodes;
+    for (const json& spec : scene.at("bodies")) {
+        if (spec.at("type").get<std::string>() == "node") nodeIds.insert(spec.at("id").get<std::string>());
+    }
+    if (scene.contains("constraints")) {
+        for (const json& spec : scene["constraints"]) {
+            if (spec.value("type", "") == "fixed_support" && spec.contains("body") && spec["body"].is_string() &&
+                nodeIds.count(spec["body"].get<std::string>()) > 0) {
+                clampedNodes.insert(spec["body"].get<std::string>());
             }
         }
+    }
+    if (scene.contains("elements")) {
         for (const json& spec : scene["elements"]) loadElement(spec, beams, clampedNodes, *world, ids);
     }
     if (scene.contains("constraints")) {
-        for (const json& spec : scene["constraints"]) loadConstraint(spec, beams, *world, ids);
+        for (const json& spec : scene["constraints"]) loadConstraint(spec, beams, clampedNodes, *world, ids);
     }
     // "surfaces" (v0.2) are drawing/editor geometry: supports carry their own angle, so the
     // engine ignores them.

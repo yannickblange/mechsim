@@ -206,15 +206,17 @@ std::unique_ptr<Constraint> make(Link::Kind kind, const nlohmann::json& spec, co
         if (d < 1e-6) throw std::runtime_error(what + ": the ends coincide");
         l->length = d;
         if (kind == Link::Kind::Rod) {
-            // clamped to a block or a disc (an Einspannung), unless params.hinged_a / hinged_b say the end is a pin
+            // clamped to a block or a disc (an Einspannung), unless params.hinged_a / hinged_b say the end is a pin; or to a
+            // node that has an Einspannung (the loader sets params.node_clamped_a / _b, v0.7c)
             const nlohmann::json params = spec.contains("params") ? spec["params"] : nlohmann::json::object();
-            auto clamped = [&](const Anchor& e, const char* hinged) {
+            auto clamped = [&](const Anchor& e, const char* hinged, const char* nodeClamped) {
                 if (e.body == GROUND) return false;
                 const std::string& t = world.bodies[e.body].type;
+                if (t == "node") return params.value(nodeClamped, false);
                 return (t == "block" || t == "disc") && !params.value(hinged, false);
             };
-            l->clampA = clamped(l->a, "hinged_a");
-            l->clampB = clamped(l->b, "hinged_b");
+            l->clampA = clamped(l->a, "hinged_a", "node_clamped_a");
+            l->clampB = clamped(l->b, "hinged_b", "node_clamped_b");
             if (l->clampA || l->clampB) {
                 l->arm_ = true;
                 l->weld_ = l->clampA && l->clampB;

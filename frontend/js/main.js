@@ -125,9 +125,9 @@ function updateUi() {
   ui.edit.textContent = editing ? 'Fertig' : 'Bearbeiten';
   ui.edit.setAttribute('aria-pressed', String(editing));
   ui.editControls.hidden = !editing;
-  // the bending selector only matters when there is a beam (in the scene being edited or shown)
+  // the bending selector only matters when something bends: a beam or an elastic Stab (in the scene being edited or shown)
   const shown = editing ? model.scene : state.scene;
-  ui.bendField.hidden = !(shown && (shown.bodies || []).some((b) => b.type === 'beam'));
+  ui.bendField.hidden = !(shown && ((shown.bodies || []).some((b) => b.type === 'beam') || (shown.elements || []).some((e) => e.type === 'bar')));
   if (ui.bend.value !== String(renderer.bendScale)) ui.bend.value = String(renderer.bendScale);
   const dark = currentTheme() === 'dark';
   ui.theme.setAttribute('aria-pressed', String(dark));
