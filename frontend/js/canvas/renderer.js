@@ -1,6 +1,8 @@
 // renderer.js - draws grid, constraints, elements and bodies.
 import { beamBendRef, stabBendRef, stabClamps } from '../editor/ends.js';
+import { surfacePath } from '../editor/geometry.js';
 import { Camera } from './camera.js';
+import { drawContacts } from './symbols/contact.js';
 import { drawGrid } from './grid.js';
 import {
   bodySymbols, constraintSymbols, drawSpringGhost, drawSurface, elementSymbols, supportHeight,
@@ -111,7 +113,7 @@ export class Renderer {
       return;
     }
     const points = (scene.bodies || []).map((b) => b.position);
-    for (const surface of scene.surfaces || []) points.push(surface.p1, surface.p2);
+    for (const surface of scene.surfaces || []) points.push(...surfacePath(surface));
     for (const c of scene.constraints || []) {
       if (c.type === 'pin_support' && c.body === null) points.push(c.point);
     }
@@ -148,6 +150,7 @@ export class Renderer {
     this.drawAll(f.elements, this.elements, elementSymbols);
     this.drawAll(f.bodies, this.bodies, bodySymbols);
     this.drawAll(this.withSupportHeights(f.constraints), this.constraints, constraintSymbols);
+    drawContacts(ctx, cam, f.contacts, theme); // v0.8
     if (this.overlay) this.overlay(ctx, cam, theme);
   }
 

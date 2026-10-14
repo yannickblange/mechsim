@@ -1,4 +1,4 @@
-# Units and conventions (frozen for v0.1; v0.2 and v0.3 / v0.3c additions at the end)
+# Units and conventions (frozen for v0.1; v0.2 to v0.8 additions at the end)
 
 - **SI units everywhere**: m, kg, s, N, N·m, rad. No mm, no degrees inside the engine or JSON.
 - **Coordinate system**: right-handed, x to the right, **y up**. Gravity is a vector, default `[0, -9.81]`.
@@ -109,3 +109,14 @@
 - **Displacement graphs** (frontend): displacement = pose minus the pose at the start of the recording (t = 0), x and y in m (shown
   in mm below 5 cm), rotation in degrees.
 - **Scene `view.bend`** (1, 10, 50 or 200): display only, shows the bending of beams that many times as large.
+
+## v0.8 additions
+
+- **Surfaces collide.** A surface is a segment `p1 -> p2` or a polyline `points` (its ends are `p1` and `p2`). **Blocks and discs rest on its left-hand side** (looking along the
+  direction of travel) and cannot cross it; the hatching, the solid side, is on the right. `friction` is the Coulomb coefficient `mu >= 0` (default 0: frictionless) and
+  `restitution` the coefficient `e` in `[0, 1]` (default 0: no bounce). Knoten, Staebe, springs and beams do not collide; a mass that a support attaches to a surface does not
+  collide with that surface. A surface drawn the wrong way round is turned with the editor's *Seiten tauschen*.
+- **Curves** (editor): `shape` `"spline"` (a centripetal Catmull-Rom spline through the `control` points) or `"arc"` (a half circle on the diameter `control[0] - control[1]`,
+  a bowl open upwards or a dome) or `"line"`; `points` is the polyline the engine uses (turning by at most 1 degree per vertex). `shape` and `control` only serve the editor.
+- **Frame `contacts`**: per contact point `body`, `surface`, `point`, `normal` (unit, surface -> body, the direction of the normal force), `gap` (m), `normal_force` (N, >= 0),
+  `friction_force` (N, along `perp(normal)`, on the body) and `sliding`. Absent when nothing touches a surface. The frontend draws them (normal solid, friction dashed).

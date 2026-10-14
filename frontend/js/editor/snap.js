@@ -1,6 +1,6 @@
 // snap.js - where does the pointer "stick"? Pure; used by every editor tool.
 import {
-  bodyFeaturePoints, bodyToWorld, closestOnSegment, dist, nearestOnOutline, pointInBody,
+  bodyFeaturePoints, bodyToWorld, closestOnSurface, dist, nearestOnOutline, pointInBody,
   roundTo, tidy, tidyPoint, worldToLocal,
 } from './geometry.js';
 
@@ -126,7 +126,7 @@ function snapToSurface(world, surfaces, tol) {
 
   let line = null;
   for (const s of surfaces) {
-    const hit = closestOnSegment(world, s.p1, s.p2);
+    const hit = closestOnSurface(world, s);
     if (hit.dist <= tol && (!line || hit.dist < line.dist)) line = { dist: hit.dist, point: hit.point, surface: s.id };
   }
   return line && result(tidyPoint(line.point), 'surface', line.surface);
@@ -135,7 +135,7 @@ function snapToSurface(world, surfaces, tol) {
 // The surface a point lies on (within `tol` m), or null: where a snapped end sits exactly on a surface.
 export function surfaceAtPoint(scene, point, tol = 1e-3) {
   for (const s of scene.surfaces || []) {
-    if (closestOnSegment(point, s.p1, s.p2).dist <= tol) return s;
+    if (closestOnSurface(point, s).dist <= tol) return s;
   }
   return null;
 }
@@ -145,7 +145,7 @@ export function surfaceNear(world, surfaces, scale, tolPx = SNAP_TOLERANCE_PX) {
   const tol = tolPx / scale;
   let best = null;
   for (const s of surfaces || []) {
-    const hit = closestOnSegment(world, s.p1, s.p2);
+    const hit = closestOnSurface(world, s);
     if (hit.dist <= tol && (!best || hit.dist < best.dist)) best = { surface: s, dist: hit.dist };
   }
   return best && best.surface;

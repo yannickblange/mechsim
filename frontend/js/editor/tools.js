@@ -5,9 +5,10 @@
 // (the canvas must then not start panning). Every tool also has move(), up(), key(name), cancel().
 import {
   add, dist, dot, length, normalizeAngle, rotate, roundTo, snapDirection, snapDirectionTo, snapOntoSurfaceAtAngles,
-  snapSegmentEnd, sub, supportAngleAt, surfaceAngle, tidy, worldToLocal,
+  nearestSegment, snapSegmentEnd, sub, supportAngleAt, surfaceAngle, surfaceLength, tidy, worldToLocal,
 } from './geometry.js';
 import { decimal } from '../format.js';
+import { halfCircle, sampleSpline } from './surfaces.js';
 import { FORCE_M_PER_N, hitTest, anchorWorld, moveTarget } from './hit.js';
 import {
   contactOffset, jointGroup, linkProblem, moveBodies, movePin, moveSurface, reattachEnd,
@@ -54,6 +55,9 @@ class Tool {
   // an on / off choice of the tool, shown as a checkbox: { label, checked } or null; setOption(checked) changes it
   get option() { return null; }
   setOption() {}
+  // a choice of the tool shown as a row of buttons: { label, items: [{ id, label, title }], value } or null; setMenu(id) picks one
+  get menu() { return null; }
+  setMenu() {}
 }
 
 // --- select -------------------------------------------------------------------------------------
@@ -155,7 +159,7 @@ export class RectTool extends TwoPointTool {
     if (this.p1 && this.start && !this.angleSet) {
       // Starting on a surface aligns the rectangle with it (width along the surface).
       const s = this.start.surface && this.scene.surfaces.find((x) => x.id === this.start.surface);
-      this.angle = s ? alignmentAngle(surfaceAngle(s)) : 0;
+      this.angle = s ? alignmentAngle(surfaceAngle(s, this.p1)) : 0; // (a curve: its direction where the rectangle starts)
       this.angleSet = true;
     }
     return consumed;
@@ -231,13 +235,115 @@ export class CircleTool extends TwoPointTool {
   }
 }
 
+// --- surface: a straight line, a spline through points, or a preset half circle ------------------------------
+
+export const SURFACE_SHAPES = [
+  { id: 'line', label: 'Gerade', title: 'Eine gerade Fläche: Anfang und Ende anklicken oder ziehen' },
+  { id: 'spline', label: 'Spline', title: 'Eine glatte Kurve durch die angeklickten Punkte' },
+  { id: 'bowl', label: 'Halbkreis ∪', title: 'Halbkreis als Mulde (nach oben offen); der Durchmesser wird gezogen' },
+  { id: 'dome', label: 'Halbkreis ∩', title: 'Halbkreis als Wölbung (nach unten offen); der Durchmesser wird gezogen' },
+];
+
+const SPLINE_CLOSE_PX = 8; // a click this close to the previous point of a spline finishes it
+const MAX_SPLINE_POINTS = 40;
+
 export class SurfaceTool extends TwoPointTool {
+  constructor(env) {
+    super(env);
+    this.shape = 'line';
+    this.pts = []; // the control points of the spline being drawn
+    this.cursor = null;
+  }
+
+  get menu() {
+    return { label: 'Form', items: SURFACE_SHAPES, value: this.shape };
+  }
+
+  setMenu(id) {
+    if (!SURFACE_SHAPES.some((x) => x.id === id) || id === this.shape) return;
+    this.cancel();
+    this.shape = id;
+  }
+
   get hint() {
+    if (this.shape === 'spline') {
+      return this.pts.length
+        ? 'Weitere Punkte anklicken. Doppelklick oder Eingabetaste beendet die Kurve, Esc bricht ab.'
+        : 'Die Punkte der Kurve nacheinander anklicken (mindestens drei für eine Kurve); die Kurve läuft durch sie. Die Fest-Seite (schraffiert) liegt rechts der Zeichenrichtung.';
+    }
+    if (this.shape === 'bowl' || this.shape === 'dome') {
+      return this.p1
+        ? 'Loslassen bzw. das Ende des Durchmessers anklicken.'
+        : `Den Durchmesser des Halbkreises ziehen (${this.shape === 'bowl' ? 'Mulde: nach oben offen' : 'Wölbung: nach unten offen'}).`;
+    }
     return this.p1
-      ? 'Loslassen bzw. den Endpunkt anklicken. Der Winkel rastet bei 0, 30, 45, 60, 90 Grad ein (Umschalt gedrückt halten für freie Winkel).'
+      ? 'Loslassen bzw. den Endpunkt anklicken. Der Winkel rastet bei 0, 30, 45, 60, 90 Grad ein (Umschalt gedrückt halten für freie Winkel). Die Fest-Seite (schraffiert) liegt rechts der Zeichenrichtung.'
       : 'Ziehen, um eine feste Fläche zu zeichnen.';
   }
 
+  // --- spline: click the points ---
+  down(e) {
+    if (this.shape !== 'spline') return super.down(e);
+    this.error = null;
+    const p = this.snap(e.world, { surfaces: true, bodies: false }).point;
+    const last = this.pts[this.pts.length - 1];
+    if (last && dist(last, e.world) * this.scale <= SPLINE_CLOSE_PX) { // a second click on the last point: done
+      this.finishSpline();
+      return true;
+    }
+    if (this.pts.length >= MAX_SPLINE_POINTS) {
+      this.error = `Höchstens ${MAX_SPLINE_POINTS} Punkte: Eingabetaste beendet die Kurve.`;
+      return true;
+    }
+    this.pts.push(p);
+    this.cursor = p;
+    return true;
+  }
+
+  move(e) {
+    if (this.shape !== 'spline') return super.move(e);
+    const s = this.snap(e.world, { surfaces: true, bodies: false });
+    this.cursor = s.point;
+    this.marker = { point: s.point, kind: s.kind };
+  }
+
+  up(e) {
+    if (this.shape !== 'spline') super.up(e);
+  }
+
+  key(name) {
+    if (this.shape === 'spline' && this.pts.length) {
+      if (name === 'Enter') {
+        this.finishSpline();
+        return true;
+      }
+      if (name === 'Escape') {
+        this.cancel();
+        return true;
+      }
+      return false;
+    }
+    return super.key(name);
+  }
+
+  finishSpline() {
+    const pts = this.pts;
+    this.pts = [];
+    this.cursor = null;
+    if (pts.length < 2 || surfaceLength({ p1: pts[0], p2: pts[pts.length - 1], points: pts }) < MIN_SIZE_M) {
+      this.error = 'Zu klein – bitte mindestens zwei Punkte setzen.';
+      return;
+    }
+    this.env.created('surface', this.env.model.addCurve('spline', pts));
+  }
+
+  cancel() {
+    super.cancel();
+    this.pts = [];
+    this.cursor = null;
+  }
+
+  // --- line and half circles: drag the two end points ---
   constrainEnd(p1, world) {
     if (this.shift) return world;
     return snapSegmentEnd(p1, world, { step: this.step });
@@ -245,16 +351,29 @@ export class SurfaceTool extends TwoPointTool {
 
   commit(p1, p2) {
     if (dist(p1, p2) < MIN_SIZE_M) return false;
-    const id = this.env.model.addSurface(p1, p2);
+    const id = this.shape === 'line' ? this.env.model.addSurface(p1, p2) : this.env.model.addCurve('arc', [p1, p2], this.shape);
     this.env.created('surface', id);
     return true;
   }
 
   get preview() {
+    if (this.shape === 'spline') {
+      if (!this.pts.length) return null;
+      const through = this.cursor && dist(this.cursor, this.pts[this.pts.length - 1]) > 1e-9 ? [...this.pts, this.cursor] : this.pts;
+      const points = through.length >= 3 ? sampleSpline(through) : through;
+      const last = points[points.length - 1];
+      return {
+        type: 'surface', p1: points[0], p2: last, points, handles: this.pts, labelAt: last,
+        label: `${this.pts.length} Punkt${this.pts.length === 1 ? '' : 'e'}, ${fmt(surfaceLength({ p1: points[0], p2: last, points }))} m`,
+      };
+    }
     if (!this.p1) return null;
     const a = surfaceAngle({ p1: this.p1, p2: this.end });
     const deg = Math.round((a * 180) / Math.PI);
-    return { type: 'surface', p1: this.p1, p2: this.end, label: `${fmt(dist(this.p1, this.end))} m, ${deg}°` };
+    if (this.shape === 'line') return { type: 'surface', p1: this.p1, p2: this.end, label: `${fmt(dist(this.p1, this.end))} m, ${deg}°` };
+    if (dist(this.p1, this.end) < 1e-9) return null;
+    const points = halfCircle(this.p1, this.end, this.shape);
+    return { type: 'surface', p1: points[0], p2: points[points.length - 1], points, label: `r = ${fmt(dist(this.p1, this.end) / 2)} m` };
   }
 }
 
@@ -301,7 +420,7 @@ export class SpringTool extends Tool {
     const surfaceOf = (id) => this.scene.surfaces.find((s) => s.id === id);
     if (!this.shift && first && first.surface && surfaceOf(first.surface)) {
       // along the allowed ray from the first end: points of masses on it, no grid or feature snap that would leave it
-      const on = snapDirectionTo(first.world, world, surfaceAngle(surfaceOf(first.surface)));
+      const on = snapDirectionTo(first.world, world, surfaceAngle(surfaceOf(first.surface), first.world));
       const s = this.snap(on, { interior: true, bodies: false, grid: false, free: false });
       return { body: s.body, point: s.body ? s.local : s.point, world: s.point, kind: s.kind, surface: null };
     }
@@ -625,7 +744,8 @@ export class SupportTool extends Tool {
     const s = this.scene.surfaces.find((x) => x.id === p.surfaceId);
     const nx = -Math.sin(p.angle);
     const ny = Math.cos(p.angle);
-    return s ? Math.max(0, (p.point[0] - s.p1[0]) * nx + (p.point[1] - s.p1[1]) * ny) : 0;
+    const origin = s && nearestSegment(s, p.point).p1; // (a curve: its segment nearest to the point)
+    return s ? Math.max(0, (p.point[0] - origin[0]) * nx + (p.point[1] - origin[1]) * ny) : 0;
   }
 
   cancel() {

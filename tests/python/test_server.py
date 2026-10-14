@@ -13,6 +13,7 @@ from mechsim.server.mock import MockSimulation
 
 SCENES = [
     "beam_i_section",
+    "bouncing_ball",
     "buckling_columns",
     "cantilever_beam",
     "cantilever_clamp",
@@ -20,8 +21,11 @@ SCENES = [
     "double_pendulum",
     "forced_vibration",
     "free_vibration",
+    "friction_oscillator",
+    "half_circle_bowl",
     "harmonic_oscillation",
     "impulse_pendulum",
+    "incline_friction",
     "incline_roller",
     "physical_pendulum",
     "pinned_block_spring",

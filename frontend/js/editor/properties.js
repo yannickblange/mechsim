@@ -3,7 +3,7 @@
 import { comma, decimal } from '../format.js';
 import { anchorWorld, isJoint, isLink, linkEnds } from './hit.js';
 import { clampableEnds, hasEinspannung, massEnds, stabClamps, standingEnds } from './ends.js';
-import { dist } from './geometry.js';
+import { dist, isCurved, surfaceLength, surfacePath } from './geometry.js';
 import { DEFAULT_STAB_DAMPING } from './model.js';
 import {
   E_MODULUS, SECTION_FIELDS, SECTION_LABELS, SECTION_TYPES, beamMass, defaultSection, describeSection,
@@ -31,15 +31,7 @@ export function propertyFields(model, id, draft = {}) {
   const { kind, obj } = found;
 
   if (kind === 'body') return bodyForm(obj, draft);
-  if (kind === 'surface') {
-    const len = dist(obj.p1, obj.p2);
-    const deg = (Math.atan2(obj.p2[1] - obj.p1[1], obj.p2[0] - obj.p1[0]) / RAD);
-    return {
-      title: `Fläche ${obj.id}`,
-      info: [`Länge ${fixed(len)} m, Richtung ${fixed(deg, 1)}°. Im Raum fest; Lager sitzen auf ihr.`],
-      fields: [],
-    };
-  }
+  if (kind === 'surface') return surfaceForm(obj);
   if (kind === 'constraint' && isLink(obj)) return linkForm(model, obj, draft);
   if (kind === 'constraint' && isJoint(obj)) return jointForm(obj);
   if (kind === 'constraint' && obj.type === 'pin_support' && obj.body === null) {
@@ -113,6 +105,27 @@ const SUPPORT_NOTES = {
   fixed_support: 'Sperrt x, y und die Drehung.',
   roller_support: 'Sperrt die Richtung senkrecht zur Fläche; gleitet reibungsfrei an ihr entlang.',
 };
+
+// A surface: its shape and the two numbers of the contact with blocks and discs (v0.8).
+function surfaceForm(surface) {
+  const path = surfacePath(surface);
+  const len = surfaceLength(surface);
+  const shape = isCurved(surface)
+    ? `${surface.shape === 'arc' ? 'Halbkreis' : surface.shape === 'spline' ? `Spline durch ${(surface.control || []).length} Punkte` : 'Kurve'}, ${path.length - 1} Teilstücke`
+    : `Gerade, Richtung ${fixed(Math.atan2(surface.p2[1] - surface.p1[1], surface.p2[0] - surface.p1[0]) / RAD, 1)}°`;
+  return {
+    title: `Fläche ${surface.id}`,
+    info: [`Länge ${fixed(len)} m, ${shape}. Im Raum fest; Lager sitzen auf ihr. Massen (Blöcke und Scheiben) stoßen an ihr an und liegen auf ihrer freien Seite: `
+      + 'links der Zeichenrichtung; die Fest-Seite (schraffiert) liegt rechts.',
+    'Reibungszahl μ: 0 = reibungsfrei. Haftet eine Masse, hält die Reibung bis zu μ · Normalkraft; gleitet sie, bremst μ · Normalkraft. '
+      + 'Rückprallzahl e: 0 = kein Rückprall, 1 = vollkommen elastischer Stoß.'],
+    fields: [
+      num('friction', 'Reibungszahl μ', '', surface.friction ?? 0, { min: 0 }),
+      num('restitution', 'Rückprallzahl e', '', surface.restitution ?? 0, { min: 0, max: 1 }),
+      select('side', 'Fest-Seite', 'keep', [['keep', 'wie gezeichnet'], ['flip', 'Seiten tauschen']]),
+    ],
+  };
+}
 
 const JOINT_NAMES = { pin_joint: 'Gelenk', fixed_joint: 'Starre Verbindung' };
 
@@ -431,6 +444,9 @@ export function applyProperties(model, id, values) {
       model.setStabSection(id, section, Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== null)));
     }
     setNodeEnds(model, id, parsed);
+  } else if (kind === 'surface') {
+    model.updateSurface(id, { friction: parsed.friction, restitution: parsed.restitution });
+    if (parsed.side === 'flip') model.flipSurface(id);
   } else if (kind === 'constraint' && isJoint(found.obj)) {
     if (parsed.jointType !== found.obj.type) model.setJointType(id, parsed.jointType);
   } else if (kind === 'body') {

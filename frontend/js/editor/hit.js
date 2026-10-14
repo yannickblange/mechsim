@@ -2,7 +2,7 @@
 import { FORCE_M_PER_N, arrowLengthPx } from '../canvas/symbols/load.js';
 import { ropePolyline } from '../canvas/symbols/rope.js';
 import {
-  bodyArea, bodyToWorld, closestOnSegment, dist, pointInBody,
+  bodyArea, bodyToWorld, closestOnSegment, closestOnSurface, dist, pointInBody,
 } from './geometry.js';
 
 export { FORCE_M_PER_N };
@@ -124,7 +124,7 @@ export function hitTest(scene, world, scale) {
     return { kind: 'body', id: bodies[0].id };
   }
   for (const s of [...scene.surfaces].reverse()) {
-    if (closestOnSegment(world, s.p1, s.p2).dist <= px(HIT_PX.surface)) return { kind: 'surface', id: s.id };
+    if (closestOnSurface(world, s).dist <= px(HIT_PX.surface)) return { kind: 'surface', id: s.id };
   }
   return null;
 }
@@ -172,7 +172,7 @@ export function moveTarget(scene, world, scale) {
     return { type: 'body', id: bodies[0].id };
   }
   for (const s of [...scene.surfaces].reverse()) {
-    if (closestOnSegment(world, s.p1, s.p2).dist <= px(HIT_PX.surface)) return { type: 'surface', id: s.id };
+    if (closestOnSurface(world, s).dist <= px(HIT_PX.surface)) return { type: 'surface', id: s.id };
   }
   return null;
 }

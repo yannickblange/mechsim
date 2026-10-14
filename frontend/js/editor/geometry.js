@@ -82,6 +82,15 @@ export function snapDirectionTo(p1, raw, baseAngle = 0, anglesDeg = SNAP_ANGLES_
 // The point of the surface line (within the segment) that is hit by a ray from p1 at an allowed angle to the
 // surface, the one closest to `raw`; null if no such ray meets the surface. Parallel rays never do.
 export function snapOntoSurfaceAtAngles(p1, raw, surface, anglesDeg = SNAP_ANGLES_DEG) {
+  let best = null; // (a curve: its segments in turn, the angles measured from each)
+  for (const seg of surfaceSegments(surface)) {
+    const point = snapOntoSegmentAtAngles(p1, raw, seg, anglesDeg);
+    if (point && (!best || dist(point, raw) < best.d)) best = { d: dist(point, raw), point };
+  }
+  return best && best.point;
+}
+
+function snapOntoSegmentAtAngles(p1, raw, surface, anglesDeg) {
   const base = surfaceAngle(surface);
   const t = [Math.cos(base), Math.sin(base)];
   let best = null;
@@ -113,10 +122,58 @@ export function closestOnSegment(p, a, b) {
   return { point, t, dist: dist(p, point) };
 }
 
-export const surfaceAngle = (s) => Math.atan2(s.p2[1] - s.p1[1], s.p2[0] - s.p1[0]);
+// --- surfaces: a segment p1 -> p2, or a polyline `points` (v0.8) ----------------------------------
 
-// > 0 if p lies on the left-hand side of the directed segment p1 -> p2.
-export const sideOfSurface = (s, p) => cross(sub(s.p2, s.p1), sub(p, s.p1));
+export const surfacePath = (s) => (s.points && s.points.length >= 2 ? s.points : [s.p1, s.p2]);
+
+export function pathLength(path) {
+  let len = 0;
+  for (let i = 0; i + 1 < path.length; i++) len += dist(path[i], path[i + 1]);
+  return len;
+}
+
+export const surfaceLength = (s) => pathLength(surfacePath(s));
+export const isCurved = (s) => surfacePath(s).length > 2;
+
+// The segments of a surface as { p1, p2, index } objects (straight "surfaces" that the helpers below understand).
+export function surfaceSegments(s) {
+  const path = surfacePath(s);
+  const out = [];
+  for (let i = 0; i + 1 < path.length; i++) out.push({ p1: path[i], p2: path[i + 1], index: i });
+  return out;
+}
+
+// The closest point on a surface: { point, dist, index (of the segment), t (along that segment), p1, p2 (that segment) }.
+export function closestOnSurface(p, s) {
+  const path = surfacePath(s);
+  let best = null;
+  for (let i = 0; i + 1 < path.length; i++) {
+    const hit = closestOnSegment(p, path[i], path[i + 1]);
+    if (!best || hit.dist < best.dist) best = { ...hit, index: i, p1: path[i], p2: path[i + 1] };
+  }
+  return best;
+}
+
+// The straight segment of the surface that `p` is nearest to ({ p1, p2 }); the surface itself if it is straight, or `p` is not given.
+export function nearestSegment(s, p) {
+  if (!p || !isCurved(s)) return { p1: s.p1, p2: s.p2 };
+  const hit = closestOnSurface(p, s);
+  return { p1: hit.p1, p2: hit.p2 };
+}
+
+// Direction of the surface (at `near`, for a curve: the direction of the segment nearest to it).
+export const surfaceAngle = (s, near = null) => {
+  const g = nearSegment(s, near);
+  return Math.atan2(g.p2[1] - g.p1[1], g.p2[0] - g.p1[0]);
+};
+
+const nearSegment = (s, near) => (near ? nearestSegment(s, near) : { p1: s.p1, p2: s.p2 });
+
+// > 0 if p lies on the left-hand side of the directed surface (a curve: of its segment nearest to p).
+export const sideOfSurface = (s, p) => {
+  const g = nearestSegment(s, p);
+  return cross(sub(g.p2, g.p1), sub(p, g.p1));
+};
 
 // --- bodies ---------------------------------------------------------------------------------
 
@@ -215,8 +272,8 @@ export function rectFromCorners(p1, p2) {
 
 // Value of a support's params.angle (see contracts/scene.schema.json): the surface direction
 // chosen so the body lies on its LEFT side. Flips by pi if the body is on the right.
-export function supportAngle(surface, bodyCenter) {
-  const a = surfaceAngle(surface);
+export function supportAngle(surface, bodyCenter, near = bodyCenter) {
+  const a = surfaceAngle(surface, near);
   return normalizeAngle(sideOfSurface(surface, bodyCenter) >= 0 ? a : a + Math.PI);
 }
 
@@ -224,10 +281,11 @@ export function supportAngle(surface, bodyCenter) {
 // distance from the surface. A point within 1 cm of the surface line (touching, up to snapping
 // noise) takes the side of the body's centre.
 export function supportAngleAt(surface, point, bodyCenter) {
-  const len = dist(surface.p1, surface.p2) || 1;
-  const side = sideOfSurface(surface, point);
-  if (Math.abs(side) / len < 0.01) return supportAngle(surface, bodyCenter);
-  return normalizeAngle(side > 0 ? surfaceAngle(surface) : surfaceAngle(surface) + Math.PI);
+  const g = nearestSegment(surface, point); // a curve: the support sits on the segment nearest to its point
+  const len = surfaceLength(surface) || 1;
+  const side = cross(sub(g.p2, g.p1), sub(point, g.p1)) / (dist(g.p1, g.p2) || 1); // distance of the point from the line, signed
+  if (Math.abs(side) / len < 0.01) return supportAngle(surface, bodyCenter, point);
+  return normalizeAngle(side > 0 ? surfaceAngle(surface, point) : surfaceAngle(surface, point) + Math.PI);
 }
 
 // --- ids ------------------------------------------------------------------------------------

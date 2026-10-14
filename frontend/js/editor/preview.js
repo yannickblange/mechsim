@@ -12,7 +12,7 @@ import { drawSurface } from '../canvas/symbols/surface.js';
 import {
   drawFixedSupport, drawPinSupport, drawRollerSupport,
 } from '../canvas/symbols/supports.js';
-import { NODE_RADIUS, bodyToWorld, blockCorners } from './geometry.js';
+import { NODE_RADIUS, bodyToWorld, blockCorners, surfacePath } from './geometry.js';
 import { defaultSection } from './section.js';
 import { connectionPoints, neighbors } from './connections.js';
 import { anchorWorld, attachedPoint, isLink, linkPath } from './hit.js';
@@ -175,8 +175,9 @@ function drawToolPreview(ctx, cam, theme, pv, scene) {
       break;
     }
     case 'surface':
-      drawSurface(ctx, cam, { p1: pv.p1, p2: pv.p2 }, theme);
-      label(ctx, cam, theme, pv.p2, pv.label);
+      drawSurface(ctx, cam, { p1: pv.p1, p2: pv.p2, points: pv.points, friction: 0 }, theme);
+      for (const q of pv.handles || []) drawHandle(ctx, cam, theme, q);
+      label(ctx, cam, theme, pv.labelAt || pv.p2, pv.label);
       break;
     case 'spring':
       if (pv.ghost) {
@@ -236,11 +237,11 @@ function drawToolPreview(ctx, cam, theme, pv, scene) {
           ctx.globalAlpha = 0.5;
           ctx.lineWidth = 5;
           ctx.strokeStyle = theme.accent;
-          const [ax, ay] = cam.toScreen(surface.p1);
-          const [bx, by] = cam.toScreen(surface.p2);
           ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(bx, by);
+          surfacePath(surface).forEach((q, i) => {
+            const [x, y] = cam.toScreen(q);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          });
           ctx.stroke();
         }
       }
@@ -327,7 +328,11 @@ function drawSelection(ctx, cam, theme, scene, sel) {
     }
   } else if (sel.kind === 'surface') {
     const s = find(scene.surfaces);
-    if (s) line(s.p1, s.p2);
+    if (s) {
+      path(surfacePath(s));
+      ctx.setLineDash([]);
+      for (const q of s.control || []) ring(q, 4); // the control points of a spline
+    }
   } else if (sel.kind === 'element') {
     const e = find(scene.elements);
     if (e && e.a && e.b) {
@@ -348,5 +353,19 @@ function drawSelection(ctx, cam, theme, scene, sel) {
       if (p) ring(p, 22);
     }
   }
+  ctx.restore();
+}
+
+// a control point of a spline that is being drawn
+function drawHandle(ctx, cam, theme, p) {
+  const [x, y] = cam.toScreen(p);
+  ctx.save();
+  ctx.fillStyle = theme.accent;
+  ctx.strokeStyle = theme.background;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }

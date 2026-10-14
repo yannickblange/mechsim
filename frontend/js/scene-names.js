@@ -2,6 +2,7 @@
 // Saved layouts show the name the user chose.
 export const SCENE_NAMES = {
   beam_i_section: 'I-Träger (Balken, gedämpft)',
+  bouncing_ball: 'Hüpfender Ball im Tal',
   buckling_columns: 'Knickstützen',
   cantilever_beam: 'Kragträger',
   cantilever_clamp: 'Eingespannter Block',
@@ -9,8 +10,11 @@ export const SCENE_NAMES = {
   double_pendulum: 'Doppelpendel',
   forced_vibration: 'Erzwungene Schwingung',
   free_vibration: 'Freie Schwingung (gedämpft)',
+  friction_oscillator: 'Masse-Feder mit Coulomb-Reibung',
+  half_circle_bowl: 'Scheibe in der Halbkreis-Mulde',
   harmonic_oscillation: 'Harmonische Schwingung',
   impulse_pendulum: 'Pendel mit Kraftstoß',
+  incline_friction: 'Schiefe Ebene mit Reibung',
   incline_roller: 'Schiefe Ebene (Loslager)',
   physical_pendulum: 'Physikalisches Pendel',
   pinned_block_spring: 'Gelagerter Block mit Feder',

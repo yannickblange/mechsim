@@ -1,0 +1,59 @@
+{
+  "version": "0.4",
+  "gravity": [0, -9.81],
+  "solver": {
+    "dt": 0.001
+  },
+  "name": "Schiefe Ebene mit Reibung",
+  "description": "Two inclines of 30 degrees. Left: friction mu = 0.25 < tan 30 = 0.577, the block slides with a = g (sin t - mu cos t) = 2.8 m/s^2 and lands on the floor (mu = 0.3), which stops it. Right: mu = 0.70 > tan 30, the block sticks (friction m g sin t = 9.8 N, normal force m g cos t = 17 N). Surfaces with friction are hatched more densely.",
+  "view": {
+    "center": [0, 0.2],
+    "width": 9.5
+  },
+  "surfaces": [
+    {
+      "id": "s1",
+      "p1": [-4.2, 1.5],
+      "p2": [-1.601924, 0],
+      "friction": 0.25
+    },
+    {
+      "id": "s2",
+      "p1": [1, 0],
+      "p2": [3.598076, 1.5],
+      "friction": 0.7
+    },
+    {
+      "id": "s3",
+      "p1": [-5, -0.4],
+      "p2": [6, -0.4],
+      "friction": 0.3
+    }
+  ],
+  "bodies": [
+    {
+      "id": "slides",
+      "type": "block",
+      "position": [-3.630385, 1.286603],
+      "angle": -0.523599,
+      "params": {
+        "mass": 2,
+        "width": 0.4,
+        "height": 0.2
+      }
+    },
+    {
+      "id": "sticks",
+      "type": "block",
+      "position": [2.335641, 0.886603],
+      "angle": 0.523599,
+      "params": {
+        "mass": 2,
+        "width": 0.4,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [],
+  "constraints": []
+}

@@ -1,4 +1,4 @@
-# Equations of motion (v0.1, extended in v0.2, v0.3, v0.4 and v0.4b)
+# Equations of motion (v0.1, extended in v0.2, v0.3, v0.4, v0.4b and v0.8)
 
 ## Coordinates
 
@@ -260,6 +260,67 @@ implementations with a decomposition into rectangles.
 Textbook checks in `tests/native/test_beam.cpp`: cantilever tip deflection and rotation, the same cantilever turned by 30 degrees,
 simply supported beam `5 q L^4 / 384 E I`, free fall and rest of rotated beams (no strain), conservation of momentum and angular momentum
 of a spinning free beam, frequency of a cantilever with a tip mass `omega = sqrt(3 E I / L^3 (M + 33/140 m))`.
+
+### Contact with surfaces (blocks and discs), v0.8
+
+A **surface** is a polyline (a straight surface has two points); its free side is the **left** of the direction of travel, the hatching (the solid
+side) is on the right. A block or a disc rests on it, slides along it with Coulomb friction `mu` (`friction`, default 0) and bounces with the
+coefficient of restitution `e` (`restitution`, default 0). Nodes, Staebe, springs and bendable beams do not collide.
+
+*Features.* Every step the possible contacts are found from the current pose (a contact is kept if its gap is below 5 mm plus what the mass travels
+in the step). For a mass touching a surface there is, per contact, a unit normal `n` (from the surface into the body: the direction of the normal
+force), the lever `r` from the centre of mass to the contact point on the body, and the gap `g` (distance, negative = penetration):
+
+| contact | gap | normal | lever |
+|---|---|---|---|
+| corner of a block on the inside of a segment | `n . (p - a)` | the segment's left normal | `p - x` |
+| vertex of the surface (a peak, an end of the line) against an edge of a block | `n_e . (w - a_e)` with the edge's outward normal `n_e` | `-n_e` | foot of the vertex on the edge `- x` |
+| disc on the inside of a segment | `n . (x - a) - R` | the segment's left normal | `-R n` |
+| disc against a vertex | `|x - w| - R` | `(x - w) / |x - w|` | `-R n` |
+
+A vertex is the nearest feature of a disc only beyond the end of the segment before it and before the start of the one after it; a vertex within 2 mm
+of the end of a block edge counts as the corner of the block, which the corner contacts cover. Of the contacts of one disc (or one corner of a block) with
+one surface only the nearest is kept: where two segments of a polyline meet, the same mass lies over both, and two sticking contacts would wedge it.
+A mass that a support (Festlager, Loslager, Einspannung) attaches to a surface does not collide with that surface: the support is the connection there.
+
+*Rows.* With `t = perp(n)`, the normal and tangential velocity of the contact point are `v_n = J_n v`, `v_t = J_t v` with
+
+```
+J_n = [ n_x  n_y  cross(r, n) ]        J_t = [ t_x  t_y  cross(r, t) ]        (the three columns of the body: x, y, phi)
+```
+
+(`J_n^T` is the generalised force of a unit normal force at the contact point, as always for a contact on a rigid body).
+
+*Unilateral condition.* The step is semi-implicit Euler as before, `v+ = v + dt a`, `q+ = q + dt v+`, so the condition is stated for the new velocity:
+
+```
+g + dt J_n v+ >= 0                    the mass may arrive at the surface during the step, not cross it     (g >= 0)
+J_n v+  >=  min(-erp g / dt, 0.5 m/s)   a penetration is pushed out at a share erp = 0.1 of it per step      (g < 0)
+J_n v+  >=  -e J_n v                  an impact (it reaches the surface in this step, faster than a resting mass falls in a step): Newton
+```
+
+With `v+ = v + dt a` this is the row `J_n a >= (b - J_n v) / dt - kappa`, where `b` is the right-hand side above and `kappa = d^2 g / dt^2` at constant velocity
+(by a central second difference of the same feature) is the curvature term that keeps a mass on a curved surface. Together with the bilateral
+constraints this is a linear complementarity problem: `lambda_n >= 0` is the normal force and complementary to the row. It is solved by an
+**active-set iteration** like the ropes' (rows of the active contacts join `G`, the multiplier of a row that would pull is released, a row the motion violates is added),
+on the Schur complement `(G M^-1 H^T) lambda = gamma - G M^-1 f`.
+
+*Friction* (Coulomb): a contact is **sticking** (an extra row `J_t a = -J_t v / dt`, i.e. `v_t+ = 0`, with the multiplier `lambda_t`, the tangential force on the body)
+or **sliding** towards `s = +-1` (no row; the force `-s mu lambda_n t` is added to the column of the normal row, so the matrix of the forces `H` differs from `G` in that
+column and the Schur complement is not symmetric). The states are chosen by iteration as well: a sticking contact with `|lambda_t| > mu lambda_n` slides (opposite to the
+force that would hold it), a sliding one whose tangential velocity would change sign sticks. **Friction states are resolved before normal forces are released** (two sticking corners of
+a block are redundant, four rows for three degrees of freedom, and the normal forces of that state are not to be trusted). The rows of contacts get a regularisation of
+`1e-9` of their diagonal. The reported `sliding` flag means moving: a contact at its friction limit that does not move is sticking.
+
+*Checked* (`tests/native/test_contact.cpp`, `tests/validation/test_v08_physics.py`): a resting block, `N = m g`, split over its two corners; a block on an incline slides with
+`s_n = a dt^2 n (n + 1) / 2`, `a = g (sin t - mu cos t)` (exact for the scheme) and sticks if `mu >= tan t` with friction `m g sin t`; a disc rolls with `v = omega r`,
+`a = (2/3) g sin t`; braking distance `v0^2 / (2 mu g)`; bounce heights `e^2 h`; the Coulomb friction oscillator loses `2 mu m g / k` per half cycle and stops inside
+`|x| < mu m g / k`; a disc in a bowl swings with `T = 2 pi sqrt((R - r) / g)` (sliding) and `2 pi sqrt(3 (R - r) / 2 g)` (rolling) to within 0.1 % with 128 segments
+per half circle; on a dome the normal force is `m g (3 cos(t) - 2)` and the disc leaves at 48 degrees.
+
+*Polylines are polygons.* A mass moving along a polyline is turned at every vertex by the angle between the segments, which costs `1/2 m (v dtheta)^2` of the
+normal velocity per vertex (inelastic). The editor therefore samples curves so that no vertex turns by more than 1 degree (at most 5 cm per segment); at 5.6 degrees (32 segments
+per half circle) the period of the bowl is 3 % off and 5 % of the amplitude is lost in 6 s, at 1.4 degrees (128 segments) 0.1 % and 1 %.
 
 ### Substeps for stiff elements, v0.4
 

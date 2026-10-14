@@ -125,10 +125,10 @@ test('load form: type switch changes the units; a load can become an impulse', (
   assert.equal(applyProperties(m, 'F1', { mode: 'ramp', fx: '1', fy: '1', moment: '0' }).ok, false);
 });
 
-test('surfaces and supports have no editable fields but describe themselves', () => {
+test('surfaces have friction and bounce, supports have no editable fields; both describe themselves', () => {
   const m = scene();
-  assert.deepEqual(propertyFields(m, 's1').fields, []);
-  assert.match(propertyFields(m, 's1').info[0], /Länge 3,00 m, Richtung 0,0°/);
+  assert.deepEqual(propertyFields(m, 's1').fields.map((f) => [f.key, f.value]), [['friction', 0], ['restitution', 0], ['side', 'keep']]);
+  assert.match(propertyFields(m, 's1').info[0], /Länge 3,00 m, Gerade, Richtung 0,0°/);
   const pin = propertyFields(m, 'A1');
   assert.deepEqual(pin.fields, []);
   assert.match(pin.title, /Festlager/);

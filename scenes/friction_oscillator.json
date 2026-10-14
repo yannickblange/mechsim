@@ -1,0 +1,53 @@
+{
+  "version": "0.4",
+  "gravity": [0, -9.81],
+  "solver": {
+    "dt": 0.001
+  },
+  "name": "Masse-Feder mit Coulomb-Reibung",
+  "description": "A block on a rough floor (mu = 0.2) pulled by a spring (k = 200 N/m, m = 2 kg): the amplitude falls by 2 mu m g / k = 39 mm per half cycle (a straight line, unlike viscous damping) and the block stops inside the band |x| < mu m g / k = 20 mm.",
+  "view": {
+    "center": [0.3, 0.4],
+    "width": 3.2
+  },
+  "surfaces": [
+    {
+      "id": "s1",
+      "p1": [-1.4, 0],
+      "p2": [2, 0],
+      "friction": 0.2
+    }
+  ],
+  "bodies": [
+    {
+      "id": "block",
+      "type": "block",
+      "position": [0.8, 0.1],
+      "angle": 0,
+      "params": {
+        "mass": 2,
+        "width": 0.4,
+        "height": 0.2
+      }
+    }
+  ],
+  "elements": [
+    {
+      "id": "k1",
+      "type": "spring",
+      "a": {
+        "body": null,
+        "point": [-1, 0.1]
+      },
+      "b": {
+        "body": "block",
+        "point": [0, 0]
+      },
+      "params": {
+        "k": 200,
+        "rest_length": 1.5
+      }
+    }
+  ],
+  "constraints": []
+}

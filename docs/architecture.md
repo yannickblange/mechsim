@@ -51,7 +51,8 @@ runs them in the native engine.
 Data flow: the editor works on a local copy of the scene. **Done** / **Play** send it to
 `POST /api/scene/apply` (validated, built, probed with one step), **Save** to `POST /api/scene/save`
 (`user_scenes/`). Surfaces are drawn from the scene (they are not part of frames); supports carry their own
-`params.angle`, so the engine ignores `surfaces`.
+`params.angle`. Since v0.8 the engine also loads `surfaces` (polylines with friction and restitution) and blocks and discs collide with them
+(`native/engine/solver/contact.cpp`); the frame then has `contacts`.
 
 Impulses are an optional interface (`elements/impulse_source.hpp`, found with `dynamic_cast`) so the frozen
 `Element` interface did not have to change; `World::initialize()` / `reset()` call

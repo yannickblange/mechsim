@@ -8,6 +8,8 @@
 // Size: by default fixed pixels. If entry.height (m) is given, the distance from the supported point
 // to the surface it sits on (see supportHeight), the symbol grows so that its ground line lies on
 // the surface: Festlager and Loslager scale uniformly, the fixed Lager gets a stem of that length.
+import { nearestSegment } from '../../editor/geometry.js';
+
 const TRI_HALF_BASE = 12; // px (24 px wide)
 const TRI_HEIGHT = 18;
 const GROUND_HALF = 17; // 34 px wide
@@ -27,7 +29,8 @@ const ROLLER_REACH = TRI_HEIGHT - 4 + 2 * ROLLER_RADIUS + 1;
 export function supportHeight(surface, angle, position) {
   const nx = -Math.sin(angle);
   const ny = Math.cos(angle);
-  const h = (position[0] - surface.p1[0]) * nx + (position[1] - surface.p1[1]) * ny;
+  const origin = nearestSegment(surface, position).p1; // a curve: the segment nearest to the supported point
+  const h = (position[0] - origin[0]) * nx + (position[1] - origin[1]) * ny;
   return h > 0 ? h : 0;
 }
 

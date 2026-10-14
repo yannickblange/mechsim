@@ -40,6 +40,7 @@ export class Editor {
     this.buildToolbox();
     this.buildHint();
     this.buildOption();
+    this.buildMenu();
     this.buildPopup();
     this.listeners = {
       key: (e) => this.onKey(e),
@@ -87,6 +88,7 @@ export class Editor {
     this.toolbox.hidden = true;
     this.hint.hidden = true;
     this.option.hidden = true;
+    this.menu.hidden = true;
   }
 
   // --- tools ------------------------------------------------------------------------------------
@@ -238,8 +240,38 @@ export class Editor {
     this.stage.append(this.option);
   }
 
+  // a choice of the tool as a row of buttons above the hint (the surface tool: Gerade, Spline, Halbkreis)
+  buildMenu() {
+    this.menu = el('div', 'editor-menu', { role: 'radiogroup' });
+    this.menu.hidden = true;
+    this.menuTool = null;
+    this.stage.append(this.menu);
+  }
+
+  updateMenu() {
+    const tool = this.tool;
+    const choice = this.enabled ? tool.menu : null;
+    this.menu.hidden = !choice;
+    if (!choice) return;
+    if (this.menuTool !== tool) { // build the buttons once per tool
+      this.menuTool = tool;
+      this.menu.setAttribute('aria-label', choice.label);
+      this.menu.replaceChildren(...choice.items.map((item) => {
+        const b = el('button', 'menu-item', { type: 'button', role: 'radio', 'data-id': item.id, title: item.title || item.label });
+        b.textContent = item.label;
+        b.addEventListener('click', () => {
+          tool.setMenu(item.id);
+          this.updateHint();
+        });
+        return b;
+      }));
+    }
+    for (const b of this.menu.children) b.setAttribute('aria-checked', String(b.dataset.id === tool.menu.value));
+  }
+
   updateHint() {
     const tool = this.tool;
+    this.updateMenu();
     const choice = this.enabled ? tool.option : null;
     this.option.hidden = !choice;
     if (choice) {

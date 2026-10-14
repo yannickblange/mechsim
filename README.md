@@ -29,7 +29,7 @@ Click **Edit** (or **New**), then the floating **+** at the bottom left: its ico
 |------|-----|
 | Rectangular mass | drag from corner to corner (starting on a sloped surface aligns it with the surface) |
 | Circular mass | click the centre, then click / drag for the radius |
-| Surface | drag; the angle snaps to 0, 30, 45, 60, 90 degrees (Shift = free) |
+| Surface | a menu appears with the shape: **Gerade** (drag; the angle snaps to 0, 30, 45, 60, 90 degrees, Shift = free), **Spline** (click the points, double click or Enter finishes, Esc cancels) or **Halbkreis ∪ / ∩** (drag the diameter: a bowl or a dome). Right-click: friction μ, bounce e, swap the solid side |
 | Spring | click end A, click end B, then move the dashed **ghost** to the relaxed length and click (Enter = unloaded) |
 | Force / moment | press on a mass (centre, corner, edge snap) and drag for the force; a plain click adds a moment |
 | Festlager, fixed Lager, Loslager | two clicks: a point of a mass, then the surface it sits on. The symbol adapts to the surface angle and grows to span the distance between them. The Loslager needs a surface. A Festlager can also be placed in free space with one click |

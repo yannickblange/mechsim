@@ -2,9 +2,10 @@
 // Holds a plain scene object (contracts/scene.schema.json, version 0.4) and never touches the DOM.
 import { clampableEnds, hasEinspannung, standingEnds } from './ends.js';
 import { bodyToWorld, dist, nextId, normalizeAngle, roundTo, sub, supportAngleAt, tidy, tidyPoint } from './geometry.js';
-import { normalizeRopes } from './moves.js';
+import { normalizeRopes, refreshSupports } from './moves.js';
 import { defaultSection } from './section.js';
 import { surfaceAtPoint } from './snap.js';
+import { flipSurface, surfaceFields } from './surfaces.js';
 
 export const DEFAULT_MASS = 1.0;
 export const DEFAULT_SPRING_K = 100.0;
@@ -224,6 +225,41 @@ export class SceneModel {
       const id = nextId('s', this.allIds());
       s.surfaces.push({ id, p1: tidyPoint(p1), p2: tidyPoint(p2) });
       return id;
+    });
+  }
+
+  // A curved surface (v0.8): "spline" through the control points, or "arc": a half circle on the diameter control[0] - control[1], `kind`
+  // "bowl" (open upwards, the free side inside) or "dome" (the free side outside). The scene gets the dense polyline for the engine and
+  // the control points so that the curve stays editable. Two control points of a spline are a straight surface.
+  addCurve(shape, control, kind = 'bowl') {
+    return this.#edit((s) => {
+      const id = nextId('s', this.allIds());
+      s.surfaces.push({ id, ...surfaceFields(control.length < 3 && shape === 'spline' ? 'line' : shape, control, kind) });
+      return id;
+    });
+  }
+
+  // patch: { friction (mu >= 0), restitution (0..1) }; the defaults (0) are not stored.
+  updateSurface(id, patch) {
+    const found = this.find(id);
+    if (!found || found.kind !== 'surface') throw new Error(`no surface "${id}"`);
+    return this.#edit((s) => {
+      const surface = s.surfaces.find((o) => o.id === id);
+      for (const key of ['friction', 'restitution']) {
+        if (patch[key] === undefined) continue;
+        if (patch[key] > 0) surface[key] = tidy(patch[key]);
+        else delete surface[key];
+      }
+    });
+  }
+
+  // The surface run the other way: its free side and its hatching change sides. Supports on it keep their side of it.
+  flipSurface(id) {
+    const found = this.find(id);
+    if (!found || found.kind !== 'surface') throw new Error(`no surface "${id}"`);
+    return this.#edit((s) => {
+      flipSurface(s.surfaces.find((o) => o.id === id));
+      refreshSupports(s, 1e-3);
     });
   }
 

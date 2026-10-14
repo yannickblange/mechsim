@@ -8,8 +8,9 @@
 //   a surface       alone
 // Ground ends of springs / ropes / rods that are not on a pin stay where they are.
 import {
-  add, blockCorners, bodyToWorld, closestOnSegment, dist, sub, supportAngleAt, tidy, tidyPoint,
+  add, blockCorners, bodyToWorld, closestOnSurface, dist, sub, supportAngleAt, surfaceSegments, tidy, tidyPoint,
 } from './geometry.js';
+import { translateSurface } from './surfaces.js';
 import { anchorWorld, isJoint, isLink } from './hit.js';
 
 const SUPPORTS = ['pin_support', 'fixed_support', 'roller_support'];
@@ -38,7 +39,7 @@ export function jointGroup(scene, bodyId) {
 export function nearestSurface(scene, p, tol) {
   let best = null;
   for (const s of scene.surfaces) {
-    const d = closestOnSegment(p, s.p1, s.p2).dist;
+    const d = closestOnSurface(p, s).dist;
     if (d <= tol && (!best || d < best.d)) best = { s, d };
   }
   return best && best.s;
@@ -81,9 +82,7 @@ export function moveBodies(scene, ids, delta, tol) {
 }
 
 export function moveSurface(scene, id, delta, tol) {
-  const s = scene.surfaces.find((x) => x.id === id);
-  s.p1 = tidyPoint(add(s.p1, delta));
-  s.p2 = tidyPoint(add(s.p2, delta));
+  translateSurface(scene.surfaces.find((x) => x.id === id), delta);
   refreshSupports(scene, tol);
 }
 
@@ -111,20 +110,22 @@ export function contactOffset(scene, bodyId, delta, tol) {
   const body = scene.bodies.find((b) => b.id === bodyId);
   const moved = { ...body, position: add(body.position, delta) };
   let best = null;
-  for (const s of scene.surfaces) {
-    const d = sub(s.p2, s.p1);
-    const len = Math.hypot(d[0], d[1]);
-    if (len < 1e-9) continue;
-    const t = [d[0] / len, d[1] / len];
-    const n = [-t[1], t[0]];
-    const probes = body.type === 'disc'
-      ? [{ p: moved.position, dist: signedDistance(moved.position, s.p1, n), radius: body.params.radius }]
-      : cornerPoints(moved).map((p) => ({ p, dist: signedDistance(p, s.p1, n), radius: 0 }));
-    for (const probe of probes) {
-      const along = (probe.p[0] - s.p1[0]) * t[0] + (probe.p[1] - s.p1[1]) * t[1];
-      if (along < -tol || along > len + tol) continue;
-      const gap = Math.sign(probe.dist || 1) * probe.radius - probe.dist; // move by gap along n
-      if (Math.abs(gap) <= tol && (!best || Math.abs(gap) < Math.abs(best.gap))) best = { gap, n };
+  for (const surface of scene.surfaces) {
+    for (const s of surfaceSegments(surface)) {
+      const d = sub(s.p2, s.p1);
+      const len = Math.hypot(d[0], d[1]);
+      if (len < 1e-9) continue;
+      const t = [d[0] / len, d[1] / len];
+      const n = [-t[1], t[0]];
+      const probes = body.type === 'disc'
+        ? [{ p: moved.position, dist: signedDistance(moved.position, s.p1, n), radius: body.params.radius }]
+        : cornerPoints(moved).map((p) => ({ p, dist: signedDistance(p, s.p1, n), radius: 0 }));
+      for (const probe of probes) {
+        const along = (probe.p[0] - s.p1[0]) * t[0] + (probe.p[1] - s.p1[1]) * t[1];
+        if (along < -tol || along > len + tol) continue;
+        const gap = Math.sign(probe.dist || 1) * probe.radius - probe.dist; // move by gap along n
+        if (Math.abs(gap) <= tol && (!best || Math.abs(gap) < Math.abs(best.gap))) best = { gap, n };
+      }
     }
   }
   return best ? [best.n[0] * best.gap, best.n[1] * best.gap] : [0, 0];

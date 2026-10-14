@@ -489,6 +489,45 @@ input[type='text']:focus-visible {
   white-space: nowrap;
 }
 
+.editor-menu {
+  position: absolute;
+  left: 50%;
+  bottom: 132px; /* above the open toolbox */
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 16px;
+  background: var(--c-label-bg);
+  box-shadow: 0 1px 4px var(--c-shadow);
+  max-width: calc(100% - 32px);
+}
+
+.editor-menu[hidden] {
+  display: none;
+}
+
+.menu-item {
+  border: 0;
+  border-radius: 13px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menu-item:hover {
+  background: var(--c-panel);
+}
+
+.menu-item[aria-checked='true'] {
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+}
+
 .editor-option[hidden] {
   display: none;
 }
