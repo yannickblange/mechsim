@@ -24,6 +24,12 @@ public:
     double mass = 1.0;     // kg
     double inertia = 1.0;  // kg m^2 about the centre of mass
 
+    // v0.8: shape for the contact with surfaces. Only blocks and discs collide; everything else is None.
+    enum class Shape { None, Block, Disc };
+    Shape shape = Shape::None;
+    double halfWidth = 0.0, halfHeight = 0.0;  // Block: half the extent along the local x / y axis, m
+    double radius = 0.0;                       // Disc, m
+
     // State
     Vec2 pos;            // centre of mass, world
     double phi = 0.0;    // rad, CCW positive

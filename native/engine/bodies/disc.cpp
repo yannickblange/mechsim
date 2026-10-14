@@ -25,6 +25,8 @@ void initDisc(Body& body, const nlohmann::json& params) {
     body.type = "disc";
     body.mass = m;
     body.inertia = discInertia(m, r);
+    body.shape = Body::Shape::Disc;
+    body.radius = r;
 }
 
 // J = m r^2 / 2 for a solid disc about its centre.

@@ -70,6 +70,7 @@ void World::step(double dt) {
 void World::reset() {
     for (auto& b : bodies) b.restoreInitialState();
     time = 0.0;
+    contacts.clear();
     for (auto& c : constraints) c->initialize(*this);
     applyInitialImpulses(*this);
 }
@@ -132,11 +133,19 @@ nlohmann::json World::frame() const {
         c->writeFrame(*this, o);
         constraintsJson.push_back(std::move(o));
     }
-    return {{"t", time},
-            {"bodies", std::move(bodiesJson)},
-            {"elements", std::move(elementsJson)},
-            {"constraints", std::move(constraintsJson)},
-            {"energy", {{"kinetic", kineticEnergy()}, {"potential", potentialEnergy()}}}};
+    json contactsJson = json::array();
+    for (const auto& c : contacts) {
+        contactsJson.push_back({{"body", c.body}, {"surface", c.surface}, {"point", {c.point.x, c.point.y}},
+                                {"normal", {c.normal.x, c.normal.y}}, {"gap", c.gap}, {"normal_force", c.normalForce},
+                                {"friction_force", c.frictionForce}, {"sliding", c.sliding}});
+    }
+    json frame = {{"t", time},
+                  {"bodies", std::move(bodiesJson)},
+                  {"elements", std::move(elementsJson)},
+                  {"constraints", std::move(constraintsJson)},
+                  {"energy", {{"kinetic", kineticEnergy()}, {"potential", potentialEnergy()}}}};
+    if (!contactsJson.empty()) frame["contacts"] = std::move(contactsJson);  // v0.8
+    return frame;
 }
 
 }  // namespace ms

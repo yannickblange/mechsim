@@ -26,6 +26,9 @@ void initBlock(Body& body, const nlohmann::json& params) {
     body.type = "block";
     body.mass = m;
     body.inertia = blockInertia(m, w, h);
+    body.shape = Body::Shape::Block;
+    body.halfWidth = 0.5 * w;
+    body.halfHeight = 0.5 * h;
 }
 
 // J = m (w^2 + h^2) / 12 for a solid rectangle about its centre (docs/formulation.md).

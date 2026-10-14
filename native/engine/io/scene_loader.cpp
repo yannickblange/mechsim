@@ -38,6 +38,29 @@ void loadSolver(const json& scene, World& world) {
     if (!(out.dt > 0.0)) throw std::runtime_error("solver: 'dt' must be > 0");
 }
 
+// v0.8: the fixed surfaces. A surface is the segment p1 -> p2, or the polyline `points` (a curve: spline, arc) whose ends are p1 and p2.
+void loadSurface(const json& spec, World& world) {
+    Surface s;
+    s.id = spec.at("id").get<std::string>();
+    const std::string what = "surface '" + s.id + "'";
+    if (spec.contains("points")) {
+        if (!spec["points"].is_array() || spec["points"].size() < 2) throw std::runtime_error(what + ": 'points' needs at least two points");
+        for (const json& p : spec["points"]) s.points.push_back(parseVec2(p, what + ": a point of 'points'"));
+    } else {
+        s.points = {parseVec2(spec.at("p1"), what + ": 'p1'"), parseVec2(spec.at("p2"), what + ": 'p2'")};
+    }
+    if (spec.contains("friction")) {
+        if (!spec["friction"].is_number() || spec["friction"].get<double>() < 0.0) throw std::runtime_error(what + ": 'friction' must be a number >= 0");
+        s.friction = spec["friction"].get<double>();
+    }
+    if (spec.contains("restitution")) {
+        const json& e = spec["restitution"];
+        if (!e.is_number() || e.get<double>() < 0.0 || e.get<double>() > 1.0) throw std::runtime_error(what + ": 'restitution' must be a number in [0, 1]");
+        s.restitution = e.get<double>();
+    }
+    world.surfaces.push_back(std::move(s));
+}
+
 void loadBody(const json& spec, World& world, std::set<std::string>& ids) {
     const std::string id = spec.at("id").get<std::string>();
     claimId(ids, id);
@@ -121,6 +144,9 @@ std::unique_ptr<World> build(const json& scene) {
     loadSolver(scene, *world);
 
     std::set<std::string> ids;
+    if (scene.contains("surfaces")) {
+        for (const json& spec : scene["surfaces"]) loadSurface(spec, *world);
+    }
     const BeamPlans beams = planBeams(scene);  // v0.4: bendable beams become chains of node bodies
     for (const json& spec : scene.at("bodies")) {
         if (spec.at("type").get<std::string>() == "beam") {
@@ -154,9 +180,22 @@ std::unique_ptr<World> build(const json& scene) {
     }
     if (scene.contains("constraints")) {
         for (const json& spec : scene["constraints"]) loadConstraint(spec, beams, clampedNodes, *world, ids);
+        // v0.8: a mass that a support (Festlager, Loslager, Einspannung) attaches to a surface does not also collide with that surface: the
+        // support is the connection there (a pendulum hung from a ceiling swings under it; two rows for one point would be redundant)
+        for (const json& spec : scene["constraints"]) {
+            const std::string type = spec.value("type", "");
+            if ((type != "pin_support" && type != "roller_support" && type != "fixed_support") || !spec.contains("surface") ||
+                !spec["surface"].is_string() || !spec.contains("body") || !spec["body"].is_string()) continue;
+            const BodyIndex body = world->findBody(spec["body"].get<std::string>());
+            for (std::size_t si = 0; si < world->surfaces.size(); ++si) {
+                if (body != GROUND && world->surfaces[si].id == spec["surface"].get<std::string>()) {
+                    world->noContact.emplace_back(body, static_cast<int>(si));
+                }
+            }
+        }
     }
-    // "surfaces" (v0.2) are drawing/editor geometry: supports carry their own angle, so the
-    // engine ignores them.
+    // "surfaces" (v0.2) are drawing/editor geometry for the supports (they carry their own angle); since v0.8 blocks
+    // and discs also collide with them (solver/contact.cpp).
     world->initialize();
     return world;
 }

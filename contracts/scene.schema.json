@@ -43,7 +43,7 @@
     "surfaces": {
       "type": "array",
       "default": [],
-      "description": "Fixed line segments (v0.2). Pure geometry: supports sit on them, bodies do not collide with them. Ignored by the engine.",
+      "description": "Fixed lines and curves (v0.2). Supports sit on them; since v0.8 blocks and discs collide with them (friction, restitution). Knoten, Staebe and beams do not.",
       "items": { "$ref": "#/$defs/surface" }
     },
     "bodies": {
@@ -90,8 +90,19 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "p1": { "$ref": "#/$defs/vec2", "description": "World start point. The hatching is drawn on the right-hand side of p1 -> p2." },
-        "p2": { "$ref": "#/$defs/vec2", "description": "World end point." }
+        "p1": { "$ref": "#/$defs/vec2", "description": "World start point. The hatching (the solid side) is drawn on the right-hand side of the direction of travel p1 -> p2 (or along `points`); blocks and discs rest on the free, left-hand side (v0.8)." },
+        "p2": { "$ref": "#/$defs/vec2", "description": "World end point." },
+        "points": {
+          "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vec2" },
+          "description": "v0.8: the surface is this polyline (a spline or an arc, sampled finely) instead of the straight segment p1 -> p2; its first and last point are p1 and p2. The editor writes it from `shape` and `control`."
+        },
+        "friction": { "type": "number", "minimum": 0, "default": 0, "description": "v0.8: Coulomb friction coefficient mu against blocks and discs. 0 = frictionless (the default)." },
+        "restitution": { "type": "number", "minimum": 0, "maximum": 1, "default": 0, "description": "v0.8: coefficient of restitution of an impact: 0 = no bounce (the default), 1 = elastic." },
+        "shape": { "enum": ["line", "spline", "arc"], "default": "line", "description": "v0.8, editor only: how the surface was made. The engine uses `points` (or p1, p2)." },
+        "control": {
+          "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/vec2" },
+          "description": "v0.8, editor only: the control points of a spline (the curve passes through them) or the ends and the apex of an arc, so that the curve can be edited again."
+        }
       }
     },
     "body": {

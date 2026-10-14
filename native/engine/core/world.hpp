@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -30,6 +31,28 @@ struct BeamGroup {
     const Element* fe = nullptr; // its BeamElement (owned by World::elements)
 };
 
+// A fixed surface (v0.8): a polyline p0 -> p1 -> ... whose free side is the LEFT of the direction of travel (the hatching is on the
+// right, the solid side). Blocks and discs rest on it and slide along it with Coulomb friction `friction` (mu >= 0, default 0);
+// `restitution` (0 = no bounce, 1 = elastic) acts on impacts.
+struct Surface {
+    std::string id;
+    std::vector<Vec2> points;  // at least two
+    double friction = 0.0;
+    double restitution = 0.0;
+};
+
+// What the contact solver found in the last step, for the frame (a mass touching a surface).
+struct ContactReport {
+    std::string body;
+    std::string surface;
+    Vec2 point;                // world position of the contact point
+    Vec2 normal;               // unit normal, from the surface into the body (the direction of the normal force)
+    double gap = 0.0;          // m, distance to the surface (negative: penetration)
+    double normalForce = 0.0;  // N, >= 0
+    double frictionForce = 0.0;  // N, along the tangent perp(normal) = rotate(normal, +90 degrees), on the body
+    bool sliding = false;
+};
+
 class World {
 public:
     Vec2 gravity{0.0, -9.81};
@@ -42,6 +65,11 @@ public:
     std::vector<std::unique_ptr<Element>> elements;
     std::vector<std::unique_ptr<Constraint>> constraints;
     std::vector<BeamGroup> beams;
+    std::vector<Surface> surfaces;            // v0.8
+    std::vector<ContactReport> contacts;      // v0.8: the contacts of the last step
+    // v0.8: (body index, surface index) pairs that do not collide: a mass that a support (Festlager, Loslager, Einspannung)
+    // attaches to that surface (the support is the connection there).
+    std::vector<std::pair<int, int>> noContact;
 
     // Index of the body with this id, or GROUND (-1) if not found.
     BodyIndex findBody(const std::string& id) const;
