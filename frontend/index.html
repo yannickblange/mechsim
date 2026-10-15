@@ -23,7 +23,6 @@
 
     <button id="btn-new" type="button" title="Einen leeren Aufbau beginnen">Neu</button>
     <button id="btn-delete" type="button" title="Diesen gespeicherten Aufbau löschen" hidden>Löschen</button>
-    <button id="btn-analysis" type="button" title="Schwingungsanalyse: Dämpfungsgrad, Eigenwerte, Eigenfrequenz, Resonanz; Werte verändern und die Schwingung vergleichen">Analyse</button>
     <button id="btn-edit" type="button" aria-pressed="false" title="Den Aufbau bearbeiten / zurück zur Simulation">Bearbeiten</button>
 
     <div class="edit-controls" id="edit-controls" hidden>
@@ -79,6 +78,10 @@
   <main class="stage">
     <canvas id="view" aria-label="Simulationsansicht"></canvas>
     <div id="error" class="error" role="alert" hidden></div>
+    <button id="btn-analysis" class="ana-fab" type="button" aria-pressed="false" title="Schwingungsanalyse: Dämpfungsgrad, Eigenwerte, Eigenfrequenz, Resonanz; Werte verändern und die Schwingung vergleichen">
+      <svg class="ico" viewBox="0 0 32 20" aria-hidden="true"><path d="M1 10 C4 -2 7 -2 10 10 S16 22 19 10 S23 2 25 10 S28 14 31 10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>Analyse</span>
+    </button>
     <button id="btn-theme" class="theme-fab" type="button" aria-pressed="false" title="Dunkelmodus" aria-label="Dunkelmodus">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.8.8 0 0 0-1.1-.9A10 10 0 1 0 21.4 15.7a.8.8 0 0 0-.9-1.1z"/></svg>
     </button>

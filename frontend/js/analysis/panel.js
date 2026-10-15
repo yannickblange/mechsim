@@ -7,7 +7,7 @@
 import { decimal } from '../format.js';
 import { dataXAt, drawChart } from './chart.js';
 import { GAUGE_MAX, criticalText, eigenvalueText, gaugePosition, modeTitle, noteTone, overview, resonanceText, shapeText, sig, zoneOf } from './describe.js';
-import { energyModel, frfModels, phaseModel, poleModel, timeModel } from './models.js';
+import { frfModels, timeModel } from './models.js';
 import {
   SLIDER_STEPS, addExcitation, applyParameter, fromSlider, initialOffsets, labelOf, parametersOf, removeExcitation, setLabel, toSlider,
 } from './params.js';
@@ -23,9 +23,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const parseNumber = (s) => Number(String(s).trim().replace(',', '.'));
 const inputValue = (v) => String(Number(Number(v).toPrecision(5))).replace('.', ',');
 
-const TABS = [
-  ['u', 'Verlauf'], ['v', 'Geschwindigkeit'], ['phase', 'Phasenraum'], ['energy', 'Energie'], ['frf', 'Frequenzgang'], ['poles', 'Pole'],
-];
+const TABS = [['u', 'Verlauf'], ['v', 'Geschwindigkeit'], ['frf', 'Frequenzgang']];
 const DURATIONS = [2, 5, 10, 20, 40, 80];
 const SAMPLES = 1200;
 const DEBOUNCE_MS = 70;
@@ -34,8 +32,8 @@ const OBJECT_TAGS = { mass: 'Masse', spring: 'Feder', damper: 'Dämpfer', load: 
 export class AnalysisPanel {
   // stage: the element the window floats in; api: { analyse(body) }; getScene(): the scene to analyse now; getTheme(): the renderer's theme;
   // onApply(scene): the app takes over the changed scene.
-  constructor({ stage, api, getScene, getTheme, onApply }) {
-    Object.assign(this, { stage, api, getScene, getTheme, onApply });
+  constructor({ stage, api, getScene, getTheme, onApply, onToggle = () => {} }) {
+    Object.assign(this, { stage, api, getScene, getTheme, onApply, onToggle });
     this.root = null;
     this.tab = 'u';
     this.dofIndex = 0;
@@ -56,6 +54,7 @@ export class AnalysisPanel {
     if (this.isOpen) { this.raise(); return; }
     this.build();
     this.reset();
+    this.onToggle(true);
   }
 
   close() {
@@ -63,6 +62,7 @@ export class AnalysisPanel {
     this.root = null;
     clearTimeout(this.timer);
     this.token++;
+    this.onToggle(false);
   }
 
   raise() { this.root.style.zIndex = '30'; }
@@ -81,6 +81,7 @@ export class AnalysisPanel {
     this.selectedMode = 0;
     this.dofIndex = 0;
     this.structure = '';
+    this.applied = null;
     if (!scene) { this.showMessage('Kein Aufbau geladen.'); return; }
     this.showMessage(null);
     text(this.sub, scene.name || '');
@@ -89,6 +90,7 @@ export class AnalysisPanel {
 
   schedule() {
     clearTimeout(this.timer);
+    this.updateSync();
     this.timer = setTimeout(() => this.request(), DEBOUNCE_MS);
   }
 
@@ -108,6 +110,7 @@ export class AnalysisPanel {
     this.showError(null);
     this.analysis = answer;
     if (answer.supported && this.state.offsets === null) this.state.offsets = initialOffsets(answer); // the start follows the rest position from now on
+    if (this.applied === null) this.applied = this.snapshot(); // what the simulation has
     this.cur = { analysis: answer, response: answer.response };
     if ((first || !this.ref) && answer.supported) this.ref = this.cur; // the first run is the reference until another one is chosen
     this.selectedMode = Math.min(this.selectedMode, Math.max(0, (answer.modes || []).length - 1));
@@ -117,6 +120,33 @@ export class AnalysisPanel {
     this.renderSummary();
     this.renderModes();
     this.renderCharts();
+    this.updateSync();
+  }
+
+  snapshot() { return JSON.stringify([this.state.scene, this.state.offsets]); }
+
+  // Whether the values in the window differ from what the simulation runs.
+  updateSync() {
+    if (!this.syncBox) return;
+    const changed = this.applied !== null && this.snapshot() !== this.applied;
+    this.syncBox.dataset.changed = String(changed);
+    text(this.syncNote, changed ? 'Die Simulation läuft noch mit den alten Werten.' : 'Die Simulation hat diese Werte.');
+    this.applyBtn.disabled = !changed || !this.analysis || !this.analysis.supported;
+  }
+
+  // The scene to hand over: the changed values, and the start pose the window runs from (a moved rest position or a start deflection).
+  sceneToApply() {
+    const scene = clone(this.state.scene);
+    const bodies = (this.cur && this.cur.response && this.cur.response.bodies) || {};
+    for (const b of scene.bodies) {
+      const r = bodies[b.id];
+      if (!r) continue;
+      const round = (v) => Number(v.toPrecision(9));
+      const pos = [round(r.x[0]), round(r.y[0])];
+      if (Math.hypot(pos[0] - b.position[0], pos[1] - b.position[1]) > 1e-6) b.position = pos;
+      if (Math.abs(r.phi[0] - (b.angle || 0)) > 1e-6) b.angle = round(r.phi[0]);
+    }
+    return scene;
   }
 
   structureKey() {
@@ -140,12 +170,17 @@ export class AnalysisPanel {
     this.refBox.checked = true;
     refToggle.append(this.refBox, text(el('span'), 'Referenz'));
     const resetBtn = text(el('button', 'ana-btn', { type: 'button', title: 'Alle Werte auf die des Aufbaus zurücksetzen' }), 'Zurücksetzen');
-    const applyBtn = text(el('button', 'ana-btn ana-primary', { type: 'button', title: 'Die geänderten Werte und Namen in den Aufbau übernehmen' }), 'Übernehmen');
     const close = text(el('button', 'ana-btn ana-close', { type: 'button', 'aria-label': 'Analyse schließen', title: 'Schließen' }), '×');
-    head.append(this.title, this.sub, spacer, dur, refBtn, refToggle, resetBtn, applyBtn, close);
+    head.append(this.title, this.sub, spacer, dur, refBtn, refToggle, resetBtn, close);
 
     const body = el('div', 'ana-body');
-    this.paramsEl = el('aside', 'ana-params');
+    const side = el('aside', 'ana-params');
+    this.paramsEl = el('div', 'ana-params-list');
+    this.syncBox = el('div', 'ana-sync');
+    this.syncNote = el('p', 'ana-sync-note');
+    this.applyBtn = text(el('button', 'ana-apply', { type: 'button', title: 'Die geänderten Werte, Namen und den Start in die Simulation übernehmen' }), 'In die Simulation übernehmen');
+    this.syncBox.append(this.syncNote, this.applyBtn);
+    side.append(this.paramsEl, this.syncBox);
     const main = el('div', 'ana-main');
     this.messageEl = el('p', 'ana-message');
     this.messageEl.hidden = true;
@@ -166,7 +201,7 @@ export class AnalysisPanel {
     this.canvasBox = el('div', 'ana-canvases');
     charts.append(this.tabsEl, this.selectsEl, this.canvasBox);
     main.append(this.messageEl, this.errorEl, this.overviewEl, this.notesEl, this.modesEl, this.cardEl, charts);
-    body.append(this.paramsEl, main);
+    body.append(side, main);
     root.append(head, body);
     this.stage.append(root);
     this.root = root;
@@ -178,17 +213,18 @@ export class AnalysisPanel {
     refBtn.addEventListener('click', () => { if (this.cur && this.cur.analysis.supported) { this.ref = this.cur; this.renderCharts(); } });
     this.refBox.addEventListener('change', () => { this.showRef = this.refBox.checked; this.renderCharts(); });
     resetBtn.addEventListener('click', () => this.reset());
-    applyBtn.addEventListener('click', async () => {
-      applyBtn.disabled = true;
+    this.applyBtn.addEventListener('click', async () => {
+      this.applyBtn.disabled = true;
       try {
-        await this.onApply(clone(this.state.scene));
-        this.original = clone(this.state.scene);
-        text(applyBtn, 'Übernommen ✓');
-        setTimeout(() => { text(applyBtn, 'Übernehmen'); }, 1500);
+        const scene = this.sceneToApply();
+        await this.onApply(scene);
+        this.state.scene = clone(scene);
+        this.applied = this.snapshot();
+        this.showError(null);
       } catch (err) {
         this.showError(`Übernehmen fehlgeschlagen: ${err.message}`);
       } finally {
-        applyBtn.disabled = false;
+        this.updateSync();
       }
     });
     close.addEventListener('click', () => this.close());
@@ -416,7 +452,7 @@ export class AnalysisPanel {
       wrap.append(text(el('span'), label), s);
       box.append(wrap);
     };
-    if (this.tab !== 'energy' && this.tab !== 'poles' && a.dofs.length > 1) {
+    if (a.dofs.length > 1) {
       select('Koordinate', a.dofs.map((d, i) => [i, d.label]), this.dofIndex, (v) => { this.dofIndex = Number(v); this.renderCard2(); this.drawCharts(); });
     }
     if (this.tab === 'frf') {
@@ -439,9 +475,6 @@ export class AnalysisPanel {
     switch (this.tab) {
       case 'u': return [timeModel(cur, ref, dof, 'u')];
       case 'v': return [timeModel(cur, ref, dof, 'v')];
-      case 'phase': return [phaseModel(cur, ref, dof)];
-      case 'energy': return [energyModel(cur, ref)];
-      case 'poles': return [poleModel(cur, ref)];
       case 'frf': {
         const m = frfModels(cur, ref, Math.min(this.loadIndex, Math.max(0, a.loads.length - 1)), this.dofIndex, this.etaMode);
         return m.empty ? [m] : [m.amplitude, m.phase];

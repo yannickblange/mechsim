@@ -225,6 +225,41 @@ input[type='range']:focus-visible {
   transition: background 0.45s, color 0.45s, transform 0.15s;
 }
 
+.ana-fab {
+  position: absolute;
+  right: 76px;
+  bottom: 16px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 48px;
+  padding: 0 20px 0 16px;
+  border: none;
+  border-radius: 24px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px var(--c-shadow);
+  transition: transform 0.15s, filter 0.2s;
+}
+
+.ana-fab .ico {
+  width: 32px;
+  height: 20px;
+}
+
+.ana-fab:hover:not(:disabled) {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.ana-fab[aria-pressed='true'] {
+  background: var(--c-fab-bg);
+  color: var(--c-fab-fg);
+}
+
 .theme-fab:hover:not(:disabled) {
   transform: scale(1.07);
 }
@@ -407,7 +442,7 @@ input[type='text']:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  max-width: calc(100vw - 110px);
+  max-width: calc(100vw - 270px);
 }
 
 .tool {
@@ -751,12 +786,6 @@ input[type='text']:focus-visible {
   font-size: 12px;
 }
 
-.ana-primary {
-  background: var(--c-accent);
-  color: var(--c-on-accent);
-  border-color: var(--c-accent);
-}
-
 .ana-close {
   font-size: 16px;
   line-height: 1;
@@ -778,11 +807,63 @@ input[type='text']:focus-visible {
 }
 
 .ana-params {
+  display: flex;
   flex: 0 0 272px;
-  overflow-y: auto;
-  padding: 8px 10px 12px;
+  flex-direction: column;
+  min-height: 0;
   border-right: 1px solid var(--c-grid-major);
   background: var(--c-panel);
+}
+
+.ana-params-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 12px;
+}
+
+.ana-sync {
+  flex: none;
+  padding: 8px 10px 10px;
+  background: var(--c-bg);
+  border-top: 1px solid var(--c-axis);
+}
+
+.ana-sync[data-changed='true'] {
+  background: var(--c-panel);
+  box-shadow: 0 -3px 10px var(--c-shadow);
+}
+
+.ana-sync-note {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.ana-sync[data-changed='true'] .ana-sync-note {
+  color: var(--c-plot-2);
+  font-weight: 600;
+}
+
+.ana-apply {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border: none;
+  border-radius: 6px;
+}
+
+.ana-apply:disabled {
+  background: var(--c-grid-major);
+  color: var(--c-muted);
+  cursor: default;
+}
+
+.ana-apply:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
 .ana-h {
@@ -1108,7 +1189,7 @@ input[type='text']:focus-visible {
 
   .ana-params {
     flex: 0 0 auto;
-    max-height: 38%;
+    max-height: 45%;
     border-right: 0;
     border-bottom: 1px solid var(--c-grid-major);
   }

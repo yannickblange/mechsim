@@ -42,6 +42,7 @@ const analysis = new AnalysisPanel({
   getTheme: () => renderer.theme,
   getScene: () => (state.editing ? model.toJSON() : state.scene),
   onApply: applyAnalysisScene,
+  onToggle: (open) => ui.analysis.setAttribute('aria-pressed', String(open)),
 });
 const editor = new Editor({ renderer, model, stage, onGraph: (id) => graphs.open(id) });
 
