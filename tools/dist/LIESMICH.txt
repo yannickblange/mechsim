@@ -14,7 +14,9 @@ BEENDEN
 
 BEIM ERSTEN START
   Das Programm ist nicht von einem Entwickler-Zertifikat signiert, deshalb warnt das Betriebssystem:
-  macOS:    "MechSim kann nicht geoeffnet werden" -> Rechtsklick auf MechSim.app -> "Oeffnen" -> "Oeffnen".
+  macOS:    macOS 14 und aelter: Rechtsklick auf MechSim.app -> "Oeffnen" -> "Oeffnen".
+            macOS 15 (Sequoia) und neuer: Doppelklick, "Fertig"; dann Systemeinstellungen -> "Datenschutz & Sicherheit" ->
+            nach unten blaettern -> bei "MechSim wurde blockiert" auf "Trotzdem oeffnen" klicken.
             Hilft das nicht: im Terminal  xattr -dr com.apple.quarantine <Pfad zu MechSim.app>
   Windows:  "Der Computer wurde durch Windows geschuetzt" -> "Weitere Informationen" -> "Trotzdem ausfuehren".
   Das ist nur beim ersten Start noetig.

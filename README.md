@@ -13,6 +13,8 @@ buckle (Euler) and adds viscous damping so that loaded beams settle.
 
 ## Giving it to someone: a program to double-click (Windows and macOS)
 
+Step-by-step guide for new users (route 1: the zip, route 2: from the source with git): **[docs/INSTALL.md](docs/INSTALL.md)**.
+
 `python tools/package.py` builds, on the system it runs on, a program that needs nothing installed (Python and all libraries are inside) and puts it in
 `dist/MechSim-<version>-<system>-<machine>.zip`: on macOS `MechSim.app`, on Windows the folder `MechSim` with `MechSim.exe`. It then unzips and starts the result and checks it
 (starts, native engine, an example scene, saving, ends on request). The program opens MechSim in the browser (local only, `127.0.0.1`), keeps saved layouts in
