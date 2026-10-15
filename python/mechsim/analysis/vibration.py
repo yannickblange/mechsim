@@ -25,6 +25,7 @@ Systems it cannot linearise honestly (rods, ropes, joints, bars, beams, contact 
 """
 from __future__ import annotations
 
+import copy
 import math
 from typing import Any, Callable
 
@@ -231,13 +232,16 @@ def _residual(sys: _System, q: np.ndarray) -> np.ndarray:
 
 
 def _project(sys: _System, q: np.ndarray) -> np.ndarray:
-    """q moved (by the smallest correction) onto the manifold of the supports."""
+    """q put onto the manifold of the supports by changing only the dependent coordinates (the free ones keep their values)."""
     q = q.copy()
+    dep, _, _ = _free_coordinates(sys, q)
+    if not dep:
+        return q
     for _ in range(30):
         c = _residual(sys, q)
         if c.size == 0 or float(np.linalg.norm(c)) < 1e-13:
             break
-        q = q - np.linalg.lstsq(sys.rows(q), c, rcond=None)[0]
+        q[dep] -= np.linalg.lstsq(sys.rows(q)[:, dep], c, rcond=None)[0]
     return q
 
 
@@ -494,9 +498,23 @@ def _matrix(a: np.ndarray) -> list[list[float]]:
     return [[float(v) for v in row] for row in a]
 
 
+def _start_pose(sys: _System, q_rest: np.ndarray, ind: list[int], offsets: dict[str, dict[str, float]]) -> np.ndarray:
+    """The rest position moved by `offsets` ({body: {x, y, phi: deflection}}) along the free coordinates, the others following the supports."""
+    q = q_rest.copy()
+    for bid, axes in offsets.items():
+        i = sys.index.get(bid)
+        if i is None:
+            continue
+        for k, axis in enumerate(("x", "y", "phi")):
+            if axis in axes and 3 * i + k in ind:
+                q[3 * i + k] += float(axes[axis])
+    return _project(sys, q)
+
+
 def analyse(scene: dict[str, Any], *, t_max: float = 10.0, samples: int = 1500, response: bool = True,
-            simulate: Callable[..., dict[str, Any]] | None = None) -> dict[str, Any]:
-    """The linear analysis of `scene` (and, with `response`, the simulation of it as `response`): see the module doc."""
+            simulate: Callable[..., dict[str, Any]] | None = None, offsets: dict[str, dict[str, float]] | None = None) -> dict[str, Any]:
+    """The linear analysis of `scene` (and, with `response`, the simulation of it as `response`): see the module doc.
+    `offsets` ({body: {x, y, phi}}, from the rest position) is where the simulation starts; without it the scene's own initial state."""
     try:
         sys = _System(scene)
     except Unsupported as why:
@@ -536,8 +554,16 @@ def analyse(scene: dict[str, Any], *, t_max: float = 10.0, samples: int = 1500, 
     out["response"] = None
     if response:
         run = simulate or _simulate
+        start = scene
+        if offsets is not None:
+            q_start = _start_pose(sys, q_rest, ind, offsets)
+            start = copy.deepcopy(scene)
+            for i, b in enumerate(start["bodies"]):
+                b["position"] = [float(q_start[3 * i]), float(q_start[3 * i + 1])]
+                b["angle"] = float(q_start[3 * i + 2])
+            out["start_offset"] = {b["id"]: [float(q_start[3 * i + k] - q_rest[3 * i + k]) for k in range(3)] for i, b in enumerate(sys.bodies)}
         try:
-            out["response"] = run(scene, t_max=t_max, samples=samples, rest=out["rest_position"])
+            out["response"] = run(start, t_max=t_max, samples=samples, rest=out["rest_position"])
         except Exception as exc:  # the analysis stands without the simulation (the mock engine has none)
             out["response"] = None
             notes.append(f"Keine Simulation: {exc}")

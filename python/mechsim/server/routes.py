@@ -40,6 +40,7 @@ class AnalysisRequest(BaseModel):
     t_max: float = 10.0
     samples: int = 1500
     response: bool = True
+    offsets: dict[str, dict[str, float]] | None = None  # {body: {x, y, phi}}: where the simulation starts, from the rest position
 
 
 class SaveRequest(BaseModel):
@@ -133,4 +134,4 @@ async def analysis(body: AnalysisRequest):
         raise HTTPException(status_code=422, detail="; ".join(errors))
     t_max = min(600.0, max(0.1, body.t_max))
     samples = min(5000, max(10, body.samples))
-    return await run_in_threadpool(lambda: analyse(body.scene, t_max=t_max, samples=samples, response=body.response))
+    return await run_in_threadpool(lambda: analyse(body.scene, t_max=t_max, samples=samples, response=body.response, offsets=body.offsets))

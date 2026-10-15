@@ -161,3 +161,28 @@ def test_the_response_of_a_scene_holds_what_the_panel_plots():
     assert all(len(v) == n for k in ("x", "y", "phi", "vx", "vy", "omega") for v in [resp["bodies"]["mass"][k]])
     assert len(resp["kinetic"]) == n and len(resp["potential"]) == n
     assert resp["rest"]["mass"][1] == pytest.approx(r["rest_position"]["mass"][1])
+
+
+@pytest.mark.native
+def test_the_simulation_can_start_from_the_rest_position_moved_by_an_offset_even_when_the_values_move_the_rest():
+    r = analyse(free(), t_max=1.0, samples=100, offsets={"mass": {"x": 0.05}})
+    resp = r["response"]
+    assert resp["bodies"]["mass"]["x"][0] - resp["rest"]["mass"][0] == pytest.approx(0.05, abs=1e-9)
+    assert r["start_offset"]["mass"][0] == pytest.approx(0.05, abs=1e-9)
+    # a weight hanging on a spring: with k changed the rest moves, the start stays 5 cm above it
+    sd = scene("spring_damper")
+    a = analyse(sd, t_max=0.5, samples=50, offsets={"mass": {"y": 0.05}})
+    sd["elements"][0]["params"]["k"] = 400.0
+    b = analyse(sd, t_max=0.5, samples=50, offsets={"mass": {"y": 0.05}})
+    assert a["rest_position"]["mass"][1] != pytest.approx(b["rest_position"]["mass"][1], abs=1e-3)
+    for r2 in (a, b):
+        assert r2["response"]["bodies"]["mass"]["y"][0] - r2["response"]["rest"]["mass"][1] == pytest.approx(0.05, abs=1e-9)
+    # a pin keeps its point where it was: the plate starts turned by 0.1 rad from its rest angle, the pin has not moved
+    p = scene("pinned_block_spring")
+    c = analyse(p, t_max=0.2, samples=20, offsets={"plate": {"phi": 0.1}})
+    plate = c["response"]["bodies"]["plate"]
+    rest = c["response"]["rest"]["plate"]
+    assert plate["phi"][0] - rest[2] == pytest.approx(0.1, abs=1e-9)
+    cos, sin = math.cos(plate["phi"][0]), math.sin(plate["phi"][0])
+    pin = (plate["x"][0] + cos * -0.2 - sin * -0.15, plate["y"][0] + sin * -0.2 + cos * -0.15)  # the pin at the local point (-0.2, -0.15)
+    assert pin == pytest.approx((0.0, 0.0), abs=1e-9)
