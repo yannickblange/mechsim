@@ -1,6 +1,7 @@
 """REST endpoints (contracts/protocol.md)."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -38,7 +39,19 @@ class SaveRequest(BaseModel):
 
 @router.get("/health")
 async def health(request: Request):
-    return {"ok": True, "mode": request.app.state.session.mode, "version": mechsim.__version__}
+    # can_quit: the packaged app (mechsim.launcher) lets the page end the program; a server started by hand does not
+    return {"ok": True, "mode": request.app.state.session.mode, "version": mechsim.__version__,
+            "can_quit": getattr(request.app.state, "shutdown", None) is not None}
+
+
+@router.post("/shutdown")
+async def shutdown(request: Request):
+    """Ends the program (only in the packaged app / launcher; 404 otherwise). The answer is sent first."""
+    stop = getattr(request.app.state, "shutdown", None)
+    if stop is None:
+        raise HTTPException(status_code=404, detail="this server cannot be ended from the page")
+    asyncio.get_running_loop().call_later(0.5, stop)
+    return {"ok": True}
 
 
 @router.get("/scenes")

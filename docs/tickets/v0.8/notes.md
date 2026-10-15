@@ -42,3 +42,28 @@ Decisions taken with the user: **blocks and discs** collide (Knoten, Staebe, spr
 409 passed                     (pytest)
 265 pass, 0 fail               (node --test tests/frontend)
 ```
+
+## Packaging: a program to double-click (v0.8-3)
+
+`python tools/package.py` -> `dist/MechSim-<version>-<system>-<machine>.zip` (see the README). Parts:
+
+| File | Content |
+|------|---------|
+| `python/mechsim/launcher.py` | the starter (also `python -m mechsim.launcher`, `mechsim` script): saved layouts to `Documents/MechSim/Aufbauten`; one instance (a second start only opens the browser); port 8000 or the next free; opens the browser when the server answers; ends when no browser tab has been connected for 45 s; without a console the log goes to `Documents/MechSim/mechsim.log` and a start problem to a dialog; the same transport on every system (asyncio, h11, websockets: no uvloop / httptools) |
+| `paths.py`, `server/app.py` | frozen-aware root (`sys._MEIPASS`); the `/tests` mount only if the folder exists |
+| `routes.py`, `index.html`, `main.js` | `POST /api/shutdown` and the **Beenden** button (only if `health.can_quit`: the launcher sets `app.state.shutdown`) |
+| `tools/mechsim.spec`, `tools/app_entry.py` | the PyInstaller recipe (a folder, no one-file: no unpacking at every start). Windows: with a console window; macOS: `MechSim.app`, `LSUIElement` (no Dock icon) |
+| `tools/package.py` | builds the native library (Windows: runtime linked in, no Visual C++ redistributable needed; macOS 11 or newer), PyInstaller, the zip (`ditto` on macOS), and **tests the unzipped program** |
+| `tools/dist/LIESMICH.txt` | the instructions that go into the zip (German) |
+| `.github/workflows/package.yml` | builds Windows, macOS (arm64, Intel) and Linux on GitHub |
+| `tests/python/test_launcher.py` | user folder, ports, one instance, idle end, shutdown from the page, a real launched process |
+
+Decisions worth knowing:
+
+- **PyInstaller cannot build for another system.** The macOS zip was built and tested on a Mac (arm64); the Windows `.exe` has to be built on Windows or by the workflow. It is **untested on Windows**:
+  the native sources compile pedantically clean with clang (`-std=c++17 -pedantic`, no VLAs, no POSIX headers) and the C API already has `__declspec(dllexport)`, but MSVC has not seen this version.
+- **The macOS app has no Dock icon.** A first version had one, and the Dock's Quit (an Apple event) was never answered: the packaged program has no event loop of its own for it (an `osascript` quit hung for minutes).
+  Now the page has a Beenden button and the program ends when the tab is closed.
+- **Unsigned.** The macOS app is signed ad hoc (valid, but Gatekeeper says "rejected" for an app from the internet): the first start needs right click -> Open. A Developer ID certificate and notarisation
+  would remove that; so would a code signing certificate for Windows SmartScreen. Both cost money and are not part of this.
+- The macOS zip is for the architecture it was built on; an Intel Mac needs its own build (the workflow has one).

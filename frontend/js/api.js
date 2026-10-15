@@ -11,6 +11,11 @@ export class Api {
     return this.#request('GET', '/api/health');
   }
 
+  // Ends the program (only the packaged app allows it: health().can_quit).
+  async quit() {
+    return this.#request('POST', '/api/shutdown');
+  }
+
   async listScenes() {
     return (await this.#request('GET', '/api/scenes')).scenes;
   }

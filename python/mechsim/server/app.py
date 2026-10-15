@@ -55,7 +55,9 @@ def create_app(sim_factory, mode: str = "native") -> FastAPI:
 
     app.mount("/css", StaticFiles(directory=paths.FRONTEND_DIR / "css"), name="css")
     app.mount("/js", StaticFiles(directory=paths.FRONTEND_DIR / "js"), name="js")
-    app.mount("/tests", StaticFiles(directory=paths.REPO_ROOT / "tests" / "frontend"), name="tests")
+    frontend_tests = paths.REPO_ROOT / "tests" / "frontend"
+    if frontend_tests.is_dir():  # (the browser smoke test of the sources; not part of the packaged app)
+        app.mount("/tests", StaticFiles(directory=frontend_tests), name="tests")
     return app
 
 

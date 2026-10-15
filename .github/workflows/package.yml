@@ -1,0 +1,36 @@
+# Builds the packaged app (tools/package.py) on Windows, macOS and Linux and keeps the zips as downloads of the run.
+# PyInstaller cannot build for another system than the one it runs on, so every zip is built on its own system; the test of the
+# unzipped program (starts, native engine, an example scene, saving, ends on request) runs there too.
+# Start it: push to GitHub, then Actions -> "Programm packen" -> Run workflow (or push a tag v*).
+name: Programm packen
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, name: windows-x86_64}
+          - {os: macos-latest, name: macos-arm64}
+          - {os: macos-15-intel, name: macos-x86_64}
+          - {os: ubuntu-latest, name: linux-x86_64}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python packages
+        run: python -m pip install -e . pyinstaller
+      - name: Build and test the package
+        run: python tools/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MechSim-${{ matrix.name }}
+          path: dist/*.zip
+          if-no-files-found: error

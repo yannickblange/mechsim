@@ -11,6 +11,18 @@ colour scheme, nodes (Knoten) and elastic bars for Fachwerke, bendable steel bea
 sections, harmonic loads and example scenes for free, harmonic and forced vibrations. v0.4b lets elastic Stabs bend and
 buckle (Euler) and adds viscous damping so that loaded beams settle.
 
+## Giving it to someone: a program to double-click (Windows and macOS)
+
+`python tools/package.py` builds, on the system it runs on, a program that needs nothing installed (Python and all libraries are inside) and puts it in
+`dist/MechSim-<version>-<system>-<machine>.zip`: on macOS `MechSim.app`, on Windows the folder `MechSim` with `MechSim.exe`. It then unzips and starts the result and checks it
+(starts, native engine, an example scene, saving, ends on request). The program opens MechSim in the browser (local only, `127.0.0.1`), keeps saved layouts in
+`Documents/MechSim/Aufbauten`, and ends with the **Beenden** button at the bottom right or after the last browser tab has been closed for 45 s.
+
+- To build: `python -m pip install -e . pyinstaller`, CMake and a C++ compiler (Xcode command line tools, Visual Studio Build Tools).
+- **PyInstaller builds only for the system it runs on**: the Windows zip has to be built on Windows. `.github/workflows/package.yml` does all systems on GitHub (Actions -> run workflow).
+- The programs are not signed. On the first start macOS asks for right click -> Open, Windows SmartScreen for "More info" -> "Run anyway" (`tools/dist/LIESMICH.txt`, in the zip, explains it in German).
+- A macOS zip runs on the architecture it was built on (Apple silicon or Intel).
+
 ## Quick start
 
 ```bash

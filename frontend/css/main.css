@@ -82,6 +82,10 @@ body {
   background: var(--c-panel);
 }
 
+#btn-quit {
+  padding: 2px 10px;
+}
+
 .toolbar {
   border-bottom: 1px solid var(--c-grid-major);
 }

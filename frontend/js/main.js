@@ -55,6 +55,7 @@ const ui = {
   edit: $('btn-edit'),
   newScene: $('btn-new'),
   del: $('btn-delete'),
+  quit: $('btn-quit'),
   editControls: $('edit-controls'),
   sceneName: $('scene-name'),
   save: $('btn-save'),
@@ -374,6 +375,7 @@ async function init() {
   try {
     const health = await api.health();
     state.mode = health.mode;
+    ui.quit.hidden = !health.can_quit;
     const groups = await refreshSceneList();
     const current = await api.getScene();
     if (current.name) {
@@ -481,6 +483,17 @@ ui.theme.addEventListener('click', () => {
 });
 ui.newScene.addEventListener('click', newLayout);
 ui.del.addEventListener('click', deleteLayout);
+ui.quit.addEventListener('click', async () => {
+  if (state.editing && model.dirty && !window.confirm('Die ungespeicherten Änderungen gehen verloren. MechSim trotzdem beenden?')) return;
+  try {
+    await api.quit();
+  } catch (err) {
+    state.lastError = `MechSim konnte nicht beendet werden: ${err.message}`;
+    updateUi();
+    return;
+  }
+  document.body.innerHTML = '<p style="font:16px system-ui;margin:3em;text-align:center">MechSim wurde beendet. Dieses Fenster kann geschlossen werden.</p>';
+});
 ui.save.addEventListener('click', saveLayout);
 ui.undo.addEventListener('click', () => model.undo());
 ui.redo.addEventListener('click', () => model.redo());
