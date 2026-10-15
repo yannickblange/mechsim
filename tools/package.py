@@ -142,6 +142,9 @@ def smoke_test(target: Path) -> None:
         else:
             with zipfile.ZipFile(target) as z:
                 z.extractall(tmp)
+            if sys.platform != "win32":  # extractall does not restore the executable bit (unzip and the Finder do)
+                for exe in tmp.glob("*/MechSim/MechSim"):
+                    exe.chmod(0o755)
         root = next(p for p in tmp.iterdir() if p.is_dir())
         exe = program(root)
         if not exe.exists():
