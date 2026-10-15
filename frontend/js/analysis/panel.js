@@ -293,7 +293,7 @@ export class AnalysisPanel {
       box.append(block);
     }
     const hasLoad = scene.elements.some((e) => e.type === 'load' && e.params.mode === 'harmonic');
-    const add = text(el('button', 'ana-btn ana-wide', { type: 'button', title: hasLoad ? 'Die harmonische Erregung entfernen' : 'Eine harmonische Kraft auf die erste Masse (Resonanz untersuchen)' }), hasLoad ? 'Erregung entfernen' : 'Erregung hinzufügen');
+    const add = text(el('button', `ana-add${hasLoad ? ' remove' : ''}`, { type: 'button', title: hasLoad ? 'Die harmonische Erregung entfernen' : 'Eine harmonische Kraft auf die erste Masse: zeigt den Frequenzgang und die Nähe zur Resonanz' }), hasLoad ? '− Erregung entfernen' : '+ Erregung hinzufügen');
     add.addEventListener('click', () => {
       if (hasLoad) removeExcitation(scene);
       else addExcitation(scene, (this.analysis && this.analysis.modes && this.analysis.modes[0] && this.analysis.modes[0].f0) || 1);

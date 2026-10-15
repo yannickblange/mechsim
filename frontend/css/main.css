@@ -1006,6 +1006,32 @@ input[type='text']:focus-visible {
   text-align: left;
 }
 
+.ana-add {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-accent);
+  background: var(--c-bg);
+  border: 2px solid var(--c-accent);
+  border-radius: 6px;
+}
+
+.ana-add:hover:not(:disabled) {
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border-color: var(--c-accent);
+}
+
+.ana-add.remove {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--c-muted);
+  border: 1px solid var(--c-muted);
+}
+
 .ana-wide {
   width: 100%;
   margin-top: 2px;
