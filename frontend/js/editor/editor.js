@@ -45,6 +45,7 @@ export class Editor {
     this.listeners = {
       key: (e) => this.onKey(e),
       context: (e) => this.onContextMenu(e),
+      dblclick: (e) => this.onDoubleClick(e),
       modelChange: () => this.onModelChange(),
     };
     this.interceptor = {
@@ -68,6 +69,7 @@ export class Editor {
     this.unsubscribe = this.model.subscribe(this.listeners.modelChange);
     window.addEventListener('keydown', this.listeners.key);
     this.canvas.addEventListener('contextmenu', this.listeners.context);
+    this.canvas.addEventListener('dblclick', this.listeners.dblclick);
     this.toolbox.hidden = false;
     this.setTool('select');
     this.onModelChange();
@@ -82,6 +84,7 @@ export class Editor {
     this.unsubscribe();
     window.removeEventListener('keydown', this.listeners.key);
     this.canvas.removeEventListener('contextmenu', this.listeners.context);
+    this.canvas.removeEventListener('dblclick', this.listeners.dblclick);
     this.closePopup();
     this.select(null);
     this.setToolboxOpen(false);
@@ -298,6 +301,17 @@ export class Editor {
 
   onContextMenu(e) {
     e.preventDefault();
+    this.openPropertiesAt(e);
+  }
+
+  // The same popup without the secondary click (a trackpad may have none, Ctrl+click may be taken): double-click an object with the select tool.
+  onDoubleClick(e) {
+    if (this.toolId !== 'select') return;
+    e.preventDefault();
+    this.openPropertiesAt(e);
+  }
+
+  openPropertiesAt(e) {
     const { world } = this.event(e);
     const hit = hitTest(this.model.scene, world, this.renderer.cam.scale);
     this.tool.cancel();

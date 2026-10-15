@@ -63,7 +63,7 @@ class Tool {
 // --- select -------------------------------------------------------------------------------------
 
 export class SelectTool extends Tool {
-  get hint() { return 'Objekt anklicken zum Auswählen, Entf löscht es. Rechtsklick öffnet die Eigenschaften.'; }
+  get hint() { return 'Objekt anklicken zum Auswählen, Entf löscht es. Rechtsklick (Mac: Ctrl+Klick) oder Doppelklick öffnet die Eigenschaften.'; }
 
   down(e) {
     const hit = hitTest(this.scene, e.world, this.scale);

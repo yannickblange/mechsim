@@ -546,7 +546,7 @@ input[type='text']:focus-visible {
 
 .props {
   position: absolute;
-  z-index: 6;
+  z-index: 9; /* above the floating dark-mode button (8) */
   max-height: calc(100% - 16px);
   overflow-y: auto;
   width: 270px;
@@ -610,6 +610,7 @@ input[type='text']:focus-visible {
 
 .props-buttons {
   display: flex;
+  flex-wrap: wrap; /* Übernehmen, Diagramm and Löschen are wider than the popup together */
   gap: 8px;
   margin-top: 8px;
 }
