@@ -21,9 +21,9 @@ MechSim runs on your own computer only; the browser just shows it (address `http
 
 | Your computer | File | On the download page |
 |---|---|---|
-| Mac with an Apple chip (M1, M2, M3, M4 ...) | `MechSim-0.8-macos-arm64.zip` | yes |
-| Windows | `MechSim-0.8-windows-x86_64.zip` | not yet - see below |
-| Mac with an Intel processor | `MechSim-0.8-macos-x86_64.zip` | not yet - see below |
+| Mac with an Apple chip (M1, M2, M3, M4 ...) | `MechSim-1.0-macos-arm64.zip` | yes |
+| Windows | `MechSim-1.0-windows-x86_64.zip` | not yet - see below |
+| Mac with an Intel processor | `MechSim-1.0-macos-x86_64.zip` | not yet - see below |
 
 *Which Mac do I have?* Apple menu  → **About This Mac**. "Chip: Apple M..." means Apple chip, "Processor: Intel ..." means Intel.
 
