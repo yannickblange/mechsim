@@ -111,6 +111,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "maxLength": 40, "description": "v0.9: a name shown instead of the id (the analysis window names masses, springs and dampers). Not used by the engine." },
         "type": { "enum": ["block", "disc", "node", "beam"] },
         "position": { "$ref": "#/$defs/vec2" },
         "angle": { "type": "number", "default": 0 },
@@ -236,6 +237,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "maxLength": 40, "description": "v0.9: a name shown instead of the id (the analysis window names masses, springs and dampers). Not used by the engine." },
         "type": { "enum": ["spring", "load", "damper", "bar"] },
         "a": { "$ref": "#/$defs/anchor" },
         "b": { "$ref": "#/$defs/anchor" },
@@ -379,6 +381,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "maxLength": 40, "description": "v0.9: a name shown instead of the id (the analysis window names masses, springs and dampers). Not used by the engine." },
         "type": {
           "enum": ["pin_support", "fixed_support", "roller_support", "rope", "rod", "pin_joint", "fixed_joint"]
         },

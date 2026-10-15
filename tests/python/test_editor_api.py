@@ -135,3 +135,38 @@ def test_delete_rejects_unknown_scenes_bad_names_and_never_touches_examples(clie
     examples = client.get("/api/scenes").json()["scenes"]
     assert examples and client.delete(f"/api/scenes/user/{examples[0]}").status_code == 404  # an example name is not a saved scene
     assert client.get("/api/scenes").json()["scenes"] == examples
+
+
+def test_analysis_endpoint_answers_for_a_scene_that_can_be_linearised_and_says_why_for_one_that_cannot(client):
+    import json
+    from pathlib import Path
+
+    scenes = Path(__file__).resolve().parents[2] / "scenes"
+    free = json.loads((scenes / "free_vibration.json").read_text())
+    r = client.post("/api/analysis", json={"scene": free, "t_max": 2.0, "samples": 200})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["supported"] is True
+    assert body["modes"][0]["zeta"] == pytest.approx(0.1, rel=1e-6)
+    assert len(body["response"]["t"]) >= 200
+    assert client.post("/api/analysis", json={"scene": free, "response": False}).json()["response"] is None  # the analysis alone
+
+    truss = json.loads((scenes / "truss_bridge.json").read_text())
+    r = client.post("/api/analysis", json={"scene": truss})
+    assert r.status_code == 200 and r.json()["supported"] is False and "Stäbe" in r.json()["reason"]
+
+    broken = dict(free, bodies="nope")
+    assert client.post("/api/analysis", json={"scene": broken}).status_code == 422
+
+
+def test_a_label_is_part_of_the_scene_format(client):
+    import json
+    from pathlib import Path
+
+    free = json.loads((Path(__file__).resolve().parents[2] / "scenes" / "free_vibration.json").read_text())
+    free["bodies"][0]["label"] = "Masse m"
+    free["elements"][0]["label"] = "Feder k"
+    free["constraints"][0]["label"] = "Führung"
+    assert client.post("/api/scene/apply", json={"scene": free}).status_code == 200
+    free["bodies"][0]["label"] = "x" * 41
+    assert client.post("/api/scene/apply", json={"scene": free}).status_code == 422

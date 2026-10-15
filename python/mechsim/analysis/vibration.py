@@ -533,6 +533,7 @@ def analyse(scene: dict[str, Any], *, t_max: float = 10.0, samples: int = 1500, 
         m, c, k = float(Mr[0, 0]), float(Cr[0, 0]), float(Kr[0, 0])
         out["single"] = {"m": m, "c": c, "k": k, "c_crit": 2 * math.sqrt(k * m) if k > 0 else None,
                          "damping_ratio": c / (2 * math.sqrt(k * m)) if k > 0 else None}
+    out["response"] = None
     if response:
         run = simulate or _simulate
         try:

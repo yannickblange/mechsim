@@ -5,9 +5,11 @@ import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 import mechsim
+from mechsim.analysis.vibration import analyse
 from mechsim.scene import (
     SceneInvalid,
     SceneNameInvalid,
@@ -17,6 +19,7 @@ from mechsim.scene import (
     list_scenes,
     list_user_scenes,
     save_user_scene,
+    validate_scene,
 )
 
 router = APIRouter(prefix="/api")
@@ -30,6 +33,13 @@ class LoadRequest(BaseModel):
 class ApplyRequest(BaseModel):
     scene: dict[str, Any]
     name: str | None = None
+
+
+class AnalysisRequest(BaseModel):
+    scene: dict[str, Any]
+    t_max: float = 10.0
+    samples: int = 1500
+    response: bool = True
 
 
 class SaveRequest(BaseModel):
@@ -111,3 +121,16 @@ async def delete_scene(name: str):
     except SceneNotFound:
         raise HTTPException(status_code=404, detail=f"unknown scene '{name}'")
     return {"deleted": name}
+
+
+@router.post("/analysis")
+async def analysis(body: AnalysisRequest):
+    """The linear vibration analysis of a scene (Eigenwerte, Dämpfungsgrad, frequency response, ...) and the engine's run of it
+    (`response`), for the analysis window. The scene is a copy that the window edits: the active simulation is not touched.
+    A scene that cannot be linearised answers 200 with `supported: false` and the reason."""
+    errors = validate_scene(body.scene)
+    if errors:
+        raise HTTPException(status_code=422, detail="; ".join(errors))
+    t_max = min(600.0, max(0.1, body.t_max))
+    samples = min(5000, max(10, body.samples))
+    return await run_in_threadpool(lambda: analyse(body.scene, t_max=t_max, samples=samples, response=body.response))
