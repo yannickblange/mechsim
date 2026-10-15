@@ -9,6 +9,6 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
-dist/
+/dist/
 build-dist/
 pyi-work/

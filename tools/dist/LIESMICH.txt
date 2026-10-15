@@ -1,0 +1,27 @@
+MechSim - Simulator fuer ebene Mehrkoerpersysteme
+===================================================
+
+STARTEN
+  macOS:    MechSim.app doppelklicken.
+  Windows:  MechSim\MechSim.exe doppelklicken (ein schwarzes Fenster bleibt offen: es zeigt, dass das Programm laeuft).
+  Nach wenigen Sekunden oeffnet sich der Browser mit MechSim (Adresse http://127.0.0.1:8000).
+  Das Programm laeuft nur auf diesem Rechner, es wird nichts ins Internet gesendet.
+
+BEENDEN
+  Unten rechts in MechSim auf "Beenden" klicken - oder den Browser-Tab schliessen: nach etwa einer Minute beendet sich MechSim von selbst.
+  Windows: Das schwarze Fenster zu schliessen beendet das Programm ebenfalls.
+  macOS: MechSim hat kein Dock-Symbol (es laeuft im Hintergrund); ein zweiter Doppelklick oeffnet nur den Browser erneut.
+
+BEIM ERSTEN START
+  Das Programm ist nicht von einem Entwickler-Zertifikat signiert, deshalb warnt das Betriebssystem:
+  macOS:    "MechSim kann nicht geoeffnet werden" -> Rechtsklick auf MechSim.app -> "Oeffnen" -> "Oeffnen".
+            Hilft das nicht: im Terminal  xattr -dr com.apple.quarantine <Pfad zu MechSim.app>
+  Windows:  "Der Computer wurde durch Windows geschuetzt" -> "Weitere Informationen" -> "Trotzdem ausfuehren".
+  Das ist nur beim ersten Start noetig.
+
+EIGENE AUFBAUTEN
+  Gespeicherte Aufbauten liegen im Ordner  Dokumente/MechSim/Aufbauten  (Dateien .json; Kopieren = Weitergeben).
+  Geloeschte Aufbauten liegen in  .trash  darin. Die Protokolldatei ist  Dokumente/MechSim/mechsim.log.
+
+PROBLEME
+  Startet das Programm nicht, steht der Grund in  Dokumente/MechSim/mechsim.log.
