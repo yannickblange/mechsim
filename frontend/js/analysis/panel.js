@@ -9,7 +9,7 @@ import { dataXAt, drawChart } from './chart.js';
 import { GAUGE_MAX, criticalText, eigenvalueText, gaugePosition, modeTitle, noteTone, overview, resonanceText, shapeText, sig, zoneOf } from './describe.js';
 import { frfModels, timeModel } from './models.js';
 import {
-  SLIDER_STEPS, addExcitation, applyParameter, fromSlider, initialOffsets, labelOf, parametersOf, removeExcitation, setLabel, toSlider,
+  SLIDER_STEPS, addExcitation, applyParameter, criticalTargets, fromSlider, initialOffsets, labelOf, parametersOf, removeExcitation, setLabel, toSlider,
 } from './params.js';
 
 const el = (tag, className, attrs = {}) => {
@@ -118,6 +118,7 @@ export class AnalysisPanel {
     const structure = this.structureKey();
     if (structure !== this.structure) { this.structure = structure; this.renderParams(); }
     this.renderSummary();
+    this.updateMarks();
     this.renderModes();
     this.renderCharts();
     this.updateSync();
@@ -266,6 +267,7 @@ export class AnalysisPanel {
   renderParams() {
     const box = this.paramsEl;
     box.replaceChildren();
+    this.ticks = new Map();
     const scene = this.state.scene;
     const params = parametersOf(scene, this.analysis && this.analysis.supported ? this.analysis : null);
     const objects = new Map();
@@ -299,6 +301,42 @@ export class AnalysisPanel {
       this.request();
     });
     box.append(add);
+    this.updateMarks();
+  }
+
+  // The marks on the sliders: where the value would take the system to the limit case D = 1 (one degree of freedom).
+  updateMarks() {
+    if (!this.ticks) return;
+    const a = this.analysis;
+    const crit = a && a.supported ? criticalTargets(this.state.scene, a, this.selectedMode) : { marks: {} };
+    for (const [id, { tick, p }] of this.ticks) {
+      const v = crit.marks[id];
+      const inside = v !== undefined && v >= p.lo && v <= p.hi;
+      tick.hidden = !inside;
+      if (!inside) continue;
+      tick.style.left = `${(toSlider(p, v) / SLIDER_STEPS) * 100}%`;
+      tick.title = `${p.symbol} = ${sig(v)} ${p.unit}: aperiodischer Grenzfall (D = 1)`;
+      tick.dataset.label = p.kind === 'damper' ? 'c_krit' : 'D = 1';
+    }
+  }
+
+  // The buttons that set the values to the limit case.
+  criticalBox(a, mode) {
+    const crit = criticalTargets(this.state.scene, a, this.selectedMode);
+    if (crit.critical) return text(el('p', 'ana-way'), 'Das System ist im aperiodischen Grenzfall: weniger Dämpfung schwingt wieder, mehr kriecht.');
+    if (!crit.actions.length) return null;
+    const box = el('div', 'ana-way');
+    box.append(text(el('span', 'ana-way-title'), 'Zum aperiodischen Grenzfall (D = 1):'));
+    for (const action of crit.actions) {
+      const b = text(el('button', 'ana-btn ana-way-btn', { type: 'button', title: 'Den Wert setzen und die Schwingung neu rechnen' }), action.label);
+      b.addEventListener('click', () => {
+        for (const { param, value } of action.sets) applyParameter(this.state, param, value);
+        this.renderParams();
+        this.schedule();
+      });
+      box.append(b);
+    }
+    return box;
   }
 
   paramRow(p) {
@@ -329,7 +367,15 @@ export class AnalysisPanel {
       range.value = String(toSlider(p, v));
       set(v);
     });
-    row.append(label, range, number, unit);
+    const wrap = el('span', 'ana-range-wrap');
+    wrap.append(range);
+    if (['mass', 'spring', 'damper'].includes(p.kind)) {
+      const tick = el('i', 'ana-tick');
+      tick.hidden = true;
+      wrap.append(tick);
+      this.ticks.set(p.id, { tick, p });
+    }
+    row.append(label, wrap, number, unit);
     return row;
   }
 
@@ -368,6 +414,8 @@ export class AnalysisPanel {
     card.append(head);
     if (mode.zeta !== null && mode.zeta !== undefined) card.append(this.gauge(mode.zeta));
     card.append(text(el('p', 'ana-crit'), criticalText(mode)));
+    const way = this.criticalBox(a, mode);
+    if (way) card.append(way);
 
     const rows = [];
     if (mode.omega0) {

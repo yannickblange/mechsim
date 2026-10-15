@@ -7,7 +7,7 @@ import test from 'node:test';
 import { criticalText, eigenvalueText, gaugePosition, modeTitle, overview, resonanceText, shapeText, sig, zoneOf } from '../../frontend/js/analysis/describe.js';
 import { dofSeries, energyModel, frfModels, phaseModel, poleModel, rangeOf, timeModel } from '../../frontend/js/analysis/models.js';
 import {
-  addExcitation, applyParameter, fromSlider, initialOffsets, labelOf, parametersOf, removeExcitation, setLabel, toSlider,
+  addExcitation, applyParameter, criticalTargets, fromSlider, initialOffsets, labelOf, parametersOf, removeExcitation, setLabel, toSlider,
 } from '../../frontend/js/analysis/params.js';
 
 const fx = JSON.parse(fs.readFileSync(new URL('./fixtures/analysis.json', import.meta.url), 'utf8'));
@@ -215,4 +215,31 @@ test('the poles in the complex plane and the rays of constant damping ratio', ()
   assert.equal(o.points.length, 4); // two real poles of the overdamped system and the faded pair of the reference
   assert.ok(o.points.slice(0, 2).every((p) => p.alpha < 1));
   assert.deepEqual(rangeOf([[1, 1, 1]]).min < 1, true);
+});
+
+test('the way to the critical case: c_krit, or the spring or mass that make D = 1 with the damping kept', () => {
+  // free: m = 1, k = 39.478, c = 1.2566 (D = 0.1), c_krit = 12.566
+  const t = criticalTargets(scene, fx.free);
+  assert.equal(t.critical, false);
+  assert.deepEqual(t.actions.map((a) => a.key), ['c', 'k', 'm']);
+  const [c, k, m] = t.actions.map((a) => a.sets[0].value);
+  close(c, fx.free.single.c_crit, 1e-9);
+  // with the new value the damping ratio is 1: c = 2 sqrt(k m)
+  const one = fx.free.single;
+  close(one.c, 2 * Math.sqrt(k * one.m), 1e-6);
+  close(one.c, 2 * Math.sqrt(one.k * m), 1e-6);
+  assert.ok(k < one.k && m < one.m, 'a softer spring and a lighter mass lead to the limit case from below');
+  assert.match(t.actions[0].label, /erhöhen/);
+  assert.ok(Object.keys(t.marks).length === 3);
+  // above the limit case the directions turn round
+  const over = criticalTargets(scene, fx.over);
+  assert.match(over.actions[0].label, /senken/);
+  assert.match(over.actions[1].label, /steifer/);
+});
+
+test('the way to the critical case: scaled dampers for several masses, nothing for an unsupported scene', () => {
+  const chain = JSON.parse(fs.readFileSync(new URL('../../scenes/two_mass_chain.json', import.meta.url), 'utf8'));
+  const t = criticalTargets(chain, fx.chain);
+  assert.ok(t.actions.length <= 1 && t.actions.every((a) => a.key === 'c'));
+  assert.deepEqual(criticalTargets(scene, fx.unsupported), { marks: {}, actions: [], critical: false });
 });

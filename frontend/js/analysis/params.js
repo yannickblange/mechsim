@@ -4,6 +4,8 @@
 // the start (deflection u0 from the rest position, velocity v0) and names (`label`). A parameter is { id, group, kind, objId, field,
 // symbol, name, unit, value, lo, hi, log } with a slider between lo and hi (logarithmic ones span 0.1 to 10 times the value).
 
+import { sig } from './describe.js';
+
 export const MASS_TYPES = ['block', 'disc', 'node'];
 const AXES = ['x', 'y', 'phi'];
 
@@ -147,6 +149,50 @@ export function initialOffsets(analysis) {
   for (const dof of (analysis && analysis.dofs) || []) {
     const v = ((analysis.initial_offset || {})[dof.body] || [0, 0, 0])[AXES.indexOf(dof.axis)] || 0;
     (out[dof.body] ||= {})[dof.axis] = v;
+  }
+  return out;
+}
+
+// --- the way to the critical case ---------------------------------------------------------------------------------------------
+
+// What takes the system to the aperiodic limit case (D = 1). One degree of freedom: the damping c_krit = 2 sqrt(k m), or, with the damping kept, the spring
+// k = c^2 / 4 m or the mass m = c^2 / 4 k. Several: every damper scaled by 1 / D of the chosen mode.
+// Returns { marks: { <param id>: value }, actions: [{ key, label, sets: [{ param, value }] }], critical: bool }. Pure.
+export function criticalTargets(scene, analysis, modeIndex = 0) {
+  const out = { marks: {}, actions: [], critical: false };
+  if (!analysis || !analysis.supported) return out;
+  const params = parametersOf(scene, analysis);
+  const dampers = params.filter((q) => q.kind === 'damper');
+  const springs = params.filter((q) => q.kind === 'spring');
+  const masses = params.filter((q) => q.kind === 'mass');
+  const one = analysis.single;
+  if (one && one.c_crit) {
+    const { m, c, k, c_crit: ck } = one;
+    const d = c / ck;
+    if (Math.abs(d - 1) < 1e-6) { out.critical = true; return out; }
+    const less = d < 1; // below the limit case: more damping, a softer spring or a lighter mass lead to it
+    if (dampers.length === 1) {
+      out.marks[dampers[0].id] = ck;
+      out.actions.push({ key: 'c', label: `Dämpfung ${less ? 'erhöhen' : 'senken'} auf c_krit = ${sig(ck)} N·s/m`, sets: [{ param: dampers[0], value: ck }] });
+    } else if (dampers.length > 1 && c > 0) {
+      out.actions.push({ key: 'c', label: `Alle Dämpfer ×${sig(ck / c)} (c = c_krit = ${sig(ck)} N·s/m)`, sets: dampers.map((q) => ({ param: q, value: q.value * (ck / c) })) });
+    }
+    if (c > 0 && springs.length === 1) {
+      const kk = (c * c) / (4 * m);
+      out.marks[springs[0].id] = kk;
+      out.actions.push({ key: 'k', label: `oder Feder ${less ? 'weicher' : 'steifer'}: k = ${sig(kk)} N/m`, sets: [{ param: springs[0], value: kk }] });
+    }
+    if (c > 0 && masses.length === 1) {
+      const mm = (c * c) / (4 * k);
+      out.marks[masses[0].id] = mm;
+      out.actions.push({ key: 'm', label: `oder Masse ${less ? 'kleiner' : 'größer'}: m = ${sig(mm)} kg`, sets: [{ param: masses[0], value: mm }] });
+    }
+    return out;
+  }
+  const mode = analysis.modes[modeIndex];
+  if (mode && mode.critical_scale && mode.zeta > 1e-9 && dampers.length) {
+    if (Math.abs(mode.zeta - 1) < 1e-6) { out.critical = true; return out; }
+    out.actions.push({ key: 'c', label: `Alle Dämpfer ×${sig(mode.critical_scale)}: Mode ${modeIndex + 1} wird kritisch`, sets: dampers.map((q) => ({ param: q, value: q.value * mode.critical_scale })) });
   }
   return out;
 }

@@ -949,6 +949,63 @@ input[type='text']:focus-visible {
   white-space: nowrap;
 }
 
+.ana-range-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.ana-tick {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 20px;
+  margin-left: -1px;
+  background: var(--c-compression);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.ana-tick::after {
+  content: attr(data-label);
+  position: absolute;
+  top: 19px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--c-compression);
+  white-space: nowrap;
+}
+
+.ana-row:has(.ana-tick:not([hidden])) {
+  margin-bottom: 10px;
+}
+
+.ana-way {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 7px;
+  padding: 6px 8px;
+  background: var(--c-bg);
+  border: 1px dashed var(--c-accent);
+  border-radius: 6px;
+}
+
+.ana-way-title {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-accent);
+}
+
+.ana-way-btn {
+  font-size: 12px;
+  text-align: left;
+}
+
 .ana-wide {
   width: 100%;
   margin-top: 2px;
@@ -1048,6 +1105,16 @@ input[type='text']:focus-visible {
   /* 0 ... 1 (oscillating, left half) | 1 ... 2 (creeping, right half); the limit case is the middle */
   background: linear-gradient(90deg, var(--c-plot-2) 0%, var(--c-plot-3) 40%, var(--c-accent) 50%, var(--c-plot-1) 75%, var(--c-plot-1) 100%);
   opacity: 0.85;
+}
+
+.ana-gauge-bar::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: 0;
+  border-left: 2px dashed var(--c-compression);
 }
 
 .ana-marker {
