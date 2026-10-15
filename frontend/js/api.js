@@ -50,6 +50,12 @@ export class Api {
     return this.#request('DELETE', `/api/scenes/user/${encodeURIComponent(name)}`);
   }
 
+  // Vibration analysis of a scene (v0.9): { scene, t_max, samples, offsets } -> modes, damping ratios, frequency response and the engine's run.
+  // A scene that cannot be linearised answers { supported: false, reason }.
+  async analyse(body) {
+    return this.#request('POST', '/api/analysis', body);
+  }
+
   // Opens the WebSocket (once) and reconnects after it closes.
   connect(onMessage, onConnectionChange) {
     if (this.socket) return;

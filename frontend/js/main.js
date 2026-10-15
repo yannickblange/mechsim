@@ -25,6 +25,7 @@ import { applyTheme, currentTheme, otherTheme } from './theme.js';
 import { Recorder } from './graphs/recorder.js';
 import { GraphManager } from './graphs/panel.js';
 import { massesAt } from './editor/hit.js';
+import { AnalysisPanel } from './analysis/panel.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -35,6 +36,13 @@ const model = new SceneModel();
 const stage = document.querySelector('.stage');
 const recorder = new Recorder();
 const graphs = new GraphManager({ stage, recorder, getTheme: () => renderer.theme });
+const analysis = new AnalysisPanel({
+  stage,
+  api,
+  getTheme: () => renderer.theme,
+  getScene: () => (state.editing ? model.toJSON() : state.scene),
+  onApply: applyAnalysisScene,
+});
 const editor = new Editor({ renderer, model, stage, onGraph: (id) => graphs.open(id) });
 
 const ui = {
@@ -53,6 +61,7 @@ const ui = {
   conn: $('conn'),
   error: $('error'),
   edit: $('btn-edit'),
+  analysis: $('btn-analysis'),
   newScene: $('btn-new'),
   del: $('btn-delete'),
   quit: $('btn-quit'),
@@ -269,6 +278,21 @@ async function selectScene(value) {
   }
 }
 
+// The analysis window hands over its changed copy of the scene (values and names): into the editor while editing, else it becomes the running scene.
+async function applyAnalysisScene(scene) {
+  if (state.editing) {
+    model.load(scene);
+    renderer.setScene(model.scene, { fit: false });
+    state.notify();
+    return;
+  }
+  const name = state.sceneName || 'analyse';
+  const { scene: applied } = await api.applyScene(scene, name);
+  state.setScene(name, applied, 'draft');
+  renderer.setScene(applied, { fit: false });
+  await refreshSceneList();
+}
+
 // --- edit mode ----------------------------------------------------------------------------------------
 
 function enterEdit(scene, displayName, origin = null) {
@@ -472,6 +496,7 @@ ui.edit.addEventListener('click', () => {
   else if (state.scene) enterEdit(state.scene, state.scene.name ?? state.sceneName, { source: state.sceneSource, name: state.sceneName });
   else enterEdit(SceneModel.emptyScene(), '');
 });
+ui.analysis.addEventListener('click', () => (analysis.isOpen ? analysis.close() : analysis.open()));
 ui.bend.addEventListener('change', () => {
   renderer.bendScale = Number(ui.bend.value);
 });
@@ -479,6 +504,7 @@ ui.theme.addEventListener('click', () => {
   applyTheme(otherTheme(currentTheme()));
   renderer.refreshTheme();
   graphs.refreshTheme();
+  analysis.refreshTheme();
   updateUi();
 });
 ui.newScene.addEventListener('click', newLayout);
@@ -514,7 +540,7 @@ function loop() {
 }
 
 // Handle for debugging in the browser console (and for UI tests).
-window.__mechsim = { api, state, renderer, model, editor, recorder, graphs };
+window.__mechsim = { api, state, renderer, model, editor, recorder, graphs, analysis };
 
 renderer.resize();
 init();

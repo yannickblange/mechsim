@@ -70,6 +70,20 @@ frame), so fast vibrations are not aliased by the 60 Hz display. The panels can 
 The default colour scheme is a white board with black lines, a grey grid and blue forces; the round **moon button** in the bottom-right corner
 switches to a dark one (remembered in the browser).
 
+## Vibration analysis (v0.9)
+
+The **Analyse** button (top bar) opens a window for spring-mass-damper systems (translations, any number of masses, supports allowed): the
+Dämpfungsgrad D with a gauge from 0 to 2 (the aperiodic limit case D = 1 in the middle), the Eigenwerte, Eigenfrequenz f₀, damped frequency,
+decay time, logarithmic decrement, `c_krit` and how far the damping is from the critical case; for several masses one chip per mode with its shape.
+Charts: deflection (with the envelope), velocity, phase plane, energy, frequency response (magnification and phase against η = Ω/ω₀) and the poles in
+the complex plane with rays of constant D. **Add an excitation** puts a harmonic force on the first mass and shows how near the resonance you are.
+
+On the left the values of the scene are sliders with number fields: masses, spring stiffness, damper constants, load amplitude and frequency, the start
+(deflection, velocity); every mass, spring and damper can be given a **name**. Every change re-runs the scene from the start; the first run stays as a
+faded **reference** (*Referenz = jetzt* sets a new one) and the analytic numbers update at once. *Übernehmen* writes the changed values and names back
+into the layout. Scenes that cannot be linearised honestly (Stäbe, Seile, Gelenke, Balken, contact with a surface) say why instead of showing wrong numbers.
+Background: `docs/formulation.md` (vibration analysis), `docs/tickets/v0.9/notes.md`.
+
 ## Supports, snapping and clamped Stabs (v0.7)
 
 - An **Einspannung** on a node clamps the elastic Stab that ends there (it was pinned before): the Eulerknickfall with a clamped foot buckles at

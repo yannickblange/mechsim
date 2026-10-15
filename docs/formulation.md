@@ -377,3 +377,17 @@ Energy is not exactly conserved but stays bounded (oscillates with relative ampl
   `delta = P L^3 / 3 E I + q L^4 / 8 E I`; first mode `omega = 3.516 sqrt(E I / (rho A L^4))` (the lumped model: `sqrt(3 E I / (33/140 m L^3))`).
 - Simply supported beam of mid-span load P: `delta = P L^3 / 48 E I`, under its own weight `5 q L^4 / 384 E I`.
 - Statically determinate truss: `2 j = m + r`; member forces by the method of joints (equilibrium of every node).
+
+## Vibration analysis, v0.9
+
+`mechsim.analysis.vibration.analyse(scene)` linearises a scene about its rest position: `M z'' + C z' + K z = b F(t)`.
+
+- `K = -df/dq`, `C = -df/dv` by central differences of the exact force law (gravity, springs, dampers, node damping); supports (pin, fixed, roller)
+  are eliminated through independent coordinates `q = q0 + N z`. The curvature of the constraint adds `N^T (-d(G^T lambda)/dq) N` (`lambda` the support reactions): this is
+  what gives a pendulum its restoring stiffness. The rest position is found by Newton's method on the constraint manifold.
+- Eigenvalues of `[[0, I], [-M^-1 K, -M^-1 C]]`: `lambda = -D w0 +- i w0 sqrt(1 - D^2)`, so `w0 = |lambda|`, `D = -Re(lambda) / |lambda|`, `w_d = w0 sqrt(1 - D^2)`,
+  decay constant `delta = D w0` (time `1/delta`), logarithmic decrement `2 pi D / sqrt(1 - D^2)`. One degree of freedom: `c_crit = 2 sqrt(k m)`, `D = c / c_crit`;
+  the distance to the critical case is the factor `1 / D`. `D < 1`: unterkritisch, `D = 1`: aperiodischer Grenzfall, `D > 1`: überkritisch (two real poles).
+- Frequency response of a harmonic load: `(K - Omega^2 M + i Omega C) X = b F`; magnification `V = |X| / x_static`, `eta = Omega / w0` (see "Harmonic load, v0.4").
+- Scenes with Stäbe, Seile, Gelenke, Balken, elastic bars, contact with a surface or without a spring are not linearised: `supported: false` with the reason.
+- Checked against closed forms and against the nonlinear engine: `tests/validation/test_v09_vibration.py`.
