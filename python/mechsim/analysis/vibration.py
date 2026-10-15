@@ -459,7 +459,7 @@ def _harmonic_loads(sys: _System, q: np.ndarray, N: np.ndarray, Mr: np.ndarray, 
         return [], None
     omegas = [m["omega0"] for m in modes if m["omega0"]]
     top = max([*omegas, *(2 * math.pi * float(ld["params"].get("frequency", 1.0)) for ld in loads), 1.0])
-    grid = list(np.linspace(0.0, 1.6 * top, 500))
+    grid = list(np.linspace(0.0, 3.2 * top, 800))
     for w0 in omegas:
         grid += list(w0 * (1 + np.linspace(-0.25, 0.25, 101)))
     grid += [2 * math.pi * float(ld["params"].get("frequency", 1.0)) for ld in loads]
