@@ -27,7 +27,7 @@ Whoever gives you MechSim sends you one zip file. Take the one that fits your co
 
 *Which Mac do I have?* Apple menu  → **About This Mac**. "Chip: Apple M..." means Apple chip, "Processor: Intel ..." means Intel.
 
-(If you have access to the GitHub repository: **Actions** → the newest green run of "Programm packen" → **Artifacts** at the bottom, one per system. They are kept for 90 days.)
+(From GitHub: <https://github.com/yannickblange/mechsim> → **Actions** → the newest green run of "Programm packen" → **Artifacts** at the bottom, one per system; you must be logged in to GitHub to download them, and they are kept for 90 days.)
 
 ### 2. Windows
 
@@ -95,13 +95,11 @@ git config --global user.name "Your Name"
 git config --global user.email "you@example.com"
 ```
 
-### B. Get access to the code
+### B. Log in to GitHub (only to send changes back)
 
-The repository is **private**: <https://github.com/yannickblange/mechsim>. You need
-1. a free GitHub account (<https://github.com/signup>), and
-2. an invitation: ask the owner (`yannickblange`) to add you under *Settings → Collaborators*. Accept the invitation in the e-mail you get from GitHub.
+The repository is **public**: <https://github.com/yannickblange/mechsim>. To **download** it you need no account and no login (step C). A free GitHub account (<https://github.com/signup>) is only needed to download the finished zips from the *Actions* page, to run the packaging workflow, or to send your own changes back: for the last one the owner must add you under *Settings → Collaborators* (or you work in your own copy, a "fork").
 
-The easiest way to log in from the terminal is the GitHub command-line tool:
+Logging in from the terminal is easiest with the GitHub command-line tool (optional):
 
 | | Install | Log in |
 |---|---|---|
@@ -114,10 +112,10 @@ The easiest way to log in from the terminal is the GitHub command-line tool:
 
 Go to the folder where the project should live (for example `cd ~/Documents` on macOS, `cd $HOME\Documents` on Windows) and run:
 ```bash
-gh repo clone yannickblange/mechsim
+git clone https://github.com/yannickblange/mechsim.git
 cd mechsim
 ```
-(Without `gh`: `git clone https://github.com/yannickblange/mechsim.git`; git then asks you to sign in.)
+(No login is needed to download. With the `gh` tool from step B, `gh repo clone yannickblange/mechsim` does the same.)
 
 ### D. Install what the build needs
 
@@ -186,6 +184,6 @@ After a `git pull` that changes the C++ code run the two `cmake` lines of step E
 | `No CMAKE_CXX_COMPILER could be found` (Windows) | The C++ part of the Build Tools is missing: start the Visual Studio Installer → Modify → tick **Desktop development with C++**. |
 | `ld: tapi error ... MacOSX27.sdk ... unknown architecture` (macOS) | A bug of the macOS 27 developer SDK. Use an older SDK: `ls /Library/Developer/CommandLineTools/SDKs`, then `export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk` (the newest one that is not 27) and build again; delete the folder `build` first. |
 | `xcode-select: error: command line tools are already installed` | Fine: they are installed. |
-| `fatal: repository ... not found` or a 404 when cloning | You have no access yet: accept the invitation (step B) and check `gh auth status`. |
+| `fatal: repository ... not found` when cloning | Check the address for typos (`https://github.com/yannickblange/mechsim.git`). For *pushing* you need write access (step B). |
 | `ModuleNotFoundError: No module named 'mechsim'` | `pip install -e .` was not run in the `.venv`, or you used the wrong Python: use `.venv/bin/python` (`.venv\Scripts\python.exe`). |
 | `libmechsim not found` | The `cmake` build of step E was not run (or failed): run it and read its last lines. |
