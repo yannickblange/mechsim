@@ -17,17 +17,17 @@ MechSim runs on your own computer only; the browser just shows it (address `http
 
 ### 1. Get the zip
 
-Whoever gives you MechSim sends you one zip file. Take the one that fits your computer:
+**Download page: <https://github.com/yannickblange/mechsim/releases/latest>** (no account needed; scroll to "Assets"). Take the zip that fits your computer:
 
-| Your computer | File |
-|---|---|
-| Windows | `MechSim-0.8-windows-x86_64.zip` |
-| Mac with an Apple chip (M1, M2, M3, M4 ...) | `MechSim-0.8-macos-arm64.zip` |
-| Mac with an Intel processor | `MechSim-0.8-macos-x86_64.zip` |
+| Your computer | File | On the download page |
+|---|---|---|
+| Mac with an Apple chip (M1, M2, M3, M4 ...) | `MechSim-0.8-macos-arm64.zip` | yes |
+| Windows | `MechSim-0.8-windows-x86_64.zip` | not yet - see below |
+| Mac with an Intel processor | `MechSim-0.8-macos-x86_64.zip` | not yet - see below |
 
 *Which Mac do I have?* Apple menu  → **About This Mac**. "Chip: Apple M..." means Apple chip, "Processor: Intel ..." means Intel.
 
-(From GitHub: <https://github.com/yannickblange/mechsim> → **Actions** → the newest green run of "Programm packen" → **Artifacts** at the bottom, one per system; you must be logged in to GitHub to download them, and they are kept for 90 days.)
+The Windows and Intel-Mac zips are not on the download page yet. Until they are: ask the owner for the file, or take it from GitHub: <https://github.com/yannickblange/mechsim/actions> → the newest green run of "Programm packen" → **Artifacts** at the bottom, one per system (you must be logged in to GitHub to download them; they are kept for 90 days).
 
 ### 2. Windows
 
